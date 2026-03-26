@@ -1,6 +1,6 @@
 # Evaluation
 
-This document is about evaluating one tool. For harness-level evaluation, see [../harnesses/evaluation.md](../harnesses/evaluation.md).
+This document is about evaluating one tool.
 
 ## What To Evaluate
 

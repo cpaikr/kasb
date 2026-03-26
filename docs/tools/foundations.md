@@ -1,6 +1,6 @@
 # Foundations
 
-This document is about single-tool design. For multi-agent composition, see [../harnesses/foundations.md](../harnesses/foundations.md).
+This document defines the repo's baseline for single-tool design.
 
 ## What An Agent Tool Is
 
