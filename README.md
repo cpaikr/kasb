@@ -2,7 +2,7 @@
 
 Markdown-first guidance for designing agent tools.
 
-This repo is not one tool implementation. It is a documentation framework for designing agent tools:
+This repo is not one tool implementation. It is a documentation framework for designing agent tools, with the KASB standards tool as the current concrete project:
 
 - how to design one good agent-facing tool.
 
@@ -15,18 +15,25 @@ This repo is not one tool implementation. It is a documentation framework for de
 
 ## Read In This Order
 
-1. [docs/tools/foundations.md](docs/tools/foundations.md)
+1. [VISION.md](VISION.md)
+   Product-level goal and scope for the current project.
+2. [docs/tools/foundations.md](docs/tools/foundations.md)
    Core principles for tool design.
-2. Tool track:
+3. Tool track:
    [docs/tools/contracts.md](docs/tools/contracts.md), [docs/tools/transport-decision.md](docs/tools/transport-decision.md), [docs/tools/evaluation.md](docs/tools/evaluation.md)
-3. Templates:
+4. [plans/kasb-standards-source-investigation.md](plans/kasb-standards-source-investigation.md)
+   Evidence-gathering plan before the concrete spec.
+5. Templates:
    [docs/tools/templates/tool-spec-template.md](docs/tools/templates/tool-spec-template.md)
-4. Relevant tool playbook in [docs/tools/playbooks/](docs/tools/playbooks/)
+6. Relevant tool playbook in [docs/tools/playbooks/](docs/tools/playbooks/)
    Tool-family-specific guidance.
 
 ## Repo Map
 
 - [ARCHITECTURE.md](ARCHITECTURE.md): document ownership and contributor flow
+- [VISION.md](VISION.md): product vision for the current KASB standards tool
+- [plans/](plans/): active investigations and phased work plans
+- [docs/specs/](docs/specs/README.md): stable capability specs once the evidence exists
 - [docs/tools/foundations.md](docs/tools/foundations.md): what makes a good agent tool
 - [docs/tools/contracts.md](docs/tools/contracts.md): input, output, references, and errors
 - [docs/tools/transport-decision.md](docs/tools/transport-decision.md): when to use CLI, MCP, or both

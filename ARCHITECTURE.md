@@ -6,6 +6,10 @@ This repo is a documentation system for future tool implementations. The archite
 
 - [README.md](README.md)
   Orientation, repo stance, and reading order.
+- [VISION.md](VISION.md)
+  Product-level goal, scope, and non-goals for the current project.
+- [plans/](plans/README.md)
+  Active investigations, phased work, and pre-spec planning.
 - [docs/tools/](docs/tools/)
   Canonical home for single-tool design.
 - [docs/tools/foundations.md](docs/tools/foundations.md)
@@ -25,18 +29,21 @@ This repo is a documentation system for future tool implementations. The archite
 - [docs/tools/templates/](docs/tools/templates/)
   Reusable structure for future tool specs.
 - [docs/specs/](docs/specs/)
-  Concrete tool and investigation plans for specific capabilities.
+  Stable, evidence-backed capability specs.
 
 ## Contributor Flow
 
 1. Start with [README.md](README.md).
-2. If the work is about one capability, start in [docs/tools/foundations.md](docs/tools/foundations.md).
-3. Write or update the relevant spec with [docs/tools/templates/tool-spec-template.md](docs/tools/templates/tool-spec-template.md).
-4. Put capability-specific plans and scoped specs in [docs/specs/](docs/specs/).
-5. Keep tool rules in the tool docs; link to canonical guidance instead of duplicating it.
+2. If the work is about the current product, read [VISION.md](VISION.md) first.
+3. Use [docs/tools/foundations.md](docs/tools/foundations.md) and the linked tool docs to shape the design.
+4. Put open-ended investigation and phased planning in [plans/](plans/README.md).
+5. Promote only evidence-backed, implementation-ready capability specs into [docs/specs/](docs/specs/README.md).
+6. Keep tool rules in the tool docs; link to canonical guidance instead of duplicating it.
 
 ## Invariants
 
+- Keep product vision at the repo root, not mixed into specs or plans.
+- Keep unstable planning material in `plans/`, not `docs/specs/`.
 - Keep single-tool philosophy in [docs/tools/foundations.md](docs/tools/foundations.md), not scattered across the repo.
 - Keep tool contract rules in [docs/tools/contracts.md](docs/tools/contracts.md); playbooks should only add family-specific constraints.
 - Keep repo structure and document ownership here, not in the topic docs.

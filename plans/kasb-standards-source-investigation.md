@@ -1,10 +1,10 @@
-# KASB Standards Reverse-Engineering Plan
+# KASB Standards Source Investigation Plan
 
 ## Scope
 
-This document is a future work plan only.
+This is an investigation plan, not a product spec.
 
-It does not attempt to reverse engineer the site now. Its purpose is to define how that investigation should be done later and what artifacts it should produce.
+Its job is to define how we learn the source, what evidence to collect, and which artifacts should exist before writing the v1 spec.
 
 ## Why This Comes First
 
@@ -19,6 +19,8 @@ Questions that block a real spec:
 - what rate limits, anti-bot behavior, or terms constraints exist
 
 Without that knowledge, the public tool contract would be guesswork.
+
+The vision is in [../VISION.md](../VISION.md). This document exists to turn that vision into evidence-backed design inputs.
 
 ## Investigation Principles
 
@@ -126,7 +128,7 @@ Deliverable:
 7. Add tests and scenario evals.
 8. Add an MCP adapter only after the core contract is stable.
 
-## Suggested Future Deliverables
+## Expected Artifacts
 
 - `docs/specs/kasb-standards-source-map.md`
   site map and entity glossary
