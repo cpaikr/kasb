@@ -94,4 +94,4 @@ These belong to investigation, not the vision:
 - how much normalization titles, clauses, and examples need
 - whether interpretation materials belong in v1 or later
 
-See [plans/kasb-standards-source-investigation.md](plans/kasb-standards-source-investigation.md) for the evidence-gathering plan that should answer them.
+See [PLAN.md](PLAN.md) for the active investigation step that should answer them.

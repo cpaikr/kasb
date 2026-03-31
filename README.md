@@ -27,11 +27,9 @@ This repo is not one tool implementation. It is a documentation framework for de
    Core principles for tool design.
 6. Tool track:
    [docs/tools/contracts.md](docs/tools/contracts.md), [docs/tools/transport-decision.md](docs/tools/transport-decision.md), [docs/tools/evaluation.md](docs/tools/evaluation.md)
-7. [plans/kasb-standards-source-investigation.md](plans/kasb-standards-source-investigation.md)
-   Evidence-gathering plan before the concrete spec.
-8. Templates:
+7. Templates:
    [docs/tools/templates/tool-spec-template.md](docs/tools/templates/tool-spec-template.md)
-9. Relevant tool playbook in [docs/tools/playbooks/](docs/tools/playbooks/)
+8. Relevant tool playbook in [docs/tools/playbooks/](docs/tools/playbooks/)
    Tool-family-specific guidance.
 
 ## Repo Map
@@ -41,7 +39,6 @@ This repo is not one tool implementation. It is a documentation framework for de
 - [ROADMAP.md](ROADMAP.md): strategic direction and phased sequencing
 - [TODO.md](TODO.md): ordered near-term work queue
 - [PLAN.md](PLAN.md): the one active detailed plan
-- [plans/](plans/): supporting investigations and evidence-gathering documents
 - [docs/specs/](docs/specs/README.md): stable capability specs once the evidence exists
 - [docs/tools/foundations.md](docs/tools/foundations.md): what makes a good agent tool
 - [docs/tools/contracts.md](docs/tools/contracts.md): input, output, references, and errors
