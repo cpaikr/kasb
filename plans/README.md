@@ -1,6 +1,14 @@
 # Plans
 
-This directory holds active work plans, investigations, and decision documents that are not yet stable specs.
+This directory holds supporting investigations and decision documents that are not yet stable specs.
+
+The root planning files own the active planning loop:
+
+- `ROADMAP.md` for strategy and sequencing
+- `TODO.md` for the near-term queue
+- `PLAN.md` for the one active detailed job
+
+Use `plans/` when the active job needs deeper evidence, transcripts, or research notes than `PLAN.md` should hold.
 
 Put a document here when it describes:
 
