@@ -4,8 +4,6 @@ Keep this as the ordered near-term queue. Expand only the active item in `PLAN.m
 
 ## Next Up
 
-1. Reverse engineer `https://db.kasb.or.kr/standard/` network calls, params, payloads, and response types.
-2. Write the source map and request inventory from observed browser traffic.
-3. Replay candidate read operations outside the browser and record cookie, header, and session requirements.
-4. Derive the stable identifier and reference model for standards, sections, and paragraphs.
-5. Draft the v1 capability spec in `docs/specs/` from the validated evidence.
+1. Derive the stable identifier and reference model for standards, route documents, index documents, and paragraphs from `docs/research/kasb-standard-source-map.md`.
+2. Draft the v1 capability spec in `docs/specs/` from the validated evidence.
+3. Define the minimal v1 read-only operation set around standard search, section lookup, and paragraph retrieval.

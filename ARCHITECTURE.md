@@ -14,6 +14,8 @@ This repo is a documentation system for future tool implementations. The archite
   Ordered near-term queue of concrete candidate tasks.
 - [PLAN.md](PLAN.md)
   The one active detailed plan for the current job.
+- [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md)
+  Durable source investigation notes and request inventory for the KASB site.
 - [docs/tools/](docs/tools/)
   Canonical home for single-tool design.
 - [docs/tools/foundations.md](docs/tools/foundations.md)
@@ -41,13 +43,15 @@ This repo is a documentation system for future tool implementations. The archite
 2. If the work is about the current product, read [VISION.md](VISION.md) first.
 3. Use [docs/tools/foundations.md](docs/tools/foundations.md) and the linked tool docs to shape the design.
 4. Put strategic sequencing in [ROADMAP.md](ROADMAP.md), the near-term queue in [TODO.md](TODO.md), and the active job breakdown in [PLAN.md](PLAN.md).
-5. Promote only evidence-backed, implementation-ready capability specs into [docs/specs/](docs/specs/README.md).
-6. Keep tool rules in the tool docs; link to canonical guidance instead of duplicating it.
+5. Keep source investigation notes in [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md) until the contract is stable.
+6. Promote only evidence-backed, implementation-ready capability specs into [docs/specs/](docs/specs/README.md).
+7. Keep tool rules in the tool docs; link to canonical guidance instead of duplicating it.
 
 ## Invariants
 
 - Keep product vision at the repo root, not mixed into specs or plans.
 - Keep roadmap, todo, and the one active plan at the repo root.
+- Keep source investigation notes outside `docs/specs/`; only promote stable contract decisions into specs.
 - Keep single-tool philosophy in [docs/tools/foundations.md](docs/tools/foundations.md), not scattered across the repo.
 - Keep tool contract rules in [docs/tools/contracts.md](docs/tools/contracts.md); playbooks should only add family-specific constraints.
 - Keep repo structure and document ownership here, not in the topic docs.

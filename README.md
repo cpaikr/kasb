@@ -39,6 +39,7 @@ This repo is not one tool implementation. It is a documentation framework for de
 - [ROADMAP.md](ROADMAP.md): strategic direction and phased sequencing
 - [TODO.md](TODO.md): ordered near-term work queue
 - [PLAN.md](PLAN.md): the one active detailed plan
+- [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md): captured source evidence and request inventory for the KASB site
 - [docs/specs/](docs/specs/README.md): stable capability specs once the evidence exists
 - [docs/tools/foundations.md](docs/tools/foundations.md): what makes a good agent tool
 - [docs/tools/contracts.md](docs/tools/contracts.md): input, output, references, and errors

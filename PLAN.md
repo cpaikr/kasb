@@ -1,39 +1,39 @@
 # Plan
 
-Current job: reverse engineer the KASB standards site request layer.
+Current job: derive the KASB identifier and reference model from the captured source evidence.
 
 ## Goal
 
-Understand how `https://db.kasb.or.kr/standard/` actually fetches data so the next spec is based on observed requests, not guesses.
+Turn the findings in `docs/research/kasb-standard-source-map.md` into a clear public reference model for the next spec step.
 
 ## In Scope
 
-- capture search and retrieval flows from `https://db.kasb.or.kr/standard/`
-- record methods, paths, query params, bodies, headers, cookies, and response types
-- distinguish stable source identifiers from UI-only parameters
+- separate stable public identifiers from route-only or UI-only ids
+- compare `stdNum`, `paraNum`, `uniqueKey`, `titleDocumentId`, and `indexDocumentId`
+- decide which ids the future read-only tool should accept and return
+- record any unresolved mappings that still block the spec
 
 ## Out Of Scope
 
-- full tool implementation
-- broad coverage beyond the standards source
-- non-read flows
+- full capability schema drafting
+- transport or adapter decisions
+- write or auth flows
 
 ## Work Plan
 
-1. Map the visible flows for search, standard detail, and paragraph retrieval.
-2. Capture representative network traffic for those flows.
-3. Record the request shapes that look reusable from outside the browser.
-4. Summarize what appears stable enough to carry into the next spec step.
+1. Restate the two document-id spaces and the evidence that they differ.
+2. Define the canonical reference tuple for standard, section, and paragraph retrieval.
+3. Mark which upstream fields are safe to expose, derive, or hide.
+4. Record the remaining mapping gaps that the v1 spec must acknowledge explicitly.
 
 ## Open Questions
 
-- Does the site expose reproducible JSON or XHR endpoints for the core flows?
-- Which cookies, tokens, or headers are required outside the browser?
-- What identifiers are stable enough to support paragraph-level citation?
-- Where does the site mix content data with presentation formatting?
+- Should the public contract expose `indexDocumentId`, or should section retrieval be defined through a higher-level path model?
+- Is there a deterministic mapping from `titleDocumentId` to `indexDocumentId`, or should route ids stay internal?
+- When a caller wants one exact paragraph, is `paraNum` alone sufficient, or do some ambiguous cases require an accompanying section key?
 
 ## Exit Criteria
 
-- at least one search or retrieval flow is captured clearly
-- the key params, headers, and response shapes are recorded
-- we can state the next spec step from evidence instead of guesswork
+- the public identifier model is clear enough to draft the v1 read-only operations
+- the doc-id mismatch is explicitly accounted for in the spec inputs and outputs
+- any unresolved identifier gaps are listed as conscious constraints, not hidden assumptions
