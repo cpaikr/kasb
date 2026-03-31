@@ -4,6 +4,6 @@ Keep this as the ordered near-term queue. Expand only the active item in `PLAN.m
 
 ## Next Up
 
-1. Derive the stable identifier and reference model for standards, route documents, index documents, and paragraphs from `docs/research/kasb-standard-source-map.md`.
-2. Draft the v1 capability spec in `docs/specs/` from the validated evidence.
-3. Define the minimal v1 read-only operation set around standard search, section lookup, and paragraph retrieval.
+1. Scaffold the repo-local split between `packages/kasb-tool` and `apps/kasb-scraper`.
+2. Define the first SQLite schema for normalized records, selected raw payloads, and scrape metadata.
+3. Capture fixture responses for search, structure, section, and paragraph retrieval from the live `https://db.kasb.or.kr/api/` surface.

@@ -1,67 +1,127 @@
 # Architecture
 
-This repo is a documentation system for future tool implementations. The architecture is the document boundary: each file should own one layer of the design, and shared guidance should live in exactly one canonical place.
+This repo is no longer docs-only. The target system has two implementation tracks:
+
+- a reusable KASB access tool that queries `https://db.kasb.or.kr/api/` with typed operations
+- a scraper that uses that tool to collect standards data and persist it to a database
+
+The docs still matter, but they now support implementation instead of standing in for it.
+
+## Start Here
+
+1. Read [README.md](README.md) for repo orientation.
+2. Read [VISION.md](VISION.md) for product scope.
+3. Read [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md) for the current contract target.
+4. Read [PRMOPT.md](PRMOPT.md) for the active implementation discussion about stack, tooling, and viable build paths.
+
+## Target Shape
+
+The intended root layout is:
+
+- `packages/kasb-tool/`
+  Reusable read-only KASB client, domain types, normalization, and CLI entry points.
+- `apps/kasb-scraper/`
+  Scraping jobs that call `kasb-tool`, decide crawl scope, and persist normalized records.
+- `db/`
+  Schema, migrations, and database bootstrap for scraper persistence.
+- `docs/specs/`
+  Stable capability specs that the tool implementation must satisfy.
+- `docs/research/`
+  Source investigation notes and upstream evidence.
+
+If the exact directory names change, preserve the same split: reusable tool core first, scraper second, persistence as a separate seam.
+
+## Component Map
+
+### `kasb-tool`
+
+Owns:
+
+- the base API client for `https://db.kasb.or.kr/api/`
+- typed operations such as standard search, structure lookup, section retrieval, and paragraph retrieval
+- identifier handling for `stdNum`, `indexDocumentId`, `paraNum`, and `uniqueKey`
+- response normalization and typed errors
+- fixture-backed tests
+- a CLI or scriptable adapter for local verification
+
+Does not own:
+
+- crawl scheduling
+- persistence policy
+- long-running sync state
+
+### `kasb-scraper`
+
+Owns:
+
+- choosing what to scrape and in what order
+- calling `kasb-tool` repeatedly without re-implementing API rules
+- persistence into the project database
+- resumability, deduplication, and scrape bookkeeping
+- refresh or backfill jobs
+
+Does not own:
+
+- raw upstream contract knowledge that already belongs in `kasb-tool`
+- ad hoc API calls that bypass the shared client
+
+### Database Layer
+
+Owns:
+
+- normalized storage for standards, sections, paragraphs, and scrape runs
+- migration history
+- persistence utilities used by the scraper
+
+The database is a scraper concern, not a tool concern. The tool returns structured results; the scraper decides what to store and how to model crawl state.
+
+## Runtime Flow
+
+The main flow should be:
+
+1. `kasb-tool` sends typed read-only requests to the live KASB API.
+2. `kasb-tool` validates and normalizes upstream payloads into stable domain objects.
+3. `kasb-scraper` uses those operations to traverse standards, sections, and paragraphs.
+4. `kasb-scraper` writes normalized records and scrape metadata to the database.
+5. Downstream analysis or export work reads from the database instead of hitting KASB directly.
+
+That split keeps source-specific logic in one place and prevents the scraper from turning into a second undocumented client.
 
 ## Document Ownership
 
 - [README.md](README.md)
-  Orientation, repo stance, and reading order.
+  Repo orientation and reading order.
 - [VISION.md](VISION.md)
-  Product-level goal, scope, and non-goals for the current project.
+  Product goal, scope, and non-goals.
 - [ROADMAP.md](ROADMAP.md)
-  Strategic direction, milestones, and intentional deferrals.
+  Strategic sequencing.
 - [TODO.md](TODO.md)
-  Ordered near-term queue of concrete candidate tasks.
+  Ordered near-term queue.
 - [PLAN.md](PLAN.md)
-  The one active detailed plan for the current job.
-- [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md)
-  Durable source investigation notes and request inventory for the KASB site.
-- [docs/tools/](docs/tools/)
-  Canonical home for single-tool design.
-- [docs/tools/foundations.md](docs/tools/foundations.md)
-  Core principles for designing agent tools.
-- [docs/tools/contracts.md](docs/tools/contracts.md)
-  Operation shape, inputs, outputs, references, and errors.
-- [docs/tools/transport-decision.md](docs/tools/transport-decision.md)
-  How to choose CLI, MCP, SDK, or more than one.
-- [docs/tools/evaluation.md](docs/tools/evaluation.md)
-  Scenario-driven tool quality criteria and failure testing.
-- [docs/tools/lifecycle.md](docs/tools/lifecycle.md)
-  Build sequence from problem definition to stable tool.
-- [docs/tools/portfolio.md](docs/tools/portfolio.md)
-  Cross-tool conventions and shared substrate.
-- [docs/tools/playbooks/](docs/tools/playbooks/)
-  Tool-family-specific guidance that extends, rather than repeats, the shared tool docs.
-- [docs/tools/templates/](docs/tools/templates/)
-  Reusable structure for future tool specs.
+  The one active detailed plan.
+- [PRMOPT.md](PRMOPT.md)
+  Active discussion brief for implementation choices, viable stacks, and build strategy.
 - [docs/specs/](docs/specs/)
-  Stable, evidence-backed capability specs.
-
-## Contributor Flow
-
-1. Start with [README.md](README.md).
-2. If the work is about the current product, read [VISION.md](VISION.md) first.
-3. Use [docs/tools/foundations.md](docs/tools/foundations.md) and the linked tool docs to shape the design.
-4. Put strategic sequencing in [ROADMAP.md](ROADMAP.md), the near-term queue in [TODO.md](TODO.md), and the active job breakdown in [PLAN.md](PLAN.md).
-5. Keep source investigation notes in [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md) until the contract is stable.
-6. Promote only evidence-backed, implementation-ready capability specs into [docs/specs/](docs/specs/README.md).
-7. Keep tool rules in the tool docs; link to canonical guidance instead of duplicating it.
+  Stable capability specs for the tool and related implementation targets.
+- [docs/research/](docs/research/)
+  Source evidence and upstream investigation notes.
+- [docs/tools/](docs/tools/)
+  Cross-cutting design guidance for agent-facing tools.
 
 ## Invariants
 
-- Keep product vision at the repo root, not mixed into specs or plans.
-- Keep roadmap, todo, and the one active plan at the repo root.
-- Keep source investigation notes outside `docs/specs/`; only promote stable contract decisions into specs.
-- Keep single-tool philosophy in [docs/tools/foundations.md](docs/tools/foundations.md), not scattered across the repo.
-- Keep tool contract rules in [docs/tools/contracts.md](docs/tools/contracts.md); playbooks should only add family-specific constraints.
-- Keep repo structure and document ownership here, not in the topic docs.
-- Prefer links to canonical guidance over repeating the same rule in multiple files.
+- Keep the KASB API contract in one reusable tool module. Do not duplicate request logic inside the scraper.
+- Treat `indexDocumentId` as the v1 public section id and keep `titleDocumentId` internal unless the contract changes explicitly.
+- Keep scraping policy separate from retrieval logic. The tool fetches; the scraper decides traversal and persistence.
+- Keep database writes out of the core tool module.
+- Keep stable specs in [docs/specs/](docs/specs/); keep upstream investigation in [docs/research/](docs/research/).
+- Prefer one shared typed language boundary between the tool, scraper, and CLI unless a stronger reason justifies a split stack.
 
-## Future Expansion
+## Near-Term Direction
 
-If implementations are added later, preserve the same split:
+The next implementation milestone is:
 
-- `spec/` or `docs/specs/` for stable capability specs
-- `libs/` or `packages/` for capability cores
-- `adapters/` for CLI, MCP, SDK, or HTTP exposure
-- `evals/` for scenario-driven tests and transcripts
+- create the first `kasb-tool` module
+- capture fixtures for the v1 operations
+- define the scraper-facing database schema
+- build the first `kasb-scraper` job on top of the shared tool

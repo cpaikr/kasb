@@ -1,39 +1,60 @@
 # Plan
 
-Current job: derive the KASB identifier and reference model from the captured source evidence.
+Current job: bootstrap the first read-only implementation slice from the v1 spec.
 
 ## Goal
 
-Turn the findings in `docs/research/kasb-standard-source-map.md` into a clear public reference model for the next spec step.
+Turn `docs/specs/kasb-standards-v1.md` into an implementation-ready layout with the first typed core surface defined.
+
+## Deliverable
+
+- a chosen code layout for the reusable core, fixtures, and CLI adapter
+- a first fixture set for the four v1 operations
+- the initial typed client and domain model boundary for `search_standards`, `get_standard_structure`, `get_section`, and `get_paragraph`
+
+## Decisions
+
+- implement in this repo with `packages/kasb-tool` and `apps/kasb-scraper`
+- use SQLite for the first scraper milestone
+- persist normalized records as the primary product
+- also persist selected raw upstream JSON payloads plus scrape metadata for debugging, drift detection, and re-normalization
+- start raw payload capture with the core retrieval endpoints, not every possible endpoint
 
 ## In Scope
 
-- separate stable public identifiers from route-only or UI-only ids
-- compare `stdNum`, `paraNum`, `uniqueKey`, `titleDocumentId`, and `indexDocumentId`
-- decide which ids the future read-only tool should accept and return
-- record any unresolved mappings that still block the spec
+- create the repo-local implementation split between the shared tool and scraper
+- define the first package or module boundaries
+- capture stable fixture examples from the live `/api/` surface
+- define the typed shapes needed for the v1 operations
+- start the read-only core before any MCP or browser-facing adapter work
 
 ## Out Of Scope
 
-- full capability schema drafting
-- transport or adapter decisions
-- write or auth flows
+- MCP adapter work
+- auth, write flows, or accounts
+- caching, persistence, or background sync
+- broad source normalization beyond the v1 spec
+
+## Inputs
+
+- `docs/specs/kasb-standards-v1.md`
+- `docs/research/kasb-standard-source-map.md`
+- `docs/tools/contracts.md`
+- `ARCHITECTURE.md`
+- `PRMOPT.md`
 
 ## Work Plan
 
-1. Restate the two document-id spaces and the evidence that they differ.
-2. Define the canonical reference tuple for standard, section, and paragraph retrieval.
-3. Mark which upstream fields are safe to expose, derive, or hide.
-4. Record the remaining mapping gaps that the v1 spec must acknowledge explicitly.
-
-## Open Questions
-
-- Should the public contract expose `indexDocumentId`, or should section retrieval be defined through a higher-level path model?
-- Is there a deterministic mapping from `titleDocumentId` to `indexDocumentId`, or should route ids stay internal?
-- When a caller wants one exact paragraph, is `paraNum` alone sufficient, or do some ambiguous cases require an accompanying section key?
+1. Scaffold the repo-local package layout for `kasb-tool` and `kasb-scraper`.
+2. Define the SQLite schema for normalized records, `scrape_runs`, and raw payload storage.
+3. Capture the smallest useful fixture corpus for search, structure, section, and paragraph retrieval.
+4. Define the typed result envelope and domain entities from the spec.
+5. Implement the read-only HTTP client against `https://db.kasb.or.kr/api/`.
+6. Add focused tests around the known identifier pitfalls, especially route ids versus retrieval ids.
 
 ## Exit Criteria
 
-- the public identifier model is clear enough to draft the v1 read-only operations
-- the doc-id mismatch is explicitly accounted for in the spec inputs and outputs
-- any unresolved identifier gaps are listed as conscious constraints, not hidden assumptions
+- the repo has a clear implementation location and package split
+- the first SQLite schema covers normalized records, scrape metadata, and selected raw payloads
+- fixture-backed work can begin without reopening the identifier investigation
+- the first core module boundary is clear enough to start coding without revisiting the contract

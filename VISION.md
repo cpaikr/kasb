@@ -9,7 +9,7 @@
 
 ## Goal
 
-Build a tool that gives agents a stable, programmatic way to search and retrieve Korean accounting standards from `https://db.kasb.or.kr/standard/`.
+Build a reusable capability that gives agents and scraper jobs a stable, programmatic way to search and retrieve Korean accounting standards from KASB.
 
 The target experience should be closer to `yfinance` than browser automation:
 
@@ -56,7 +56,7 @@ The product should eventually support a narrow set of agent-facing capabilities:
 - read-only access to public standards content
 - stable references to standards, sections, and paragraphs where possible
 - enough metadata to verify origin, completeness, and source URL
-- a core capability that can later back a CLI, Python package, and MCP adapter
+- a core capability that can back a CLI, scraper jobs, and later SDK or MCP adapters
 
 ### Out Of Scope
 
@@ -85,13 +85,18 @@ The product is successful when an agent can reliably:
 - cite the standard and paragraph number in its answer
 - compare related paragraphs with low tool-call overhead
 
-## Open Questions
+## Current State
 
-These belong to investigation, not the vision:
+The identifier model and public-read API surface are now established enough to support implementation:
 
-- what stable identifiers the upstream site truly exposes
-- whether public JSON endpoints are sufficient for all needed retrieval
-- how much normalization titles, clauses, and examples need
-- whether interpretation materials belong in v1 or later
+- the reusable v1 contract lives in [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md)
+- the active implementation split between the shared tool and scraper lives in [ARCHITECTURE.md](ARCHITECTURE.md)
+- the current implementation work is tracked in [PLAN.md](PLAN.md)
 
-See [PLAN.md](PLAN.md) for the active investigation step that should answer them.
+## Remaining Product Questions
+
+These are not blockers for the first implementation slice:
+
+- how much normalization titles, clauses, and examples need beyond the v1 contract
+- whether interpretation materials belong in v1 or a later phase
+- how far the first scraper should go beyond the core standards corpus

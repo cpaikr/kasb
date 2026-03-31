@@ -10,6 +10,17 @@ Method:
 
 This document records source evidence for the KASB standards site. It is not yet the public tool spec.
 
+## API Origin
+
+- Browser routes live under `https://db.kasb.or.kr/standard/`.
+- The current JSON API origin is `https://db.kasb.or.kr/api/`.
+- Direct calls to `https://db.kasb.or.kr/standard/api/...` return the SPA HTML shell, not JSON.
+
+Implementation note:
+
+- treat `/standard/` as the browser route base
+- treat `/api/` as the read API base
+
 ## UI Flow Map
 
 - Home: `/standard/`
@@ -47,6 +58,12 @@ Important finding:
 - `/api/paragraphs/1116/ZB2hJW` returns paragraphs `1` and `2`.
 
 That mismatch is the main identifier risk to settle before writing the tool contract.
+
+Current decision for v1:
+
+- expose `indexDocumentId` directly for section retrieval
+- keep `titleDocumentId` out of the public contract
+- treat route ids as browser-facing only unless later evidence reveals a stable mapping worth supporting
 
 ## Request Inventory
 
@@ -134,13 +151,25 @@ This is evidence for a public read-only core, but it is still worth rechecking i
   Returned `200 OK` and `totalCount: 1043`.
 - `GET /api/paragraphs/content/1116/23`
   Returned paragraph `23` with `uniqueKey: "1116-23"` and `documentId: "bdbwhT"`.
+- `GET /api/paragraphs/content/1116/한2.1`
+  Returned one paragraph with `uniqueKey: "1116-한2.1"` and `documentId: "fgc8eT"`.
+- `GET /api/paragraphs/content/1116/B3`
+  Returned one paragraph with `uniqueKey: "1116-B3"` and `documentId: "M12hre"`.
+- `GET /api/paragraphs/content/1116/BC240A`
+  Returned one paragraph with `uniqueKey: "1116-BC240A"` and `documentId: "ITKVjD"`.
 - `GET /api/paragraphs/1116/ZB2hJW`
   Returned the `목적` section with paragraphs `1` and `2`.
+
+Observed implication:
+
+- `stdNum + paraNum` currently behaves as an exact paragraph reference across numeric, Korean-prefixed, appendix, and basis-for-conclusions paragraph forms.
+- direct paragraph lookup also returns the parent retrieval `documentId`, so callers do not need to supply a section id to fetch one exact paragraph.
 
 ## Implications For The Next Spec Step
 
 - Use `stdNum` as the standard-level public id.
 - Use `paraNum` as the paragraph-level public reference.
 - Treat `indexDocumentId` as the current retrieval key for section-level fetches.
+- Define the v1 exact paragraph input as `stdNum + paraNum`; return the parent `indexDocumentId` as metadata.
 - Do not expose `bigSeq`/`midSeq` as public ids unless later evidence proves they are stable.
-- Decide whether `titleDocumentId` should stay internal to routing or be mapped explicitly to `indexDocumentId`.
+- Keep `titleDocumentId` internal to routing in v1.
