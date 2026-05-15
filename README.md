@@ -1,72 +1,74 @@
-# agent-design
+# kasb-standards
 
-Implementation-first work on the KASB standards tool and scraper, with supporting design docs kept in the same repo.
+Read-only KASB standards CLI target, following the app design used in `../darty`.
 
-This repo now has two concrete targets:
+The product should provide a Bun/TypeScript capability core for `https://db.kasb.or.kr/api/` and a thin Commander CLI for local and agent use.
 
-- a reusable KASB access tool for typed search and retrieval against `https://db.kasb.or.kr/api/`
-- a scraper that uses that tool and persists retrievable data into a database
+Current status: source investigation and v1 contract docs exist; implementation directories have not been scaffolded yet.
+
+KASB public API behavior can drift. Keep source claims evidence-backed and update the research note when live behavior changes.
 
 ## Core Stance
 
-- Start from the `capability` or `workflow`, not the transport or UI.
-- Treat `CLI`, `MCP`, and SDKs as adapters over the same core capability.
-- Optimize for structured, traceable, bounded results with explicit failure modes.
-- Treat context as a scarce resource and design around that fact.
+- The CLI is the only planned public interface.
+- The capability layer is the real app; the CLI is a thin transport over it.
+- Follow `../darty`'s layer split: CLI transport -> app composition -> capability contract/execution -> source adapter.
+- Optimize for structured, traceable, bounded results with typed failures.
+- Make CLI success and failure output parseable JSON for subprocess callers.
+- Keep KASB source details explicit before adding higher-level abstractions.
+- Treat context as scarce: return stable references and progressive detail instead of giant dumps.
 
 ## Read In This Order
 
 1. [ARCHITECTURE.md](ARCHITECTURE.md)
-   System shape, ownership boundaries, and target repo layout.
+   Target repo shape, document ownership, and Darty-parity implementation boundaries.
 2. [VISION.md](VISION.md)
-   Product-level goal and scope for the current project.
-3. [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md)
-   Current contract target for the reusable KASB tool.
-4. [PRMOPT.md](PRMOPT.md)
-   Active implementation discussion about stack, tooling, and viable build paths.
-5. [ROADMAP.md](ROADMAP.md)
-   Strategic sequencing from investigation into implementation.
-6. [TODO.md](TODO.md)
-   Ordered near-term work queue.
-7. [PLAN.md](PLAN.md)
-   Detailed plan for the one active job.
-8. [docs/tools/foundations.md](docs/tools/foundations.md)
-   Core principles for tool design.
-9. Tool track:
-   [docs/tools/contracts.md](docs/tools/contracts.md), [docs/tools/transport-decision.md](docs/tools/transport-decision.md), [docs/tools/evaluation.md](docs/tools/evaluation.md)
-10. Templates:
-   [docs/tools/templates/tool-spec-template.md](docs/tools/templates/tool-spec-template.md)
-11. Relevant tool playbook in [docs/tools/playbooks/](docs/tools/playbooks/)
-   Tool-family-specific guidance.
+   Product goal, scope, principles, and non-goals.
+3. [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md)
+   Observed KASB API behavior, identifier spaces, and replay evidence.
+4. [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md)
+   v1 capability contract target.
+5. [PRMOPT.md](PRMOPT.md)
+   Accepted stack and implementation discussion brief.
+6. [ROADMAP.md](ROADMAP.md)
+   Strategic sequencing.
+7. [TODO.md](TODO.md)
+   Ordered near-term queue.
+8. [PLAN.md](PLAN.md)
+   Active detailed implementation plan.
+9. [docs/tools/foundations.md](docs/tools/foundations.md)
+   Shared tool design principles.
 
 ## Repo Map
 
-- [ARCHITECTURE.md](ARCHITECTURE.md): system shape, ownership boundaries, and target repo layout
-- [VISION.md](VISION.md): product vision for the current KASB standards tool
-- [PRMOPT.md](PRMOPT.md): working brief for implementation choices and stack discussion
-- [ROADMAP.md](ROADMAP.md): strategic direction and phased sequencing
-- [TODO.md](TODO.md): ordered near-term work queue
-- [PLAN.md](PLAN.md): the one active detailed plan
-- [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md): captured source evidence and request inventory for the KASB site
-- [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md): v1 contract target for the reusable KASB tool
-- [docs/specs/](docs/specs/README.md): stable capability specs once the evidence exists
-- [docs/tools/foundations.md](docs/tools/foundations.md): what makes a good agent tool
-- [docs/tools/contracts.md](docs/tools/contracts.md): input, output, references, and errors
-- [docs/tools/transport-decision.md](docs/tools/transport-decision.md): when to use CLI, MCP, or both
-- [docs/tools/evaluation.md](docs/tools/evaluation.md): how to measure real tool usefulness
-- [docs/tools/lifecycle.md](docs/tools/lifecycle.md): recommended tool build sequence
-- [docs/tools/portfolio.md](docs/tools/portfolio.md): shared conventions across a tool portfolio
-- [docs/tools/playbooks/pdf-tool.md](docs/tools/playbooks/pdf-tool.md): PDF tool guidance
-- [docs/tools/playbooks/excel-tool.md](docs/tools/playbooks/excel-tool.md): spreadsheet tool guidance
-- [docs/tools/playbooks/site-data-tool.md](docs/tools/playbooks/site-data-tool.md): site/API data tool guidance
-- [docs/tools/playbooks/filesystem-tool.md](docs/tools/playbooks/filesystem-tool.md): workspace tool guidance
-- [docs/tools/templates/tool-spec-template.md](docs/tools/templates/tool-spec-template.md): spec template for new tools
+- [AGENTS.md](AGENTS.md): instructions for coding agents working in this repo
+- [ARCHITECTURE.md](ARCHITECTURE.md): target system shape, ownership boundaries, and Darty-parity architecture
+- [VISION.md](VISION.md): product vision for `kasb-standards`
+- [PRMOPT.md](PRMOPT.md): implementation choices and stack decision brief
+- [ROADMAP.md](ROADMAP.md): phased direction from docs to implementation
+- [TODO.md](TODO.md): ordered near-term queue
+- [PLAN.md](PLAN.md): one active detailed plan
+- [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md): captured source evidence and request inventory
+- [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md): v1 capability contract target
+- [docs/specs/](docs/specs/README.md): stable capability specs
+- [docs/tools/](docs/tools/foundations.md): shared tool-design guidance
+
+## Intended Implementation Roots
+
+```text
+src/                    reusable capability core, CLI, source adapters
+fixtures/               captured KASB API responses for deterministic tests
+test/                   broader CLI/live checks once code exists
+evals/                  later agent/task evals after the CLI works
+```
+
+The exact scaffold should follow [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## External References
 
 Useful Anthropic writing that informs this repo:
 
-- [Building effective agents](https://www.anthropic.com/research/building-effective-agents/)
+- [Building effective agents](https://www.anthropic.com/research/building-effective-agents)
 - [How we built our multi-agent research system](https://www.anthropic.com/engineering/built-multi-agent-research-system)
 - [Writing effective tools for agents](https://www.anthropic.com/engineering/writing-tools-for-agents)
 - [Effective context engineering for AI agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)

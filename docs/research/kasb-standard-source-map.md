@@ -2,26 +2,31 @@
 
 Captured on 2026-03-31.
 
+Status: observed source evidence, not the public contract or architecture guide. Promote stable contract decisions into [../specs/kasb-standards-v1.md](../specs/kasb-standards-v1.md) and implementation-shape decisions into [../../ARCHITECTURE.md](../../ARCHITECTURE.md).
+
 Method:
 
 - inspected the shipped frontend bundles under `https://db.kasb.or.kr/standard/`
 - confirmed visible routes in a browser session
 - replayed the read endpoints directly with `curl`
 
-This document records source evidence for the KASB standards site. It is not yet the public tool spec.
-
 ## API Origin
+
+Observed:
 
 - Browser routes live under `https://db.kasb.or.kr/standard/`.
 - The current JSON API origin is `https://db.kasb.or.kr/api/`.
 - Direct calls to `https://db.kasb.or.kr/standard/api/...` return the SPA HTML shell, not JSON.
 
-Implementation note:
+Implementation implication:
 
 - treat `/standard/` as the browser route base
 - treat `/api/` as the read API base
+- make KASB API URL construction a source-adapter concern under `sources/kasb/`
 
 ## UI Flow Map
+
+Observed:
 
 - Home: `/standard/`
 - Search results: `/search?q=&searchWord={term}`
@@ -32,12 +37,19 @@ Observed route behavior:
 - searching `리스` from the home page navigated to `/search?q=&searchWord=%EB%A6%AC%EC%8A%A4`
 - opening `/s/1116/5?searchWord=%EB%A6%AC%EC%8A%A4` normalized to `/s/1116/19970f`
 
+Implementation implication:
+
+- browser routes are useful evidence but not the public v1 access path
+- route-facing ids should not be accepted as section retrieval ids without a future explicit mapping operation
+
 ## Identifier Spaces
+
+Observed:
 
 - `stdNum`
   Stable standard identifier. Example: `1116`.
 - `paraNum`
-  Stable paragraph reference inside a standard. Example: `23`, `한2.1`, `BC240A`.
+  Stable paragraph reference inside a standard. Examples: `23`, `한2.1`, `B3`, `BC240A`.
 - `uniqueKey`
   Paragraph key returned by the API as `{stdNum}-{paraNum}`. Example: `1116-23`.
 - `titleDocumentId`
@@ -49,7 +61,7 @@ Observed route behavior:
 - `bigSeq`, `midSeq`, `smallSeq`, `littleSeq`
   Tree-ordering fields still present in title data. They look like UI sequencing, not stable public ids.
 
-Important finding:
+Important observed finding:
 
 - `titleDocumentId` and `indexDocumentId` are not interchangeable.
 - For `stdNum=1116`, `/api/standard/1116/first-document-id` returns `19970f`.
@@ -57,17 +69,18 @@ Important finding:
 - `/api/paragraphs/1116/19970f` returns empty clauses.
 - `/api/paragraphs/1116/ZB2hJW` returns paragraphs `1` and `2`.
 
-That mismatch is the main identifier risk to settle before writing the tool contract.
-
-Current decision for v1:
+Current v1 decision:
 
 - expose `indexDocumentId` directly for section retrieval
 - keep `titleDocumentId` out of the public contract
 - treat route ids as browser-facing only unless later evidence reveals a stable mapping worth supporting
+- keep `bigSeq`, `midSeq`, `smallSeq`, and `littleSeq` internal source fields
 
 ## Request Inventory
 
 ### Search And Discovery
+
+Observed endpoints:
 
 - `GET /api/standard?searchWord={term}`
   Standard-level search counts by `stdNum`.
@@ -86,7 +99,11 @@ Current decision for v1:
 - `GET /api/search/standard-indexes/{indexDocumentId}/paragraphs?stdNum={stdNum}&searchWord={term}`
   Highlight metadata for matched paragraphs under one index node.
 
+v1 uses only the source surface needed for `search-standards` and optional search-filtered structure/section retrieval. Additional search endpoints should stay internal until a capability needs them.
+
 ### Standard Structure
+
+Observed endpoints:
 
 - `GET /api/standard/{stdNum}/first-document-id`
   First route-facing `titleDocumentId` for `/s/{stdNum}/{titleDocumentId}`.
@@ -103,7 +120,11 @@ Current decision for v1:
 - `GET /api/standard-indexes/{stdNum}/html-type/{documentType}`
   Fetches typed docs such as overview or revision.
 
+v1 public structure lookup should use `standard-indexes`, not `title` ids.
+
 ### Content Retrieval
+
+Observed endpoints:
 
 - `GET /api/paragraphs/{stdNum}/{indexDocumentId}?searchWord={term?}`
   Returns `clauses[]` plus `mainTitle` metadata. `clauses[]` may mix title rows and paragraph rows.
@@ -112,14 +133,22 @@ Current decision for v1:
 - `GET /api/paragraphs/bookmarks/{stdNum}/{paraNum}`
   Bookmark-related paragraph lookup.
 
+v1 public section retrieval should use `indexDocumentId`. v1 public paragraph retrieval should use `stdNum + paraNum`.
+
 ### Non-Read Noise To Ignore In V1
+
+Observed endpoints:
 
 - `POST /api/search/search-log`
   Analytics/logging only.
 - `GET /api/standard/check-ip`
-  Public gating check, currently returns `{"status":200}`.
+  Public gating check, observed as `{"status":200}`.
+
+These do not belong in the public v1 contract.
 
 ## Response Notes
+
+Observed response shapes:
 
 - `/api/standard`
   Returns `standards.stdCountObj`, `standards.totalCount`, and `standards.stdCountArr`.
@@ -134,18 +163,30 @@ Current decision for v1:
 - `/api/search/standard-indexes/{indexDocumentId}/paragraphs`
   Returns `highlightedUniqueKey[]` and `highlightedParagraphWord`.
 
+Implementation implication:
+
+- source response schemas should live under `src/sources/kasb/`
+- public capability result schemas should expose normalized standards, sections, paragraphs, references, metadata, and warnings
+- raw source payloads may be exposed only through explicit CLI debugging output, not the default public success result
+
 ## Browser Independence
 
-Read-only replay worked directly from `curl` in this investigation:
+Observed read-only replay worked directly from `curl` during this investigation:
 
 - no cookie was required in tested calls
 - no CSRF token was required in tested calls
 - no special header beyond default `curl` behavior was required
 - no redirect to login was observed
 
-This is evidence for a public read-only core, but it is still worth rechecking if the site changes.
+Implementation implication:
+
+- the first core can use direct read-only HTTP requests
+- add opt-in live checks later because public source behavior can change
+- if auth or anti-bot behavior appears later, record it here before changing specs
 
 ## Example Evidence
+
+Observed:
 
 - `GET /api/standard?searchWord=리스`
   Returned `200 OK` and `totalCount: 1043`.
@@ -162,14 +203,19 @@ This is evidence for a public read-only core, but it is still worth rechecking i
 
 Observed implication:
 
-- `stdNum + paraNum` currently behaves as an exact paragraph reference across numeric, Korean-prefixed, appendix, and basis-for-conclusions paragraph forms.
-- direct paragraph lookup also returns the parent retrieval `documentId`, so callers do not need to supply a section id to fetch one exact paragraph.
+- `stdNum + paraNum` behaves as an exact paragraph reference across numeric, Korean-prefixed, appendix, and basis-for-conclusions paragraph forms in tested cases
+- direct paragraph lookup also returns the parent retrieval `documentId`, so callers do not need to supply a section id to fetch one exact paragraph
 
-## Implications For The Next Spec Step
+## Promoted v1 Decisions
 
-- Use `stdNum` as the standard-level public id.
-- Use `paraNum` as the paragraph-level public reference.
-- Treat `indexDocumentId` as the current retrieval key for section-level fetches.
-- Define the v1 exact paragraph input as `stdNum + paraNum`; return the parent `indexDocumentId` as metadata.
-- Do not expose `bigSeq`/`midSeq` as public ids unless later evidence proves they are stable.
-- Keep `titleDocumentId` internal to routing in v1.
+Promoted to [../specs/kasb-standards-v1.md](../specs/kasb-standards-v1.md):
+
+- use public `keyword` for search text and map it to source `searchWord`
+- use `stdNum` as the standard-level public id
+- use `indexDocumentId` as the public section retrieval id
+- use `paraNum` as the paragraph-level public reference
+- define exact paragraph input as `stdNum + paraNum`
+- return parent `indexDocumentId` as paragraph metadata when available
+- keep `titleDocumentId` internal in v1
+- do not expose `bigSeq`/`midSeq` as public ids unless later evidence proves they are stable
+- return API URLs as the guaranteed source URL

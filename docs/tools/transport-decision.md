@@ -2,68 +2,51 @@
 
 ## Short Answer
 
-Neither `MCP` nor `CLI` is universally better.
+This repo is CLI-only.
 
-The practical default for durable tools is:
+The practical shape is:
 
-- implement a reusable core,
-- expose a CLI first,
-- add MCP when the agent runtime or multi-tool ecosystem benefits from standardized discovery and invocation.
-
-## Decision Table
-
-### Prefer CLI when
-
-- you want simple local execution,
-- the capability is naturally command-oriented,
-- the output can be streamed or piped,
-- you want easy manual debugging,
-- you want the tool to work outside agent runtimes too.
-
-### Prefer MCP when
-
-- you need standardized discovery across many tools,
-- the agent platform already speaks MCP well,
-- you want a shared schema-based interface across editors or agent hosts,
-- the tool benefits from persistent sessions, resource exposure, or server-managed state.
-
-### Expose both when
-
-- the capability is important enough to deserve a stable core,
-- humans and agents both need it,
-- there is a real advantage in manual debugging plus agent-native integration.
+- implement a reusable core
+- expose it through a Commander CLI
+- keep other transports out of scope unless the product direction changes
 
 ## Recommendation For This Repo
 
-Adopt `capability core + adapter matrix`.
+Adopt `capability core + thin CLI`, matching `../darty`.
 
-For each tool, decide which of these adapters are justified:
+The CLI should mostly:
 
-- `CLI adapter`
-- `MCP adapter`
-- `Language SDK`
-- `Batch/offline runner`
+- parse command-line input
+- apply command help and examples
+- call the shared app/capability layer
+- serialize success envelopes as JSON on `stdout`
+- serialize failure envelopes as JSON on `stderr` with nonzero exit codes
 
-Do not fork logic between adapters. Adapters should mostly validate input, call the core, and serialize output.
+Do not fork logic between CLI commands and source adapters. The CLI should not call KASB endpoints directly.
 
-## Why CLI First Often Wins
+## Why CLI First Wins Here
 
-- easiest to test manually,
-- easiest to profile and benchmark,
-- easiest to inspect failure modes,
-- least coupled to one agent ecosystem,
-- easiest starting point for later MCP wrapping.
+- easiest to test manually
+- easiest to profile and benchmark
+- easiest to inspect failure modes
+- least coupled to one agent ecosystem
+- works well for subprocess-based agent use
 
-## Why MCP Still Matters
+## Out Of Scope
 
-MCP gives you a clean interop story. The value is not magic capability; the value is shared protocol, tool discovery, and less custom glue.
+- MCP handlers
+- SDK packages
+- Pi-native tools
+- database persistence or background ingestion
+- HTTP wrappers
 
-If your future environment involves multiple hosts, multiple models, or multiple teams, that standardization can matter a lot.
+These can be reconsidered only if the product docs change. They are not current implementation targets.
 
 ## Anti-Patterns
 
-- writing MCP handlers that contain the real domain logic,
-- designing outputs around human terminal readability only,
-- forcing agents to chain multiple tiny shell-oriented commands when one semantic call should exist,
-- using a skill to compensate for a poor tool contract,
-- returning giant unfiltered dumps because "the model can figure it out."
+- putting domain logic in CLI command files
+- designing outputs around human terminal readability only
+- printing non-JSON failure text that subprocess callers must special-case
+- forcing agents to chain multiple shell-oriented commands when one semantic call should exist
+- using a skill to compensate for a poor tool contract
+- returning giant unfiltered dumps because "the model can figure it out"

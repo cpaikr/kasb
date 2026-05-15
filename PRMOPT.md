@@ -1,176 +1,126 @@
 # PRMOPT
 
-This file is the working brief for implementation discussion.
+This file is the working brief for implementation choices. Stable decisions should be reflected in [ARCHITECTURE.md](ARCHITECTURE.md), [docs/specs/](docs/specs/README.md), and code once scaffolded.
 
-The repo now needs two real deliverables:
-
-- a KASB tool module that can query the live KASB API effectively with code
-- a scraper module that uses that tool and persists retrievable data into a database
-
-This document is for choosing how to build that system, not for storing final architecture forever. Once decisions are stable, promote them into specs, architecture docs, and code.
+The project should follow `../darty` unless a KASB-specific constraint justifies a different path.
 
 ## What We Need To Build
-
-### 1. KASB Tool
 
 The tool should:
 
 - talk directly to `https://db.kasb.or.kr/api/`
-- expose typed operations around search, structure lookup, section retrieval, and paragraph retrieval
-- normalize upstream responses
-- surface typed errors around invalid ids, empty section lookups, upstream drift, and unavailable source states
-- support local scripted use, ideally through a CLI
+- expose typed capabilities for standards search, structure lookup, section retrieval, and paragraph retrieval
+- validate public semantic requests with Effect Schema
+- export JSON Schemas from the same contracts used at runtime
+- normalize upstream responses into traceable success envelopes
+- surface typed failures for invalid input, missing ids, source unavailability, source drift, and partial retrieval
+- provide a thin Commander CLI over the shared capability core
+- always emit JSON from the CLI: success envelopes on `stdout`, failure envelopes on `stderr`
 
-### 2. Scraper
+## Accepted Stack
 
-The scraper should:
+Follow `../darty` for the core app shape:
 
-- depend on the tool instead of making raw HTTP calls
-- iterate standards, sections, and paragraphs in a controlled order
-- persist normalized data into a database
-- track scrape runs, failures, retries, and refresh state
+- Bun for runtime, package management, and scripts
+- strict TypeScript
+- Effect Schema for public contracts, runtime validation, and JSON Schema export
+- Commander for CLI transport
+- Bun test runner
+- native `fetch` for KASB JSON API calls
+- success-only result schemas plus typed failures
+- always-JSON CLI output, including failures
+- CLI help/examples/output controls kept transport-local
 
-## Decision Criteria
+KASB-specific handling:
 
-Any implementation choice should be judged by:
+- paragraph HTML handling where the KASB API returns HTML fragments
+- source drift detection for changing public API payloads
+- opt-in live checks for public endpoint behavior
 
-- how quickly we can ship the first reliable read-only client
-- how easy it is to keep the tool and scraper in one coherent system
-- typing quality around ids and result shapes
-- fixture-backed testing
-- CLI ergonomics
-- database integration quality
-- future MCP or SDK reuse without rewriting the core
+## Naming Decisions
 
-## Viable Build Options
+- Public JSON fields use camelCase semantic names: `keyword`, `stdNum`, `indexDocumentId`, `paraNum`.
+- KASB source parameters such as `searchWord` stay inside source adapters.
+- CLI command names use kebab-case: `search-standards`, `get-standard-structure`, `get-section`, `get-paragraph`.
+- CLI flags use kebab-case: `--keyword`, `--std-num`, `--index-document-id`, `--para-num`.
+- TypeScript names should follow the repo's eventual implementation style; do not lock function names in docs before code exists.
 
-### Option A: TypeScript + Bun + SQLite first
-
-Shape:
-
-- `packages/kasb-tool` in TypeScript
-- `apps/kasb-scraper` in TypeScript
-- `bun` for runtime, package management, and scripts
-- SQLite for first persistence and local iteration
-
-Gains:
-
-- one language across tool, scraper, and future adapters
-- strong type boundaries for `stdNum`, `indexDocumentId`, and `paraNum`
-- simple `fetch` support and good CLI ergonomics
-- aligns with the repo preference for `bun`
-- easiest path to a reusable JS/TS SDK and later MCP wrapper
-
-Losses:
-
-- less mature scraping/data ecosystem than Python in some areas
-- some database libraries still assume Node compatibility details
-- SQLite may need migration later if we outgrow local-first persistence
-
-### Option B: Python + SQLite or Postgres
-
-Shape:
-
-- `kasb_tool/` in Python
-- `scraper/` in Python
-- `uv` or `poetry` for packaging
-- SQLite first or Postgres from the start
-
-Gains:
-
-- strong ecosystem for scraping, ETL, and data workflows
-- straightforward scripting
-- mature ORM and migration options
-
-Losses:
-
-- splits the implementation language from the repo’s current package-tooling preference
-- weaker path to reuse in JS-heavy agent runtimes
-- likely higher friction if we later want CLI, SDK, and MCP packaging in one stack
-
-### Option C: Split stack
-
-Shape:
-
-- tool in TypeScript
-- scraper in Python
-- shared contract through HTTP, JSON files, or duplicated schemas
-
-Gains:
-
-- each side uses a locally optimal language
-
-Losses:
-
-- duplicated types or codegen burden
-- slower iteration
-- higher maintenance cost
-- easy for the scraper to drift from the tool contract
-
-This should be avoided unless a concrete requirement forces it.
-
-## Recommendation
-
-Start with:
-
-- TypeScript
-- `bun`
-- one repo-local implementation
-- SQLite first
-
-Why:
-
-- the current problem is contract-heavy, not browser-heavy
-- the live KASB API is already usable directly
-- the tool and scraper share the same domain model
-- the repo wants a reusable tool first and a scraper built on top of it
-- SQLite is enough for the first crawl and easiest for fixtures, local development, and inspection
-
-## Recommended Initial Layout
+## Target Layout
 
 ```text
-packages/
-  kasb-tool/
-    src/
-    test/
-    fixtures/
-apps/
-  kasb-scraper/
-    src/
-    test/
-db/
-  migrations/
-  schema/
+src/
+  app/
+  capabilities/
+  cli.ts
+  cli/
+  sources/kasb/
+fixtures/
+test/
+  cli/
+  live/
+evals/
 ```
 
-## Recommended Early Libraries To Inspect
+Use [ARCHITECTURE.md](ARCHITECTURE.md) for layer boundaries. Avoid locking exact files in docs before the first scaffold exists.
 
-These are candidates, not fixed decisions:
+## Capability Pattern
 
-- HTTP/runtime:
-  native `fetch` in Bun
-- CLI:
-  small custom CLI first, or `commander`
-- validation:
-  `zod` if runtime validation proves necessary
-- database:
-  `drizzle` with SQLite, or a thinner SQL-first layer if we want less abstraction
-- testing:
-  Bun test runner first unless we hit a concrete limitation
+Each operation should mirror Darty's boundary split without copying unnecessary detail upfront:
 
-## Questions To Discuss Before Scaffolding
+- public request/result contracts and JSON Schema export
+- execution and typed failure mapping
+- provider interface between capability and source adapter
+- transport-local CLI descriptions, flags, examples, and output controls
 
-1. Do we want SQLite only for the first scraper milestone, or do you already expect a shared Postgres-backed dataset?
-2. Should the first scraper persist raw upstream payloads alongside normalized rows, or only normalized records plus scrape metadata?
-3. Do you want the first CLI to be developer-facing only, or should we design it immediately as a stable user-facing interface?
-4. Should the scraper aim for full-corpus backfill first, or start with one standard and one traversal path as the proving slice?
+Choose exact file names during scaffolding, then update docs only where the code establishes a stable convention.
 
-## Proposed Next Step
+## Source Adapter Pattern
 
-If we accept the recommendation above, the next implementation step is:
+KASB source code should live under `src/sources/kasb/` and own:
 
-1. scaffold `packages/kasb-tool`
-2. scaffold `apps/kasb-scraper`
-3. choose SQLite schema boundaries
-4. capture fixtures from the live API
-5. implement the first typed read-only client
+- endpoint URL construction
+- source response schemas
+- fetch behavior and timeouts
+- raw KASB identifier handling
+- normalization into provider-facing results
+- source errors such as unavailable, changed, not found, or partial response
+
+Public capabilities should not import raw KASB source models. Source adapters may expose provider implementations that satisfy capability provider interfaces.
+
+## Testing Direction
+
+Match Darty's verification layers:
+
+1. colocated deterministic tests for contracts, specs, execute paths, source normalization, and known identifier pitfalls
+2. fixture-backed source tests for KASB API responses
+3. subprocess CLI smoke tests under `test/cli/` once the CLI exists
+4. subprocess CLI tests that assert `stdout`, `stderr`, and exit-code behavior for success and failure
+5. opt-in live checks under `test/live/`, gated by `LIVE_KASB_TESTS=1`
+6. capability-scoped evals under `evals/` only after the CLI works
+
+## Rejected Or Deferred Options
+
+### Python-first implementation
+
+Rejected for now. It weakens parity with `../darty`, splits runtime reuse, and adds schema duplication pressure.
+
+### MCP, SDK, or Pi-native adapters
+
+Rejected for this repo's current product direction. The public interface is CLI-only.
+
+### Database persistence or background ingestion
+
+Rejected for this repo's current product direction. This repo should retrieve and normalize KASB standards on demand through the CLI, not maintain a local corpus.
+
+### Browser automation
+
+Rejected as the primary implementation path. Browser observations are useful for source investigation, but the tool should call the public KASB API directly.
+
+## Next Implementation Step
+
+Scaffold the Bun/TypeScript repo-local implementation:
+
+1. create root package files as needed
+2. create Darty-shaped `src/` roots for app composition, capabilities, CLI, and KASB source adapters
+3. add only the capability skeleton needed for the first implementation slice
+4. capture fixtures from the live KASB API before implementing normalization

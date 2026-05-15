@@ -1,127 +1,169 @@
 # Architecture
 
-This repo is no longer docs-only. The target system has two implementation tracks:
+This repo should track `../darty`'s app design while applying it to KASB standards access.
 
-- a reusable KASB access tool that queries `https://db.kasb.or.kr/api/` with typed operations
-- a scraper that uses that tool to collect standards data and persist it to a database
+The target system is a CLI-first, read-only TypeScript app:
 
-The docs still matter, but they now support implementation instead of standing in for it.
+- `src/`: reusable capability core, source adapters, CLI transport, and app composition
+- `fixtures/`: captured KASB API responses for deterministic tests
+- `test/`: broader CLI and opt-in live checks once code exists
+- `evals/`: later scenario evals after the CLI works
 
-## Start Here
+The implementation is not scaffolded yet. This document defines boundaries and direction; exact files should be settled while scaffolding real code.
 
-1. Read [README.md](README.md) for repo orientation.
-2. Read [VISION.md](VISION.md) for product scope.
-3. Read [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md) for the current contract target.
-4. Read [PRMOPT.md](PRMOPT.md) for the active implementation discussion about stack, tooling, and viable build paths.
+## Big Picture
 
-## Target Shape
+The CLI is not the real app. The capability layer is: a semantic request contract, a provider interface, and an execution path that validates inputs, calls KASB source adapters, normalizes source results, and shapes typed success envelopes or typed failures.
 
-The intended root layout is:
+The first public capabilities are:
 
-- `packages/kasb-tool/`
-  Reusable read-only KASB client, domain types, normalization, and CLI entry points.
-- `apps/kasb-scraper/`
-  Scraping jobs that call `kasb-tool`, decide crawl scope, and persist normalized records.
-- `db/`
-  Schema, migrations, and database bootstrap for scraper persistence.
-- `docs/specs/`
-  Stable capability specs that the tool implementation must satisfy.
-- `docs/research/`
-  Source investigation notes and upstream evidence.
+- `search-standards`
+- `get-standard-structure`
+- `get-section`
+- `get-paragraph`
 
-If the exact directory names change, preserve the same split: reusable tool core first, scraper second, persistence as a separate seam.
+The CLI is the only planned public interface. MCP, SDK, Pi-native tools, database persistence, and background ingestion are not implementation goals for this repo.
 
-## Component Map
+## Target Layering
 
-### `kasb-tool`
+```mermaid
+graph TD
+    subgraph CLI["CLI Transport · src/cli/"]
+        CMD["Commander commands · flags · help · presentation"]
+    end
 
-Owns:
+    subgraph App["App Composition · src/app/"]
+        APP["Operation name · schemas · provider wiring"]
+    end
 
-- the base API client for `https://db.kasb.or.kr/api/`
-- typed operations such as standard search, structure lookup, section retrieval, and paragraph retrieval
-- identifier handling for `stdNum`, `indexDocumentId`, `paraNum`, and `uniqueKey`
-- response normalization and typed errors
-- fixture-backed tests
-- a CLI or scriptable adapter for local verification
+    subgraph Cap["Capability Contracts · src/capabilities/"]
+        CAP["Request/result schemas · validation · execution"]
+    end
 
-Does not own:
+    subgraph Src["Source Adapters · src/sources/kasb/"]
+        SRC["KASB API request builders · fetchers · source models · normalizers"]
+    end
 
-- crawl scheduling
-- persistence policy
-- long-running sync state
+    CMD --> APP
+    APP --> CAP
+    CAP --> SRC
+    SRC --> KASB[("db.kasb.or.kr/api")]
+```
 
-### `kasb-scraper`
+| Layer | Target path | Owns |
+|---|---|---|
+| CLI transport | `src/cli.ts`, `src/cli/` | Parse CLI input, own help/examples/output flags, call shared operations, serialize JSON |
+| App composition | `src/app/` | Operation names, JSON Schemas, and default provider wiring for the CLI |
+| Capability | `src/capabilities/` | Public semantic request/result schemas, request resolution, typed failures, execution |
+| Source | `src/sources/kasb/` | KASB API URLs, source response schemas, fetchers, normalization, source error mapping |
 
-Owns:
+## Intended Implementation Roots
 
-- choosing what to scrape and in what order
-- calling `kasb-tool` repeatedly without re-implementing API rules
-- persistence into the project database
-- resumability, deduplication, and scrape bookkeeping
-- refresh or backfill jobs
+- `src/app/` for operation composition and default wiring
+- `src/capabilities/` for public contracts and execution
+- `src/cli/` for Commander commands, flags, help, and JSON serialization
+- `src/sources/kasb/` for KASB endpoint access and source normalization
+- `fixtures/`, `test/`, and `evals/` for captured source responses, verification, and later task scenarios
 
-Does not own:
+Start from `../darty`'s per-capability shape when scaffolding, but let the first real implementation decide exact file names.
 
-- raw upstream contract knowledge that already belongs in `kasb-tool`
-- ad hoc API calls that bypass the shared client
+## Behavior-First Core
 
-### Database Layer
+The shared layer owns semantic behavior. The CLI owns presentation and protocol details.
 
-Owns:
+```mermaid
+graph LR
+    CONTRACT["Effect Schema contracts"] --> VALIDATE["Runtime validation"]
+    CONTRACT --> TS["TypeScript types"]
+    CONTRACT --> SPEC["JSON Schema export"]
+    SPEC --> APP["operation wiring"]
+    APP --> CLI_META["CLI command names"]
+    CONTRACT --> RESULT["success result envelope"]
+```
 
-- normalized storage for standards, sections, paragraphs, and scrape runs
-- migration history
-- persistence utilities used by the scraper
+One source of truth should provide:
 
-The database is a scraper concern, not a tool concern. The tool returns structured results; the scraper decides what to store and how to model crawl state.
+- runtime validation shape
+- TypeScript request/result types
+- success result schema
+- JSON Schema for CLI-facing specs
+- typed failure mapping
+
+What stays CLI-local:
+
+- CLI flags
+- help text and examples
+- pretty/verbose output controls
+- terminal presentation
 
 ## Runtime Flow
 
-The main flow should be:
+Target CLI flow:
 
-1. `kasb-tool` sends typed read-only requests to the live KASB API.
-2. `kasb-tool` validates and normalizes upstream payloads into stable domain objects.
-3. `kasb-scraper` uses those operations to traverse standards, sections, and paragraphs.
-4. `kasb-scraper` writes normalized records and scrape metadata to the database.
-5. Downstream analysis or export work reads from the database instead of hitting KASB directly.
+```text
+argv -> CLI transport -> app operation -> capability execution -> KASB source adapter -> https://db.kasb.or.kr/api/...
+```
 
-That split keeps source-specific logic in one place and prevents the scraper from turning into a second undocumented client.
+## Public Contract vs Source Contract
+
+Keep two schema families separate:
+
+- **Public capability schemas** use stable semantic fields such as `keyword`, `stdNum`, `indexDocumentId`, and `paraNum`.
+- **Internal source schemas** model KASB response and endpoint details, including fields such as `searchWord`, `titleDocumentId`, `bigSeq`, `midSeq`, `smallSeq`, `littleSeq`, `documentType`, and raw paragraph HTML.
+
+`titleDocumentId` is browser-route-facing and must stay internal in v1. `indexDocumentId` is the public v1 section retrieval id.
 
 ## Document Ownership
 
 - [README.md](README.md)
-  Repo orientation and reading order.
+  Minimal project orientation, status, reading order, and target roots.
 - [VISION.md](VISION.md)
-  Product goal, scope, and non-goals.
+  Product-level goal, scope, principles, and non-goals.
+- [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md)
+  Durable source investigation notes and observed API behavior.
+- [docs/specs/](docs/specs/README.md)
+  Stable, evidence-backed capability specs.
+- [docs/tools/](docs/tools/foundations.md)
+  Shared single-tool design guidance.
+- [PRMOPT.md](PRMOPT.md)
+  Working brief for accepted stack and implementation choices.
 - [ROADMAP.md](ROADMAP.md)
   Strategic sequencing.
 - [TODO.md](TODO.md)
   Ordered near-term queue.
 - [PLAN.md](PLAN.md)
-  The one active detailed plan.
-- [PRMOPT.md](PRMOPT.md)
-  Active discussion brief for implementation choices, viable stacks, and build strategy.
-- [docs/specs/](docs/specs/)
-  Stable capability specs for the tool and related implementation targets.
-- [docs/research/](docs/research/)
-  Source evidence and upstream investigation notes.
-- [docs/tools/](docs/tools/)
-  Cross-cutting design guidance for agent-facing tools.
+  One active detailed implementation plan.
+- `src/`
+  Future implementation root for the KASB capability core, source adapters, app composition, and CLI.
+
+## Contributor Flow
+
+1. Start with [README.md](README.md).
+2. For product scope, read [VISION.md](VISION.md).
+3. For source behavior, read [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md).
+4. For capability contracts, read [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md).
+5. For app layout and layer boundaries, use this file and mirror `../darty/src/ARCHITECTURE.md` when scaffolding.
+6. For one active job, use [PLAN.md](PLAN.md); keep the ordered queue in [TODO.md](TODO.md).
 
 ## Invariants
 
-- Keep the KASB API contract in one reusable tool module. Do not duplicate request logic inside the scraper.
-- Treat `indexDocumentId` as the v1 public section id and keep `titleDocumentId` internal unless the contract changes explicitly.
-- Keep scraping policy separate from retrieval logic. The tool fetches; the scraper decides traversal and persistence.
-- Keep database writes out of the core tool module.
-- Keep stable specs in [docs/specs/](docs/specs/); keep upstream investigation in [docs/research/](docs/research/).
-- Prefer one shared typed language boundary between the tool, scraper, and CLI unless a stronger reason justifies a split stack.
+- Public JSON request fields use camelCase; CLI flags use kebab-case.
+- The success result schema contains `result`, `metadata`, `references`, and `warnings`; typed failures are separate from success schemas.
+- Source adapters may know raw KASB fields; public capabilities expose only stable semantic fields.
+- Provider implementations return capability-shaped results, not raw source payloads.
+- CLI commands import app/capability surfaces, not `sources/kasb/*` internals.
+- CLI help, examples, and presentation options stay CLI-local.
+- CLI success output is JSON on `stdout`; CLI failure output is JSON on `stderr` with nonzero exit code and empty `stdout`.
+- MCP, SDK, Pi-native tools, database persistence, and background ingestion are not current implementation targets.
+- Mark source observations as observed, inferred, or unverified when they affect contracts.
 
-## Near-Term Direction
+## Current Status
 
-The next implementation milestone is:
+The repo currently has docs, source evidence, and a v1 spec. It does not yet have:
 
-- create the first `kasb-tool` module
-- capture fixtures for the v1 operations
-- define the scraper-facing database schema
-- build the first `kasb-scraper` job on top of the shared tool
+- `package.json`
+- `src/`
+- `fixtures/`
+- tests, CLI, or implementation code
+
+The next milestone is to scaffold the Darty-shaped Bun/TypeScript implementation and then implement the four v1 capabilities fixture-first.
