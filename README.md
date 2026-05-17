@@ -1,10 +1,10 @@
 # kasb-standards
 
-Read-only KASB standards CLI target, following the app design used in `../darty`.
+Read-only KASB standards CLI, following the app design used in `../darty`.
 
-The product should provide a Bun/TypeScript capability core for `https://db.kasb.or.kr/api/` and a thin Commander CLI for local and agent use.
+The product provides a Bun/TypeScript capability core for `https://db.kasb.or.kr/api/` and a thin Commander CLI for local and agent use.
 
-Current status: a Bun/TypeScript CLI scaffold exists with fixture-backed implementations for standards search, structure lookup, section retrieval, paragraph retrieval, Q&A search, and Q&A document retrieval.
+Current status: the first CLI implementation exists with fixture-backed standards search, structure lookup, section retrieval, paragraph retrieval, Q&A search, and Q&A document retrieval. Hardening and review fixes are in progress.
 
 KASB public API behavior can drift. Keep source claims evidence-backed and update the research note when live behavior changes.
 
@@ -27,29 +27,27 @@ KASB public API behavior can drift. Keep source claims evidence-backed and updat
 3. [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md)
    Observed KASB API behavior, identifier spaces, and replay evidence.
 4. [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md)
-   v1 capability contract target.
-5. [PRMOPT.md](PRMOPT.md)
-   Accepted stack and implementation discussion brief.
-6. [ROADMAP.md](ROADMAP.md)
-   Strategic sequencing.
-7. [TODO.md](TODO.md)
+   v1 capability contract.
+5. [TODO.md](TODO.md)
    Ordered near-term queue.
-8. [PLAN.md](PLAN.md)
+6. [PLAN.md](PLAN.md)
    Active detailed implementation plan.
-9. [docs/tools/foundations.md](docs/tools/foundations.md)
+7. [docs/tools/foundations.md](docs/tools/foundations.md)
    Shared tool design principles.
+
+For historical planning context, see [ROADMAP.md](ROADMAP.md) and [PRMOPT.md](PRMOPT.md).
 
 ## Repo Map
 
 - [AGENTS.md](AGENTS.md): instructions for coding agents working in this repo
-- [ARCHITECTURE.md](ARCHITECTURE.md): target system shape, ownership boundaries, and Darty-parity architecture
+- [ARCHITECTURE.md](ARCHITECTURE.md): implemented system shape, ownership boundaries, and Darty-parity architecture
 - [VISION.md](VISION.md): product vision for `kasb-standards`
-- [PRMOPT.md](PRMOPT.md): implementation choices and stack decision brief
-- [ROADMAP.md](ROADMAP.md): phased direction from docs to implementation
+- [PRMOPT.md](PRMOPT.md): historical implementation choices and stack decision brief
+- [ROADMAP.md](ROADMAP.md): historical phased direction from docs to implementation
 - [TODO.md](TODO.md): ordered near-term queue
 - [PLAN.md](PLAN.md): one active detailed plan
 - [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md): captured source evidence and request inventory
-- [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md): v1 capability contract target
+- [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md): v1 capability contract
 - [docs/specs/](docs/specs/README.md): stable capability specs
 - [docs/tools/](docs/tools/foundations.md): shared tool-design guidance
 
@@ -67,10 +65,10 @@ KASB public API behavior can drift. Keep source claims evidence-backed and updat
 src/                    reusable capability core, CLI, source adapters
 fixtures/               captured KASB API responses for deterministic tests
 test/                   CLI, fixture-backed, and opt-in live checks
-evals/                  later agent/task evals after the CLI works
+evals/                  later agent/task evals after CLI behavior stabilizes
 ```
 
-The scaffold follows [ARCHITECTURE.md](ARCHITECTURE.md).
+The implementation follows [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## External References
 

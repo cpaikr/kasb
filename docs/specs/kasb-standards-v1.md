@@ -4,7 +4,7 @@
 
 - `name`: `kasb-standards`
 - `owner`: repo-local spec
-- `status`: draft implementation target
+- `status`: implemented draft contract; hardening in progress
 - `domain`: Korean accounting standards access
 - `users`: LLM agents, agent developers, researchers, and humans using the CLI
 
@@ -148,7 +148,7 @@ Allowed public failure codes:
 
 ### Output Modes
 
-The first implementation should support structured output. Summary and raw projections may be CLI output options only when they do not change the core result contract or the always-JSON CLI rule.
+The first implementation supports structured output. Summary and raw projections may be CLI output options only when they do not change the core result contract or the always-JSON CLI rule.
 
 Every output mode still emits a JSON envelope:
 

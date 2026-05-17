@@ -12,16 +12,13 @@ Ordered near-term queue. Keep details for the active item in [PLAN.md](PLAN.md).
 
 ## Next Up
 
-1. Broaden contract tests.
-   - Assert JSON Schema exports for each operation.
-   - Add request validation edge cases for every command.
+1. Finish the current hardening pass.
+   - Keep JSON Schema export, request validation, source drift, and CLI entrypoint coverage aligned with the implemented commands.
+   - Avoid documenting command details until review fixes settle.
 2. Harden source normalization.
-   - Add drift tests for missing KASB fields.
-   - Add more Q&A type examples.
-3. Improve CLI smoke coverage.
-   - Add success-path subprocess checks with mocked or fixture-backed fetch where practical.
-   - Add bundled CLI entrypoint tests.
-4. Add docs after behavior settles.
+   - Add focused drift tests for malformed or missing KASB fields when new source assumptions are discovered.
+   - Add more Q&A type examples only if they clarify stable behavior.
+3. Add user-facing docs after behavior settles.
    - CLI examples for each command.
    - Q&A capability spec refinements if source type names are promoted.
 

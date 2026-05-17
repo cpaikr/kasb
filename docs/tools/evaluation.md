@@ -38,12 +38,14 @@ Initial fixture targets:
 - `/api/paragraphs/1116/ZB2hJW`
 - `/api/paragraphs/content/1116/23`
 - appendix-style paragraph lookups such as `한2.1`, `B3`, and `BC240A`
+- `/api/qnas/v2?types=11,12,13,14,15,24,25&searchWord=리스&page=1&rows=5`
+- `/api/qnas/v2/SSI-35629`
 
 ### Live checks
 
 Use opt-in live checks for source behavior that fixtures cannot prove, such as source drift, id mismatches, and endpoint availability.
 
-In this repo, those should belong under `test/live/` and be gated by `LIVE_KASB_TESTS=1` once tests exist.
+In this repo, those belong under `test/live/` and are gated by `LIVE_KASB_TESTS=1`.
 
 ### Scenario evals
 

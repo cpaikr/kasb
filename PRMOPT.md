@@ -1,15 +1,15 @@
 # PRMOPT
 
-This file is the working brief for implementation choices. Stable decisions should be reflected in [ARCHITECTURE.md](ARCHITECTURE.md), [docs/specs/](docs/specs/README.md), and code once scaffolded.
+This file is historical implementation context for the first CLI scaffold. Current architecture, contracts, and active work are authoritative in [ARCHITECTURE.md](ARCHITECTURE.md), [docs/specs/](docs/specs/README.md), [TODO.md](TODO.md), [PLAN.md](PLAN.md), and code.
 
-The project should follow `../darty` unless a KASB-specific constraint justifies a different path.
+The project follows `../darty` unless a KASB-specific constraint justifies a different path.
 
 ## What We Need To Build
 
 The tool should:
 
 - talk directly to `https://db.kasb.or.kr/api/`
-- expose typed capabilities for standards search, structure lookup, section retrieval, and paragraph retrieval
+- expose typed capabilities for standards search, structure lookup, section retrieval, paragraph retrieval, Q&A search, and Q&A document retrieval
 - validate public semantic requests with Effect Schema
 - export JSON Schemas from the same contracts used at runtime
 - normalize upstream responses into traceable success envelopes
@@ -41,9 +41,9 @@ KASB-specific handling:
 
 - Public JSON fields use camelCase semantic names: `keyword`, `stdNum`, `indexDocumentId`, `paraNum`.
 - KASB source parameters such as `searchWord` stay inside source adapters.
-- CLI command names use kebab-case: `search-standards`, `get-standard-structure`, `get-section`, `get-paragraph`.
-- CLI flags use kebab-case: `--keyword`, `--std-num`, `--index-document-id`, `--para-num`.
-- TypeScript names should follow the repo's eventual implementation style; do not lock function names in docs before code exists.
+- CLI command names use kebab-case: `search-standards`, `get-standard-structure`, `get-section`, `get-paragraph`, `search-qnas`, `get-qna`.
+- CLI flags use kebab-case: `--keyword`, `--std-num`, `--index-document-id`, `--para-num`, `--doc-number`.
+- TypeScript names should follow the established implementation style; do not lock new function names in docs before code establishes them.
 
 ## Target Layout
 
@@ -61,7 +61,7 @@ test/
 evals/
 ```
 
-Use [ARCHITECTURE.md](ARCHITECTURE.md) for layer boundaries. Avoid locking exact files in docs before the first scaffold exists.
+Use [ARCHITECTURE.md](ARCHITECTURE.md) for layer boundaries. Avoid locking new exact files in docs before the implementation establishes a stable convention.
 
 ## Capability Pattern
 
@@ -72,7 +72,7 @@ Each operation should mirror Darty's boundary split without copying unnecessary 
 - provider interface between capability and source adapter
 - transport-local CLI descriptions, flags, examples, and output controls
 
-Choose exact file names during scaffolding, then update docs only where the code establishes a stable convention.
+Keep docs aligned with exact file names only where the code has established a stable convention.
 
 ## Source Adapter Pattern
 
@@ -96,7 +96,7 @@ Match Darty's verification layers:
 3. subprocess CLI smoke tests under `test/cli/` once the CLI exists
 4. subprocess CLI tests that assert `stdout`, `stderr`, and exit-code behavior for success and failure
 5. opt-in live checks under `test/live/`, gated by `LIVE_KASB_TESTS=1`
-6. capability-scoped evals under `evals/` only after the CLI works
+6. capability-scoped evals under `evals/` only after CLI behavior stabilizes
 
 ## Rejected Or Deferred Options
 
@@ -116,11 +116,14 @@ Rejected for this repo's current product direction. This repo should retrieve an
 
 Rejected as the primary implementation path. Browser observations are useful for source investigation, but the tool should call the public KASB API directly.
 
-## Next Implementation Step
+## Current Implementation State
 
-Scaffold the Bun/TypeScript repo-local implementation:
+The Bun/TypeScript repo-local implementation now exists:
 
-1. create root package files as needed
-2. create Darty-shaped `src/` roots for app composition, capabilities, CLI, and KASB source adapters
-3. add only the capability skeleton needed for the first implementation slice
-4. capture fixtures from the live KASB API before implementing normalization
+- root package files and real scripts
+- Darty-shaped `src/` roots for app composition, capabilities, CLI, and KASB source adapters
+- standards and Q&A capabilities
+- captured KASB fixtures and fixture-backed tests
+- subprocess CLI tests and gated live checks
+
+Use [PLAN.md](PLAN.md) and [TODO.md](TODO.md) for active hardening work.

@@ -4,12 +4,12 @@
 
 - This repo is for a read-only KASB standards CLI, not a generic Markdown guide.
 - The app design should follow `../darty`: a behavior-first capability core, thin CLI transport, explicit source adapters, and typed contract/error boundaries.
-- The current repo is still pre-scaffold. Do not mistake the documentation state for a different product shape.
+- The first CLI implementation now exists. Treat broad docs as product and architecture guidance, while `PLAN.md` and `TODO.md` track active hardening work.
 
 ## Read First
 
 1. Start with [README.md](README.md).
-2. Read [ARCHITECTURE.md](ARCHITECTURE.md) for document ownership, target layout, and Darty-parity boundaries.
+2. Read [ARCHITECTURE.md](ARCHITECTURE.md) for document ownership, implemented layout, and Darty-parity boundaries.
 3. Read [VISION.md](VISION.md) for product scope and non-goals.
 4. Read [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md) before changing source assumptions.
 5. Read [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md) before changing capability contracts.

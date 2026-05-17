@@ -3,7 +3,7 @@
 ## Product
 
 - `name`: `kasb-standards`
-- `status`: implementation bootstrap
+- `status`: first CLI implementation exists; hardening in progress
 - `domain`: Korean accounting standards and related interpretation material exposed through KASB public read surfaces
 - `users`: LLM agents, agent developers, researchers, and humans who need reliable CLI access to standards content
 
@@ -34,12 +34,14 @@ This is worth standardizing because standards work is repetitive, citation-sensi
 
 ## Product Shape
 
-The product should support a narrow set of CLI-facing capabilities first:
+The v1 CLI exposes a narrow set of read-only capabilities:
 
 - search standards by keyword
 - retrieve the structural index for a standard
 - fetch one section by KASB's retrieval-facing section id
 - fetch one exact paragraph by standard number and paragraph number
+- search KASB Q&A material by keyword
+- fetch one Q&A document by document number
 - return source URLs, stable references, and warnings for source drift or partial normalization
 
 ## Principles
@@ -97,9 +99,9 @@ The product is successful when an agent or human can reliably:
 ## Current State
 
 - The KASB API source map is documented in [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md).
-- The v1 contract target is documented in [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md).
-- The target implementation architecture now follows `../darty`; see [ARCHITECTURE.md](ARCHITECTURE.md).
-- The implementation scaffold does not exist yet.
+- The v1 public contract is documented in [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md).
+- The implementation follows `../darty`'s layer split; see [ARCHITECTURE.md](ARCHITECTURE.md).
+- The first Bun/TypeScript CLI version exists with standards and Q&A operations, fixture-backed tests, and gated live checks.
 
 ## Remaining Product Questions
 

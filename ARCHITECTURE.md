@@ -1,15 +1,15 @@
 # Architecture
 
-This repo should track `../darty`'s app design while applying it to KASB standards access.
+This repo tracks `../darty`'s app design while applying it to KASB standards access.
 
-The target system is a CLI-first, read-only TypeScript app:
+The system is a CLI-first, read-only TypeScript app:
 
 - `src/`: reusable capability core, source adapters, CLI transport, and app composition
 - `fixtures/`: captured KASB API responses for deterministic tests
-- `test/`: broader CLI and opt-in live checks once code exists
-- `evals/`: later scenario evals after the CLI works
+- `test/`: CLI, fixture-backed, contract, and opt-in live checks
+- `evals/`: later scenario evals after CLI behavior stabilizes
 
-The implementation is now scaffolded. This document defines boundaries and direction; exact files should continue to follow the proven code shape rather than precommitting unused modules.
+The first CLI implementation exists. This document defines implemented boundaries and ongoing direction; exact files should follow the proven code shape rather than precommitting unused modules.
 
 ## Big Picture
 
@@ -26,7 +26,7 @@ The first public capabilities are:
 
 The CLI is the only planned public interface. MCP, SDK, Pi-native tools, database persistence, and background ingestion are not implementation goals for this repo.
 
-## Target Layering
+## Layering
 
 ```mermaid
 graph TD
@@ -52,14 +52,14 @@ graph TD
     SRC --> KASB[("db.kasb.or.kr/api")]
 ```
 
-| Layer | Target path | Owns |
+| Layer | Path | Owns |
 |---|---|---|
 | CLI transport | `src/cli.ts`, `src/cli/` | Parse CLI input, own help/examples/output flags, call shared operations, serialize JSON |
 | App composition | `src/app/` | Operation names, JSON Schemas, and default provider wiring for the CLI |
 | Capability | `src/capabilities/` | Public semantic request/result schemas, request resolution, typed failures, execution |
 | Source | `src/sources/kasb/` | KASB API URLs, source response schemas, fetchers, normalization, source error mapping |
 
-## Intended Implementation Roots
+## Implementation Roots
 
 - `src/app/` for operation composition and default wiring
 - `src/capabilities/` for public contracts and execution
@@ -67,7 +67,7 @@ graph TD
 - `src/sources/kasb/` for KASB endpoint access and source normalization
 - `fixtures/`, `test/`, and `evals/` for captured source responses, verification, and later task scenarios
 
-Start from `../darty`'s per-capability shape when scaffolding, but let the first real implementation decide exact file names.
+The first implementation established the current per-capability file shape. Continue that pattern unless a concrete refactor improves the layer boundaries.
 
 ## Behavior-First Core
 
@@ -100,7 +100,7 @@ What stays CLI-local:
 
 ## Runtime Flow
 
-Target CLI flow:
+Runtime CLI flow:
 
 ```text
 argv -> CLI transport -> app operation -> capability execution -> KASB source adapter -> https://db.kasb.or.kr/api/...
@@ -118,7 +118,7 @@ Keep two schema families separate:
 ## Document Ownership
 
 - [README.md](README.md)
-  Minimal project orientation, status, reading order, and target roots.
+  Minimal project orientation, status, reading order, and implementation roots.
 - [VISION.md](VISION.md)
   Product-level goal, scope, principles, and non-goals.
 - [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md)
@@ -136,7 +136,7 @@ Keep two schema families separate:
 - [PLAN.md](PLAN.md)
   One active detailed implementation plan.
 - `src/`
-  Future implementation root for the KASB capability core, source adapters, app composition, and CLI.
+  Implementation root for the KASB capability core, source adapters, app composition, and CLI.
 
 ## Contributor Flow
 
@@ -144,7 +144,7 @@ Keep two schema families separate:
 2. For product scope, read [VISION.md](VISION.md).
 3. For source behavior, read [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md).
 4. For capability contracts, read [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md).
-5. For app layout and layer boundaries, use this file and mirror `../darty/src/ARCHITECTURE.md` when scaffolding.
+5. For app layout and layer boundaries, use this file and keep parity with `../darty` where it still fits KASB.
 6. For one active job, use [PLAN.md](PLAN.md); keep the ordered queue in [TODO.md](TODO.md).
 
 ## Invariants
@@ -161,7 +161,7 @@ Keep two schema families separate:
 
 ## Current Status
 
-The repo currently has docs, source evidence, a v1 spec, and a Darty-shaped Bun/TypeScript implementation scaffold.
+The repo currently has docs, source evidence, a v1 spec, and a Darty-shaped Bun/TypeScript CLI implementation.
 
 Implemented roots:
 
@@ -171,4 +171,4 @@ Implemented roots:
 - `test/`
 - `scripts/build-cli.ts`
 
-The next milestone is to harden the implementation with broader contract tests, docs for the Q&A capability contract, and opt-in live checks as public KASB API behavior drifts.
+The current milestone is to keep hardening the implementation with broader contract tests, source-drift coverage, CLI entrypoint coverage, and docs/examples after command behavior settles.

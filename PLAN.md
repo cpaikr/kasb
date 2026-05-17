@@ -4,7 +4,7 @@ Current job: harden the Darty-shaped CLI implementation for `kasb-standards`.
 
 ## Goal
 
-Turn the scaffolded KASB contract into a reliable Bun/TypeScript CLI that mirrors `../darty` while targeting KASB standards and Q&A read APIs.
+Harden the implemented Bun/TypeScript CLI so it remains reliable, Darty-shaped, and focused on KASB standards and Q&A read APIs.
 
 ## Implemented
 
@@ -41,11 +41,10 @@ Turn the scaffolded KASB contract into a reliable Bun/TypeScript CLI that mirror
 
 ## Next Work Plan
 
-1. Add JSON Schema export tests for every capability.
-2. Add request validation tests for every capability and CLI flag mapping.
-3. Add source drift tests for malformed KASB responses.
-4. Add bundled CLI entrypoint smoke tests.
-5. Expand docs/examples after tests lock the command behavior.
+1. Finish the current review and hardening pass without changing the public product shape.
+2. Keep JSON Schema export, request validation, source drift, and CLI entrypoint coverage green as fixes land.
+3. Add only focused source normalization tests when a concrete KASB drift assumption is discovered.
+4. Expand docs/examples after tests lock command behavior.
 
 ## Exit Criteria
 
