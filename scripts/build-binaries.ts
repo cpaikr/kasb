@@ -24,7 +24,7 @@ type BinaryTarget = {
   readonly archiveType: ReleaseArchiveType;
 };
 
-const targets: readonly BinaryTarget[] = [
+const supportedTargets: readonly BinaryTarget[] = [
   {
     bunTarget: "bun-darwin-arm64",
     assetPlatform: "macos",
@@ -61,6 +61,13 @@ const targets: readonly BinaryTarget[] = [
     archiveType: "zip",
   },
 ];
+
+const releaseTargetBunTargets = new Set<string>([
+  "bun-darwin-arm64",
+  "bun-linux-x64",
+  "bun-linux-arm64",
+  "bun-windows-x64",
+]);
 
 const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
   version?: string;
@@ -151,12 +158,15 @@ const createArchive = (target: BinaryTarget, executablePath: string, releaseDir:
 
 const { outdir, selectedTargets, smokeTest } = parseArgs(Bun.argv.slice(2));
 const selectedTargetSet = new Set(selectedTargets);
+const defaultReleaseTargets = supportedTargets.filter((target) =>
+  releaseTargetBunTargets.has(target.bunTarget),
+);
 const buildTargets = selectedTargets.length === 0
-  ? targets
-  : targets.filter((target) => selectedTargetSet.has(target.bunTarget));
+  ? defaultReleaseTargets
+  : supportedTargets.filter((target) => selectedTargetSet.has(target.bunTarget));
 
 const unknownTargets = selectedTargets.filter(
-  (selectedTarget) => !targets.some((target) => target.bunTarget === selectedTarget),
+  (selectedTarget) => !supportedTargets.some((target) => target.bunTarget === selectedTarget),
 );
 
 if (unknownTargets.length > 0) {
