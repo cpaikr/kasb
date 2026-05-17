@@ -24,6 +24,12 @@
 
 Do not add placeholder build, lint, format, or test commands to docs. Document only commands that exist in `package.json`.
 
+## CLI Tryouts
+
+- Agents may run the local CLI from the repo root to inspect behavior and validate changes.
+- Treat the CLI help output as the guide: start with `bun src/cli.ts --help`, then use `bun src/cli.ts help <command>` for command-specific usage.
+- After `bun run build`, use `node dist/cli.js --help` to check the packaged entrypoint.
+
 Expected implementation stack, matching `../darty` unless a later decision changes it:
 
 - Bun
