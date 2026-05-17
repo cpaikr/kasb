@@ -53,6 +53,7 @@ For historical planning context, see [ROADMAP.md](ROADMAP.md) and [PRMOPT.md](PR
 - [docs/specs/](docs/specs/README.md): stable capability specs
 - [docs/tools/](docs/tools/foundations.md): shared tool-design guidance
 - [docs/tools/cli-tryouts.md](docs/tools/cli-tryouts.md): live CLI examples agents can run while dogfooding usage
+- [docs/release.md](docs/release.md): Release Please, npm publishing, and standalone binary release flow
 
 ## Commands
 
@@ -60,6 +61,7 @@ For historical planning context, see [ROADMAP.md](ROADMAP.md) and [PRMOPT.md](PR
 - Typecheck: `bun run typecheck`
 - Test: `bun test`
 - Build npm CLI: `bun run build`
+- Build standalone binaries: `bun run build:binaries`
 - Live checks: `bun run test:live`
 
 ## Implementation Roots

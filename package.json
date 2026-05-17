@@ -14,11 +14,15 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20.18.1"
   },
   "scripts": {
     "build": "bun run scripts/build-cli.ts",
+    "build:binaries": "bun run scripts/build-binaries.ts",
     "prepack": "bun run build",
     "prepublishOnly": "bun run typecheck && bun test",
     "typecheck": "tsc --noEmit",
