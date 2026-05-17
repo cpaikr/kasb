@@ -1,1 +1,7 @@
-.tmp/
+node_modules/
+dist/
+dist-bin/
+.npm-cache/
+.env
+.env.local
+.env.*.local

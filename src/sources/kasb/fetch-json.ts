@@ -1,0 +1,42 @@
+import { ProviderFailure } from "../../capabilities/types.ts";
+
+const requestTimeoutMs = 15_000;
+
+export const fetchKasbJson = async (sourceUrl: string): Promise<unknown> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+
+  try {
+    const response = await fetch(sourceUrl, {
+      headers: {
+        accept: "application/json",
+        "user-agent": "kasb-standards-cli/0.0.0",
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new ProviderFailure({
+        code: response.status === 404 ? "not_found" : "source_unavailable",
+        message: `KASB API 요청이 실패했습니다(status=${response.status}).`,
+        retryable: response.status >= 500,
+        sourceUrl,
+      });
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ProviderFailure) {
+      throw error;
+    }
+
+    throw new ProviderFailure({
+      code: "source_unavailable",
+      message: "KASB API에 연결할 수 없습니다.",
+      retryable: true,
+      sourceUrl,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+};

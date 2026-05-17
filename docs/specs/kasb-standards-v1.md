@@ -29,6 +29,8 @@ In scope:
 - standard structure lookup
 - section retrieval
 - exact paragraph retrieval
+- Q&A search
+- Q&A document retrieval
 - stable references and source metadata
 - JSON Schemas exported from the same contracts used at runtime
 - Commander CLI commands for the v1 operations
@@ -62,6 +64,8 @@ Out of scope:
   Public v1 section retrieval identifier. Example: `ZB2hJW`.
 - `paraNum`
   Public paragraph identifier within one standard. Examples: `23`, `한2.1`, `B3`, `BC240A`.
+- `docNumber`
+  Public Q&A document identifier. Example: `SSI-35629`.
 
 ### Derived Or Internal Identifiers
 
@@ -109,6 +113,8 @@ Examples:
 | `get-standard-structure` | `stdNum` | `--std-num` |
 | `get-section` | `indexDocumentId` | `--index-document-id` |
 | `get-paragraph` | `paraNum` | `--para-num` |
+| `search-qnas` | `keyword` | `--keyword` |
+| `get-qna` | `docNumber` | `--doc-number` |
 
 ### Success Envelope
 
@@ -238,6 +244,48 @@ Implementation notes:
 - Use `GET /api/paragraphs/content/{stdNum}/{paraNum}`.
 - Normalize the direct paragraph response into a single exact result or a typed `not_found` failure.
 - Direct paragraph lookup should not require the caller to know the section id.
+
+### `search-qnas`
+
+- `purpose`
+  Find KASB Q&A and interpretation material relevant to a keyword.
+- `inputs`
+  `keyword`, optional `page`, optional `rows`, optional source `types` CSV
+- `output`
+  Matching Q&A records with `docNumber`, source type, title, snippet, tags, source links, and count metadata.
+- `warnings`
+  `source_html_preserved`, `source_metadata_incomplete`
+- `failure cases`
+  `invalid_input`, `source_unavailable`, `source_changed`
+- `safety class`
+  read-only
+
+Implementation notes:
+
+- Use `GET /api/qnas/v2?types={csv}&searchWord={keyword}&page={page}&rows={rows}`.
+- Default observed public `types` to `11,12,13,14,15,24,25`.
+- Keep type numbers source-facing until a later spec promotes semantic type names.
+
+### `get-qna`
+
+- `purpose`
+  Fetch one Q&A document by stable source document number.
+- `inputs`
+  `docNumber`, optional `keyword`
+- `output`
+  One Q&A record with `docNumber`, title, full plain content, optional HTML content, related standards HTML, tags, adjacent document numbers, and source links.
+- `warnings`
+  `source_html_preserved`, `source_metadata_incomplete`
+- `failure cases`
+  `invalid_input`, `not_found`, `source_unavailable`, `source_changed`
+- `safety class`
+  read-only
+
+Implementation notes:
+
+- Use `GET /api/qnas/v2/{docNumber}`.
+- Include source `searchWord` only when optional `keyword` is supplied.
+- Treat `contentHtml` and related-standards fragments as source HTML; preserve them rather than inventing lossy citations.
 
 ## 7. CLI Transport
 

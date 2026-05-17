@@ -2,36 +2,30 @@
 
 Ordered near-term queue. Keep details for the active item in [PLAN.md](PLAN.md).
 
+## Done In Current Scaffold
+
+- Added Bun/TypeScript package files and real scripts.
+- Created `src`, `fixtures`, `test`, `evals`, and build script roots.
+- Implemented Darty-style app, capability, CLI, and KASB source adapter layers.
+- Captured fixtures for standards search, structure lookup, section retrieval, paragraph retrieval, Q&A search, and Q&A detail retrieval.
+- Added fixture-backed provider tests, CLI subprocess tests, and gated live checks.
+
 ## Next Up
 
-1. Scaffold the Darty-shaped Bun/TypeScript CLI project.
-   - Add the real package files.
-   - Create `src`, `fixtures`, `test`, and `evals` roots.
-2. Create the source skeleton.
-   - Add the Darty-style layer roots needed for app composition, capabilities, CLI, and KASB source access.
-   - Start with one capability path, then repeat the pattern once code proves it.
-3. Capture v1 KASB fixtures.
-   - `/api/standard?searchWord=리스`
-   - `/api/standard-indexes/1116`
-   - `/api/paragraphs/1116/ZB2hJW`
-   - `/api/paragraphs/content/1116/23`
-   - include appendix-style paragraph examples from the source map.
-4. Implement the shared capability contracts.
-   - Effect Schema request/result contracts.
-   - JSON Schema exports.
-   - request resolution and typed failures.
-   - keep every CLI output mode as JSON.
-5. Implement source adapters and core execution.
-   - Normalize KASB API payloads into capability envelopes.
-   - Test `titleDocumentId` versus `indexDocumentId` behavior explicitly.
-6. Add the CLI transport.
-   - Commander root command.
-   - Four v1 operation commands.
-   - JSON success output on `stdout`.
-   - JSON failure output on `stderr` with nonzero exit code and empty `stdout`.
-   - CLI smoke tests for both success and failure paths.
+1. Broaden contract tests.
+   - Assert JSON Schema exports for each operation.
+   - Add request validation edge cases for every command.
+2. Harden source normalization.
+   - Add drift tests for missing KASB fields.
+   - Add more Q&A type examples.
+3. Improve CLI smoke coverage.
+   - Add success-path subprocess checks with mocked or fixture-backed fetch where practical.
+   - Add bundled CLI entrypoint tests.
+4. Add docs after behavior settles.
+   - CLI examples for each command.
+   - Q&A capability spec refinements if source type names are promoted.
 
 ## Later
 
-- Add opt-in live checks gated by `LIVE_KASB_TESTS=1`.
-- Add capability-scoped evals after the CLI works.
+- Add capability-scoped evals after the CLI behavior stabilizes.
+- Consider user-facing route URLs only if they can be derived safely.

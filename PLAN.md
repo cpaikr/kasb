@@ -1,17 +1,30 @@
 # Plan
 
-Current job: bootstrap the Darty-shaped CLI implementation for `kasb-standards`.
+Current job: harden the Darty-shaped CLI implementation for `kasb-standards`.
 
 ## Goal
 
-Turn the v1 KASB contract into a real Bun/TypeScript CLI implementation layout that mirrors `../darty`.
+Turn the scaffolded KASB contract into a reliable Bun/TypeScript CLI that mirrors `../darty` while targeting KASB standards and Q&A read APIs.
 
-## Deliverable
+## Implemented
 
-- a root repo scaffold with `src/`, `fixtures/`, `test/`, and `evals/`
-- a source tree split into app composition, capabilities, CLI transport, and KASB source adapters
-- initial fixture files for the four v1 operations
-- first Effect Schema contracts and typed failure boundaries for `search-standards`, `get-standard-structure`, `get-section`, and `get-paragraph`
+- Root Bun/TypeScript package files with real scripts.
+- Darty-style layer roots:
+  - `src/app/`
+  - `src/capabilities/`
+  - `src/cli.ts` and `src/cli/`
+  - `src/sources/kasb/`
+- Standards capabilities:
+  - `search-standards`
+  - `get-standard-structure`
+  - `get-section`
+  - `get-paragraph`
+- Q&A capabilities:
+  - `search-qnas`
+  - `get-qna`
+- Captured KASB fixtures under `fixtures/kasb/`.
+- Fixture-backed provider tests and CLI failure/help tests.
+- Gated live traversal test under `test/live/`.
 
 ## Decisions
 
@@ -23,54 +36,20 @@ Turn the v1 KASB contract into a real Bun/TypeScript CLI implementation layout t
 - use native `fetch` for KASB API calls
 - use success-only result envelopes plus separate typed failures
 - keep raw KASB source models internal to `sources/kasb`
+- write CLI success JSON to `stdout` and failure JSON to `stderr`
 - keep the public product CLI-only
 
-## In Scope
+## Next Work Plan
 
-- root package scaffold needed to start implementation
-- `src` layer roots for the first implementation slice
-- capability contract boundaries for the four v1 operations
-- KASB fixture capture for search, structure, section, and paragraph retrieval
-- deterministic tests around known identifier risks
-- Commander CLI commands for the four v1 operations
-
-## Out Of Scope
-
-- MCP adapter work
-- SDK packaging
-- Pi-native adapter work
-- database persistence or background ingestion
-- answer generation or accounting interpretation
-- mutation, login, or account flows
-- broad interpretation-material coverage
-
-## Inputs
-
-- `../darty/ARCHITECTURE.md`
-- `../darty/src/ARCHITECTURE.md`
-- `../darty/src/`
-- [ARCHITECTURE.md](ARCHITECTURE.md)
-- [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md)
-- [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md)
-- [PRMOPT.md](PRMOPT.md)
-
-## Work Plan
-
-1. Scaffold root Bun/TypeScript project files using only real scripts.
-2. Create the Darty-style layer roots needed for app composition, capabilities, CLI, and KASB source access.
-3. Implement one capability path first, then repeat the pattern only when it is proven by code.
-4. Capture fixture responses from the live KASB API for the v1 scenarios.
-5. Define shared contract, validation, and typed failure boundaries as they become necessary.
-6. Implement source adapters and normalizers for the four KASB endpoint families.
-7. Add deterministic tests for JSON Schema shape, source normalization, and identifier mismatch behavior.
-8. Add the Commander CLI once the core execution path works.
-9. Add subprocess CLI smoke tests for all four v1 commands.
+1. Add JSON Schema export tests for every capability.
+2. Add request validation tests for every capability and CLI flag mapping.
+3. Add source drift tests for malformed KASB responses.
+4. Add bundled CLI entrypoint smoke tests.
+5. Expand docs/examples after tests lock the command behavior.
 
 ## Exit Criteria
 
-- the repo has a clear Darty-shaped implementation location
-- the first capability path establishes a repeatable pattern for the remaining v1 operations
-- internal source ids and route-only ids are isolated from public contracts; promoted KASB ids remain explicit
-- CLI commands are thin over the shared app/capability layer
-- CLI success and failure paths are always JSON and covered by subprocess tests
-- fixture-backed implementation can continue without revisiting the app architecture
+- CLI commands are thin over the shared app/capability layer.
+- Internal source ids and route-only ids are isolated from public contracts.
+- Success and failure output are always parseable JSON and covered by subprocess tests.
+- Fixture-backed tests cover the known KASB identifier mismatch and Q&A endpoint behavior.

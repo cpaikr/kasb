@@ -9,7 +9,7 @@ The target system is a CLI-first, read-only TypeScript app:
 - `test/`: broader CLI and opt-in live checks once code exists
 - `evals/`: later scenario evals after the CLI works
 
-The implementation is not scaffolded yet. This document defines boundaries and direction; exact files should be settled while scaffolding real code.
+The implementation is now scaffolded. This document defines boundaries and direction; exact files should continue to follow the proven code shape rather than precommitting unused modules.
 
 ## Big Picture
 
@@ -21,6 +21,8 @@ The first public capabilities are:
 - `get-standard-structure`
 - `get-section`
 - `get-paragraph`
+- `search-qnas`
+- `get-qna`
 
 The CLI is the only planned public interface. MCP, SDK, Pi-native tools, database persistence, and background ingestion are not implementation goals for this repo.
 
@@ -159,11 +161,14 @@ Keep two schema families separate:
 
 ## Current Status
 
-The repo currently has docs, source evidence, and a v1 spec. It does not yet have:
+The repo currently has docs, source evidence, a v1 spec, and a Darty-shaped Bun/TypeScript implementation scaffold.
+
+Implemented roots:
 
 - `package.json`
 - `src/`
 - `fixtures/`
-- tests, CLI, or implementation code
+- `test/`
+- `scripts/build-cli.ts`
 
-The next milestone is to scaffold the Darty-shaped Bun/TypeScript implementation and then implement the four v1 capabilities fixture-first.
+The next milestone is to harden the implementation with broader contract tests, docs for the Q&A capability contract, and opt-in live checks as public KASB API behavior drifts.

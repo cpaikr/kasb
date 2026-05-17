@@ -4,7 +4,7 @@ Read-only KASB standards CLI target, following the app design used in `../darty`
 
 The product should provide a Bun/TypeScript capability core for `https://db.kasb.or.kr/api/` and a thin Commander CLI for local and agent use.
 
-Current status: source investigation and v1 contract docs exist; implementation directories have not been scaffolded yet.
+Current status: a Bun/TypeScript CLI scaffold exists with fixture-backed implementations for standards search, structure lookup, section retrieval, paragraph retrieval, Q&A search, and Q&A document retrieval.
 
 KASB public API behavior can drift. Keep source claims evidence-backed and update the research note when live behavior changes.
 
@@ -53,16 +53,24 @@ KASB public API behavior can drift. Keep source claims evidence-backed and updat
 - [docs/specs/](docs/specs/README.md): stable capability specs
 - [docs/tools/](docs/tools/foundations.md): shared tool-design guidance
 
-## Intended Implementation Roots
+## Commands
+
+- Install deps: `bun install`
+- Typecheck: `bun run typecheck`
+- Test: `bun test`
+- Build npm CLI: `bun run build`
+- Live checks: `bun run test:live`
+
+## Implementation Roots
 
 ```text
 src/                    reusable capability core, CLI, source adapters
 fixtures/               captured KASB API responses for deterministic tests
-test/                   broader CLI/live checks once code exists
+test/                   CLI, fixture-backed, and opt-in live checks
 evals/                  later agent/task evals after the CLI works
 ```
 
-The exact scaffold should follow [ARCHITECTURE.md](ARCHITECTURE.md).
+The scaffold follows [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## External References
 

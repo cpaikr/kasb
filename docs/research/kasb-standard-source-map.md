@@ -1,6 +1,6 @@
 # KASB Standards Source Map
 
-Captured on 2026-03-31.
+Captured on 2026-03-31. Q&A endpoint notes refreshed on 2026-05-17.
 
 Status: observed source evidence, not the public contract or architecture guide. Promote stable contract decisions into [../specs/kasb-standards-v1.md](../specs/kasb-standards-v1.md) and implementation-shape decisions into [../../ARCHITECTURE.md](../../ARCHITECTURE.md).
 
@@ -14,7 +14,7 @@ Method:
 
 Observed:
 
-- Browser routes live under `https://db.kasb.or.kr/standard/`.
+- Browser routes live under `https://db.kasb.or.kr/standard/` and `https://db.kasb.or.kr/qnas/`.
 - The current JSON API origin is `https://db.kasb.or.kr/api/`.
 - Direct calls to `https://db.kasb.or.kr/standard/api/...` return the SPA HTML shell, not JSON.
 
@@ -134,6 +134,34 @@ Observed endpoints:
   Bookmark-related paragraph lookup.
 
 v1 public section retrieval should use `indexDocumentId`. v1 public paragraph retrieval should use `stdNum + paraNum`.
+
+### Q&A Retrieval
+
+Observed endpoints:
+
+- `GET /api/qnas/v2/types`
+  Returns Q&A type metadata. Observed public type ids include `11`, `12`, `13`, `14`, `15`, `24`, and `25`.
+- `GET /api/qnas/v2/count`
+  Returns Q&A counts by type.
+- `GET /api/qnas/v2?types={csv}&searchWord={term}&page={page}&rows={rows}`
+  Returns Q&A search results with `docNumber`, `type`, highlighted `title`, highlighted `fullContent`, tags, source links, and count metadata.
+- `GET /api/qnas/v2/{docNumber}?searchWord={term?}`
+  Returns one Q&A document with `docNumber`, `type`, `title`, `fullContent`, optional `contentHtml`, related standards HTML, tags, adjacent document numbers, and similar Q&A references.
+- `GET /api/qnas/v2/paragraph?faqDocNumbers={csv}`
+  Appears to map paragraph FAQ document numbers to Q&A data.
+
+Observed:
+
+- Searching `리스` with `types=11,12,13,14,15,24,25&page=1&rows=5` returned `200 OK` and Q&A documents such as `IFRSIC2207E`, `2020-I-KQA002`, and `SSI-35629`.
+- `GET /api/qnas/v2/SSI-35629?searchWord=리스` returned a full Q&A document for `리스 개시일과 계약일`.
+- Calling legacy `GET /api/qnas?...` with the same search shape returned `500` during refresh; v1 implementation should use `/api/qnas/v2`.
+
+Implementation implication:
+
+- treat Q&A document identity as `docNumber`
+- keep Q&A `type` values source-facing until product docs promote a stable semantic enum
+- preserve source `contentHtml` and `relStds` as HTML fields when returned, with warnings
+- use `/api/qnas/v2` for read-only Q&A search and detail retrieval
 
 ### Non-Read Noise To Ignore In V1
 

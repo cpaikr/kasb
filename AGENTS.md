@@ -16,9 +16,13 @@
 
 ## Commands
 
-No implementation package exists yet, so this repo currently has no project commands.
+- Install deps: `bun install`
+- Typecheck: `bun run typecheck`
+- Test: `bun test`
+- Build npm CLI: `bun run build`
+- Live checks: `bun run test:live`
 
-Do not add placeholder build, lint, format, or test commands to docs. Once the scaffold exists, document only commands that exist in `package.json`.
+Do not add placeholder build, lint, format, or test commands to docs. Document only commands that exist in `package.json`.
 
 Expected implementation stack, matching `../darty` unless a later decision changes it:
 
