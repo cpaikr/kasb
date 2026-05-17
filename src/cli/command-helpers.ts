@@ -6,7 +6,7 @@ export const exitAfterHelpOrThrowCommanderError = (error: {
   readonly code: string;
   readonly exitCode: number;
 }): never => {
-  if (error.code === "commander.helpDisplayed") {
+  if (error.code === "commander.helpDisplayed" || error.code === "commander.help") {
     process.exit(error.exitCode);
   }
   throw error;
@@ -73,10 +73,13 @@ export const extractCliOptions = <Key extends string>(
 
 export const buildCliNameByOptionKey = <Key extends string>(
   registeredOptions: readonly RegisteredOption<Key>[],
-): Partial<Record<Key, string>> =>
-  Object.fromEntries(registeredOptions.map((option) => [option.key, option.cliName])) as Partial<
-    Record<Key, string>
-  >;
+): Partial<Record<Key, string>> => {
+  const cliNameByKey: Partial<Record<Key, string>> = {};
+  for (const option of registeredOptions) {
+    cliNameByKey[option.key] ??= option.cliName;
+  }
+  return cliNameByKey;
+};
 
 export const renderInvalidInputCliErrorMessage = <Key extends string>(
   error: { readonly code: string; readonly parameter?: string; readonly message: string },
@@ -85,10 +88,15 @@ export const renderInvalidInputCliErrorMessage = <Key extends string>(
   if (error.code !== "invalid_input" || error.parameter === undefined) return undefined;
   const cliName = cliNameByOptionKey[error.parameter as Key];
   if (cliName === undefined) return undefined;
-  return error.message
-    .replaceAll(`"${error.parameter}"`, `"${cliName}"`)
+  let message = error.message
     .replaceAll("필수 매개변수", "필수 옵션")
     .replaceAll("매개변수", "옵션");
+  for (const [key, optionCliName] of Object.entries(cliNameByOptionKey)) {
+    if (optionCliName !== undefined) {
+      message = message.replaceAll(`"${key}"`, `"${optionCliName}"`);
+    }
+  }
+  return message;
 };
 
 export const splitCliCommandOptions = <RequestInput, Key extends string>(

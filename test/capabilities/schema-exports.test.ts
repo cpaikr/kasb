@@ -4,7 +4,7 @@ import { defaultGetParagraphOperation } from "../../src/app/get-paragraph.ts";
 import { defaultGetQnaOperation } from "../../src/app/get-qna.ts";
 import { defaultGetSectionOperation } from "../../src/app/get-section.ts";
 import { defaultGetStandardStructureOperation } from "../../src/app/get-standard-structure.ts";
-import { defaultSearchQnasOperation } from "../../src/app/search-qnas.ts";
+import { defaultSearchQnaOperation } from "../../src/app/search-qna.ts";
 import { defaultSearchStandardsOperation } from "../../src/app/search-standards.ts";
 
 const operations = [
@@ -22,8 +22,8 @@ const operations = [
   },
   {
     operation: defaultGetSectionOperation,
-    requiredInput: ["stdNum", "indexDocumentId"],
-    inputProperties: ["stdNum", "indexDocumentId", "keyword"],
+    requiredInput: ["stdNum"],
+    inputProperties: ["stdNum", "indexDocumentId", "ref", "keyword"],
     resultProperties: ["result", "metadata", "references", "warnings"],
   },
   {
@@ -33,7 +33,7 @@ const operations = [
     resultProperties: ["result", "metadata", "references", "warnings"],
   },
   {
-    operation: defaultSearchQnasOperation,
+    operation: defaultSearchQnaOperation,
     requiredInput: ["keyword"],
     inputProperties: ["keyword", "page", "rows", "types"],
     resultProperties: ["result", "metadata", "references", "warnings"],

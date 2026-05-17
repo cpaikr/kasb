@@ -41,7 +41,7 @@ KASB-specific handling:
 
 - Public JSON fields use camelCase semantic names: `keyword`, `stdNum`, `indexDocumentId`, `paraNum`.
 - KASB source parameters such as `searchWord` stay inside source adapters.
-- CLI command names use kebab-case: `search-standards`, `get-standard-structure`, `get-section`, `get-paragraph`, `search-qnas`, `get-qna`.
+- CLI command names use kebab-case: `search-standards`, `get-standard-structure`, `get-section`, `get-paragraph`, `search-qna`, `get-qna`.
 - CLI flags use kebab-case: `--keyword`, `--std-num`, `--index-document-id`, `--para-num`, `--doc-number`.
 - TypeScript names should follow the established implementation style; do not lock new function names in docs before code establishes them.
 

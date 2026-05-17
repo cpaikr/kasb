@@ -23,7 +23,7 @@ describe("scripts/kasb.ts", () => {
     expect(result.stderr).toBe("");
     expect(result.stdout).toContain("Usage: kasb [options] [command]");
     expect(result.stdout).toContain("search-standards");
-    expect(result.stdout).toContain("search-qnas");
+    expect(result.stdout).toContain("search-qna");
   });
 
   test("forwards subcommands to the kasb CLI", async () => {

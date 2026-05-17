@@ -4,13 +4,13 @@ import { defaultGetParagraphOperation } from "./app/get-paragraph.ts";
 import { defaultGetQnaOperation } from "./app/get-qna.ts";
 import { defaultGetSectionOperation } from "./app/get-section.ts";
 import { defaultGetStandardStructureOperation } from "./app/get-standard-structure.ts";
-import { defaultSearchQnasOperation } from "./app/search-qnas.ts";
+import { defaultSearchQnaOperation } from "./app/search-qna.ts";
 import { defaultSearchStandardsOperation } from "./app/search-standards.ts";
 import type { GetParagraphRawInput, GetParagraphResult } from "./capabilities/get-paragraph/contract.ts";
 import type { GetQnaRawInput, GetQnaResult } from "./capabilities/get-qna/contract.ts";
 import type { GetSectionRawInput, GetSectionResult } from "./capabilities/get-section/contract.ts";
 import type { GetStandardStructureRawInput, GetStandardStructureResult } from "./capabilities/get-standard-structure/contract.ts";
-import type { SearchQnasRawInput, SearchQnasResult } from "./capabilities/search-qnas/contract.ts";
+import type { SearchQnaRawInput, SearchQnaResult } from "./capabilities/search-qna/contract.ts";
 import type { SearchStandardsRawInput, SearchStandardsResult } from "./capabilities/search-standards/contract.ts";
 import { configureCliTransport, renderCliFailureJson } from "./cli/command-helpers.ts";
 import { buildOperationCommand } from "./cli/commands/shared.ts";
@@ -32,11 +32,12 @@ const searchStandardsCommand = buildOperationCommand<
 >({
   operationName: defaultSearchStandardsOperation.name,
   summary: "KASB 기준서를 키워드로 검색합니다.",
-  description: "KASB 기준서 검색 API(/api/standard)를 호출해 기준서별 검색 건수를 반환합니다.",
+  description: "KASB 기준서 검색 API(/api/standard)를 호출해 기준서별 검색 건수, 기준서 제목(가능한 경우), 넓은 검색어 제안을 반환합니다.",
   options: [
     { key: "keyword", flags: "--keyword <text>", description: "[필수] 검색어입니다." },
     { key: "limit", flags: "--limit <number>", description: "[기본값: 20] 반환할 기준서 수입니다.", integer: true },
   ],
+  notes: ["정확한 용어로 결과가 좁을 때는 suggestedKeywords 또는 더 넓은 표준명 용어로 다시 검색하세요. 예: 장기종업원급여 → 종업원급여"],
   examples: [{ description: "리스 관련 기준서를 검색합니다.", argv: ["--keyword", "리스"] }],
   runOperation: (input) => defaultSearchStandardsOperation.execute(input),
   writeStdout,
@@ -65,15 +66,19 @@ const getSectionCommand = buildOperationCommand<
   GetSectionResult
 >({
   operationName: defaultGetSectionOperation.name,
-  summary: "기준서 섹션을 indexDocumentId로 조회합니다.",
+  summary: "기준서 섹션을 indexDocumentId 또는 ref로 조회합니다.",
   description: "KASB paragraphs API를 호출해 섹션 제목과 문단 행을 반환합니다.",
   options: [
     { key: "stdNum", flags: "--std-num <text>", description: "[필수] 기준서 번호입니다. 예: 1116" },
-    { key: "indexDocumentId", flags: "--index-document-id <text>", description: "[필수] standard-indexes에서 반환된 섹션 검색용 문서 ID입니다." },
+    { key: "indexDocumentId", flags: "--index-document-id <text>", description: "[선택] standard-indexes에서 반환된 섹션 검색용 문서 ID입니다. --ref와 함께 사용할 수 없습니다." },
+    { key: "ref", flags: "--ref <text>", description: "[선택] 기준서 구조의 ref입니다. 예: 153~158, 21.5~21.5의3" },
     { key: "keyword", flags: "--keyword <text>", description: "[선택] 섹션 문단 하이라이트 검색어입니다." },
   ],
-  notes: ["브라우저 경로의 titleDocumentId가 아니라 standard-indexes의 indexDocumentId를 사용합니다."],
-  examples: [{ description: "제1116호 목적 섹션을 조회합니다.", argv: ["--std-num", "1116", "--index-document-id", "ZB2hJW"] }],
+  notes: ["--index-document-id 또는 --ref 중 하나가 필요합니다.", "브라우저 경로의 titleDocumentId가 아니라 standard-indexes의 indexDocumentId를 사용합니다.", "동일한 ref가 여러 섹션에 있으면 가장 구체적인 하위 섹션을 선택하고 경고를 반환합니다."],
+  examples: [
+    { description: "제1116호 목적 섹션을 조회합니다.", argv: ["--std-num", "1116", "--index-document-id", "ZB2hJW"] },
+    { description: "제1019호 기타장기종업원급여 섹션을 ref로 조회합니다.", argv: ["--std-num", "1019", "--ref", "153~158"] },
+  ],
   runOperation: (input) => defaultGetSectionOperation.execute(input),
   writeStdout,
 });
@@ -95,22 +100,23 @@ const getParagraphCommand = buildOperationCommand<
   writeStdout,
 });
 
-const searchQnasCommand = buildOperationCommand<
-  keyof SearchQnasRawInput,
-  SearchQnasRawInput,
-  SearchQnasResult
+const searchQnaCommand = buildOperationCommand<
+  keyof SearchQnaRawInput,
+  SearchQnaRawInput,
+  SearchQnaResult
 >({
-  operationName: defaultSearchQnasOperation.name,
+  operationName: defaultSearchQnaOperation.name,
   summary: "KASB Q&A 자료를 키워드로 검색합니다.",
   description: "KASB Q&A API(/api/qnas/v2)를 호출해 질의회신, 신속처리질의, IFRS IC 자료를 검색합니다.",
   options: [
     { key: "keyword", flags: "--keyword <text>", description: "[필수] 검색어입니다." },
     { key: "page", flags: "--page <number>", description: "[기본값: 1] 결과 페이지입니다.", integer: true },
     { key: "rows", flags: "--rows <number>", description: "[기본값: 10] 반환할 Q&A 수입니다(최대 50).", integer: true },
+    { key: "rows", flags: "--limit <number>", description: "[별칭] --rows와 같습니다.", integer: true },
     { key: "types", flags: "--types <csv>", description: "[선택] Q&A 유형 번호 CSV입니다. 기본값: 11,12,13,14,15,24,25" },
   ],
-  examples: [{ description: "리스 관련 Q&A를 검색합니다.", argv: ["--keyword", "리스", "--rows", "5"] }],
-  runOperation: (input) => defaultSearchQnasOperation.execute(input),
+  examples: [{ description: "리스 관련 Q&A를 검색합니다.", argv: ["--keyword", "리스", "--limit", "5"] }],
+  runOperation: (input) => defaultSearchQnaOperation.execute(input),
   writeStdout,
 });
 
@@ -148,7 +154,7 @@ const program = configureCliTransport(new Command())
   .addCommand(getStandardStructureCommand.command)
   .addCommand(getSectionCommand.command)
   .addCommand(getParagraphCommand.command)
-  .addCommand(searchQnasCommand.command)
+  .addCommand(searchQnaCommand.command)
   .addCommand(getQnaCommand.command);
 
 if (process.argv.length <= 2) {
@@ -160,7 +166,7 @@ if (process.argv.length <= 2) {
       getStandardStructureCommand.renderErrorMessage(error) ??
       getSectionCommand.renderErrorMessage(error) ??
       getParagraphCommand.renderErrorMessage(error) ??
-      searchQnasCommand.renderErrorMessage(error) ??
+      searchQnaCommand.renderErrorMessage(error) ??
       getQnaCommand.renderErrorMessage(error);
 
     writeStderr(

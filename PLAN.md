@@ -20,7 +20,7 @@ Harden the implemented Bun/TypeScript CLI so it remains reliable, Darty-shaped, 
   - `get-section`
   - `get-paragraph`
 - Q&A capabilities:
-  - `search-qnas`
+  - `search-qna`
   - `get-qna`
 - Captured KASB fixtures under `fixtures/kasb/`.
 - Fixture-backed provider tests and CLI failure/help tests.

@@ -21,7 +21,7 @@ The first public capabilities are:
 - `get-standard-structure`
 - `get-section`
 - `get-paragraph`
-- `search-qnas`
+- `search-qna`
 - `get-qna`
 
 The CLI is the only planned public interface. MCP, SDK, Pi-native tools, database persistence, and background ingestion are not implementation goals for this repo.
@@ -151,7 +151,7 @@ Keep two schema families separate:
 
 - Public JSON request fields use camelCase; CLI flags use kebab-case.
 - The success result schema contains `result`, `metadata`, `references`, and `warnings`; typed failures are separate from success schemas.
-- Source adapters may know raw KASB fields; public capabilities expose stable semantic fields unless the spec explicitly promotes a source-facing exception, such as `search-qnas.types`.
+- Source adapters may know raw KASB fields; public capabilities expose stable semantic fields unless the spec explicitly promotes a source-facing exception, such as `search-qna.types`.
 - Provider implementations return capability-shaped results, not raw source payloads.
 - CLI commands import app/capability surfaces, not `sources/kasb/*` internals.
 - CLI help, examples, and presentation options stay CLI-local.

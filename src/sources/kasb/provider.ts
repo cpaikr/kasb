@@ -3,11 +3,11 @@ import type { Paragraph } from "../../capabilities/get-paragraph/contract.ts";
 import type { GetQnaProvider } from "../../capabilities/get-qna/provider.ts";
 import type { Qna } from "../../capabilities/get-qna/contract.ts";
 import type { GetSectionProvider } from "../../capabilities/get-section/provider.ts";
-import type { SectionClause } from "../../capabilities/get-section/contract.ts";
+import type { GetSectionRequest, SectionClause } from "../../capabilities/get-section/contract.ts";
 import type { GetStandardStructureProvider } from "../../capabilities/get-standard-structure/provider.ts";
 import type { StandardSectionNode } from "../../capabilities/get-standard-structure/contract.ts";
-import type { SearchQnasProvider } from "../../capabilities/search-qnas/provider.ts";
-import type { QnaSearchItem } from "../../capabilities/search-qnas/contract.ts";
+import type { SearchQnaProvider } from "../../capabilities/search-qna/provider.ts";
+import type { QnaSearchItem } from "../../capabilities/search-qna/contract.ts";
 import type { SearchStandardsProvider } from "../../capabilities/search-standards/provider.ts";
 import type { SearchStandardItem } from "../../capabilities/search-standards/contract.ts";
 import { ProviderFailure, type ResultMetadata } from "../../capabilities/types.ts";
@@ -58,8 +58,8 @@ export const kasbParagraphProvider: GetParagraphProvider = {
   getParagraph: (request) => getParagraph(request),
 };
 
-export const kasbSearchQnasProvider: SearchQnasProvider = {
-  search: (request) => searchQnas(request),
+export const kasbSearchQnaProvider: SearchQnaProvider = {
+  search: (request) => searchQna(request),
 };
 
 export const kasbQnaProvider: GetQnaProvider = {
@@ -77,7 +77,8 @@ const searchStandards: SearchStandardsProvider["search"] = async (request) => {
     .map((item) => toSearchStandardItem(item, sourceUrl))
     .filter((item): item is SearchStandardItem => item !== undefined);
   assertAnyNormalized(stdCountArr, items, sourceUrl, "기준서 검색 결과 필드가 변경되었습니다.");
-  const limitedItems = items.slice(0, request.limit);
+  const baseLimitedItems = items.slice(0, request.limit);
+  const limitedItems = await addStandardDisplayMetadata(baseLimitedItems);
   const incomplete = items.length !== stdCountArr.length;
 
   return {
@@ -87,6 +88,7 @@ const searchStandards: SearchStandardsProvider["search"] = async (request) => {
       totalStandardCount: items.length,
       returnedCount: limitedItems.length,
       standards: limitedItems,
+      suggestedKeywords: suggestBroaderStandardKeywords(request.keyword),
     },
     metadata: metadata(sourceUrl, incomplete ? "partial" : "complete"),
     references: { searchUrl: sourceUrl },
@@ -114,6 +116,67 @@ const toSearchStandardItem = (
     matchCount,
     references: { apiUrl: standardsSearchUrl(stdNum) === sourceUrl ? sourceUrl : standardIndexesUrl(stdNum) },
   };
+};
+
+const addStandardDisplayMetadata = async (
+  items: readonly SearchStandardItem[],
+): Promise<SearchStandardItem[]> =>
+  Promise.all(
+    items.map(async (item) => ({
+      ...item,
+      ...(await getStandardDisplayMetadata(item.stdNum)),
+    })),
+  );
+
+const getStandardDisplayMetadata = async (
+  stdNum: string,
+): Promise<Pick<SearchStandardItem, "standardTitle" | "standardKind">> => {
+  try {
+    const sourceUrl = standardIndexesUrl(stdNum);
+    const payload = asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "standard indexes");
+    const sourceItems = asArray(payload.standardIndexes, sourceUrl, "standardIndexes");
+    const sections = sourceItems
+      .map((item) => toSectionNode(item, sourceUrl, stdNum))
+      .filter((item): item is StandardSectionNode => item !== undefined);
+    const standardTitle = sections.find((section) => section.level === 1)?.title;
+    if (standardTitle === undefined) return {};
+    return {
+      standardTitle,
+      standardKind: inferStandardKind(standardTitle),
+    };
+  } catch {
+    return {};
+  }
+};
+
+const inferStandardKind = (standardTitle: string): string => {
+  if (standardTitle.includes("기업회계기준해석서")) return "k-ifrs-interpretation";
+  if (standardTitle.includes("기업회계기준서")) return "k-ifrs-standard";
+  if (/^제\d+장(?:\s|$)/u.test(standardTitle)) return "general-gaap-chapter";
+  return "standard";
+};
+
+const suggestBroaderStandardKeywords = (keyword: string): string[] => {
+  const suggestions = new Set<string>();
+  const normalizedKeyword = keyword.trim();
+  const mappedSuggestions: readonly [string, string][] = [
+    ["기타장기종업원급여", "종업원급여"],
+    ["장기종업원급여", "종업원급여"],
+    ["장기근속급여", "종업원급여"],
+    ["장기근속", "종업원급여"],
+  ];
+
+  for (const [narrowKeyword, broaderKeyword] of mappedSuggestions) {
+    if (normalizedKeyword.includes(narrowKeyword)) suggestions.add(broaderKeyword);
+  }
+
+  const withoutAccountingTreatment = normalizedKeyword.replace(/\s*회계처리\s*$/u, "").trim();
+  if (withoutAccountingTreatment.length > 0 && withoutAccountingTreatment !== normalizedKeyword) {
+    suggestions.add(withoutAccountingTreatment);
+  }
+
+  suggestions.delete(normalizedKeyword);
+  return [...suggestions];
 };
 
 const getStandardStructure: GetStandardStructureProvider["getStructure"] = async (request) => {
@@ -218,12 +281,68 @@ const toSectionNode = (
   };
 };
 
+type ResolvedSectionLookup = {
+  readonly indexDocumentId: string;
+  readonly ref?: string;
+  readonly title?: string;
+  readonly ambiguousRef?: boolean;
+};
+
+const resolveSectionLookup = async (request: GetSectionRequest): Promise<ResolvedSectionLookup> => {
+  if (request.indexDocumentId !== undefined) {
+    return { indexDocumentId: request.indexDocumentId };
+  }
+
+  const requestedRef = request.ref;
+  if (requestedRef === undefined) {
+    throw new ProviderFailure({
+      code: "internal_failure",
+      message: "섹션 조회 요청에 indexDocumentId와 ref가 모두 없습니다.",
+      retryable: false,
+    });
+  }
+
+  const sourceUrl = standardIndexesUrl(request.stdNum);
+  const payload = asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "standard indexes");
+  const sourceItems = asArray(payload.standardIndexes, sourceUrl, "standardIndexes");
+  const sections = sourceItems
+    .map((item) => toSectionNode(item, sourceUrl, request.stdNum))
+    .filter((item): item is StandardSectionNode => item !== undefined);
+  assertAnyNormalized(sourceItems, sections, sourceUrl, "기준서 구조 행 필드가 변경되었습니다.");
+
+  const matches = sections.filter((section) => normalizeRef(section.ref) === normalizeRef(requestedRef));
+  if (matches.length === 0) {
+    throw new ProviderFailure({
+      code: "not_found",
+      message: `기준서 ${request.stdNum}에서 ref ${requestedRef}에 해당하는 섹션을 찾을 수 없습니다.`,
+      retryable: false,
+      sourceUrl,
+    });
+  }
+
+  const selected = [...matches].sort(
+    (left, right) => right.level - left.level || (left.sort ?? 0) - (right.sort ?? 0),
+  )[0];
+  if (selected === undefined) {
+    throw sourceChanged(sourceUrl, "ref 섹션 해석 결과를 정규화할 수 없습니다.");
+  }
+  return {
+    indexDocumentId: selected.indexDocumentId,
+    ref: selected.ref,
+    title: selected.title,
+    ...(matches.length > 1 ? { ambiguousRef: true } : {}),
+  };
+};
+
+const normalizeRef = (ref: string): string => ref.replaceAll(/\s+/gu, "");
+
 const getSection: GetSectionProvider["getSection"] = async (request) => {
-  const sourceUrl = paragraphsUrl(request.stdNum, request.indexDocumentId, request.keyword);
+  const lookup = await resolveSectionLookup(request);
+  const sourceUrl = paragraphsUrl(request.stdNum, lookup.indexDocumentId, request.keyword);
   const payload = asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "paragraphs");
   const sourceClauses = asArray(payload.clauses, sourceUrl, "clauses");
   const clauses = sourceClauses
-    .map((item) => toSectionClause(item, sourceUrl, request.stdNum, request.indexDocumentId))
+    .map((item) => toSectionClause(item, sourceUrl, request.stdNum, lookup.indexDocumentId))
     .filter((item): item is SectionClause => item !== undefined);
   assertAnyNormalized(sourceClauses, clauses, sourceUrl, "섹션 문단 행 필드가 변경되었습니다.");
   const incomplete = clauses.length !== sourceClauses.length;
@@ -232,12 +351,12 @@ const getSection: GetSectionProvider["getSection"] = async (request) => {
     const structureUrl = standardIndexesUrl(request.stdNum);
     const structure = asRecord(await fetchKasbJson(structureUrl), structureUrl, "standard indexes");
     const exists = asArray(structure.standardIndexes, structureUrl, "standardIndexes").some((item) =>
-      asSoftRecord(item) && toStringValue(item.documentId) === request.indexDocumentId,
+      asSoftRecord(item) && toStringValue(item.documentId) === lookup.indexDocumentId,
     );
     if (!exists) {
       throw new ProviderFailure({
         code: "not_found",
-        message: "요청한 indexDocumentId에 해당하는 섹션을 찾을 수 없습니다.",
+        message: "요청한 indexDocumentId 또는 ref에 해당하는 섹션을 찾을 수 없습니다.",
         retryable: false,
         sourceUrl,
       });
@@ -251,16 +370,20 @@ const getSection: GetSectionProvider["getSection"] = async (request) => {
       request,
       section: {
         stdNum: request.stdNum,
-        indexDocumentId: request.indexDocumentId,
-        title: optionalString(payload.mainTitle) ?? "",
+        indexDocumentId: lookup.indexDocumentId,
+        title: optionalString(payload.mainTitle) ?? lookup.title ?? "",
+        ...(lookup.ref === undefined ? {} : { ref: lookup.ref }),
         ...(level === undefined ? {} : { level }),
         ...(sort === undefined ? {} : { sort }),
       },
       clauses,
     },
     metadata: metadata(sourceUrl, incomplete ? "partial" : "complete"),
-    references: { stdNum: request.stdNum, indexDocumentId: request.indexDocumentId, sectionUrl: sourceUrl },
+    references: { stdNum: request.stdNum, indexDocumentId: lookup.indexDocumentId, sectionUrl: sourceUrl },
     warnings: [
+      ...(lookup.ambiguousRef === true
+        ? [{ code: "ambiguous_ref_resolved" as const, message: "여러 섹션이 같은 ref를 사용해 가장 구체적인 하위 섹션을 선택했습니다." }]
+        : []),
       ...(clauses.length === 0 ? [{ code: "empty_section" as const, message: "섹션에 문단이 없습니다." }] : []),
       ...(incomplete
         ? [{ code: "partial_clause_normalization" as const, message: "일부 섹션 문단 행을 정규화할 수 없어 제외했습니다." }]
@@ -391,7 +514,7 @@ const toParagraph = (value: unknown, sourceUrl: string): Paragraph => {
   };
 };
 
-const searchQnas: SearchQnasProvider["search"] = async (request) => {
+const searchQna: SearchQnaProvider["search"] = async (request) => {
   const sourceUrl = qnasSearchUrl({
     searchWord: request.keyword,
     page: request.page,

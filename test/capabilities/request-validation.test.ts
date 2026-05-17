@@ -4,7 +4,7 @@ import { resolveGetParagraphRequest } from "../../src/capabilities/get-paragraph
 import { resolveGetQnaRequest } from "../../src/capabilities/get-qna/contract.ts";
 import { resolveGetSectionRequest } from "../../src/capabilities/get-section/contract.ts";
 import { resolveGetStandardStructureRequest } from "../../src/capabilities/get-standard-structure/contract.ts";
-import { resolveSearchQnasRequest } from "../../src/capabilities/search-qnas/contract.ts";
+import { resolveSearchQnaRequest } from "../../src/capabilities/search-qna/contract.ts";
 import { resolveSearchStandardsRequest } from "../../src/capabilities/search-standards/contract.ts";
 import { InvalidCapabilityRequest } from "../../src/capabilities/types.ts";
 
@@ -51,9 +51,8 @@ describe("capability request validation", () => {
   }[] = [
     { name: "search-standards", resolver: resolveSearchStandardsRequest as Resolver<unknown>, parameter: "keyword" },
     { name: "get-standard-structure", resolver: resolveGetStandardStructureRequest as Resolver<unknown>, parameter: "stdNum" },
-    { name: "get-section", resolver: resolveGetSectionRequest as Resolver<unknown>, parameter: "indexDocumentId", base: { stdNum: "1116" } },
     { name: "get-paragraph", resolver: resolveGetParagraphRequest as Resolver<unknown>, parameter: "paraNum", base: { stdNum: "1116" } },
-    { name: "search-qnas", resolver: resolveSearchQnasRequest as Resolver<unknown>, parameter: "keyword" },
+    { name: "search-qna", resolver: resolveSearchQnaRequest as Resolver<unknown>, parameter: "keyword" },
     { name: "get-qna", resolver: resolveGetQnaRequest as Resolver<unknown>, parameter: "docNumber" },
   ];
 
@@ -66,10 +65,25 @@ describe("capability request validation", () => {
     });
   }
 
+  test("requires get-section to receive exactly one section locator", () => {
+    expectInvalid(
+      () => resolveGetSectionRequest({ stdNum: "1116" }),
+      { parameter: "indexDocumentId", messageIncludes: "indexDocumentId\" 또는 \"ref" },
+    );
+    expectInvalid(
+      () => resolveGetSectionRequest({ stdNum: "1116", indexDocumentId: "ZB2hJW", ref: "1~2" }),
+      { parameter: "ref", messageIncludes: "동시에 사용할 수 없습니다" },
+    );
+  });
+
   test("trims required strings and omits blank optional strings", () => {
     expect(resolveGetSectionRequest({ stdNum: " 1116 ", indexDocumentId: " ZB2hJW ", keyword: " " })).toEqual({
       stdNum: "1116",
       indexDocumentId: "ZB2hJW",
+    });
+    expect(resolveGetSectionRequest({ stdNum: " 1116 ", ref: " 1~2 " })).toEqual({
+      stdNum: "1116",
+      ref: "1~2",
     });
     expect(resolveGetQnaRequest({ docNumber: " SSI-35629 ", keyword: " 리스 " })).toEqual({
       docNumber: "SSI-35629",
@@ -79,14 +93,14 @@ describe("capability request validation", () => {
 
   test("applies integer defaults", () => {
     expect(resolveSearchStandardsRequest({ keyword: "리스" }).limit).toBe(20);
-    expect(resolveSearchQnasRequest({ keyword: "리스" })).toMatchObject({ page: 1, rows: 10 });
+    expect(resolveSearchQnaRequest({ keyword: "리스" })).toMatchObject({ page: 1, rows: 10 });
   });
 
   test.each([
     ["search-standards limit", () => resolveSearchStandardsRequest({ keyword: "리스", limit: 1.5 }), "limit", "정수"],
-    ["search-qnas page", () => resolveSearchQnasRequest({ keyword: "리스", page: 0 }), "page", "1 이상 1000 이하"],
-    ["search-qnas rows", () => resolveSearchQnasRequest({ keyword: "리스", rows: 51 }), "rows", "1 이상 50 이하"],
-    ["search-qnas rows type", () => resolveSearchQnasRequest({ keyword: "리스", rows: "5" } as Record<string, unknown>), "rows", "정수"],
+    ["search-qna page", () => resolveSearchQnaRequest({ keyword: "리스", page: 0 }), "page", "1 이상 1000 이하"],
+    ["search-qna rows", () => resolveSearchQnaRequest({ keyword: "리스", rows: 51 }), "rows", "1 이상 50 이하"],
+    ["search-qna rows type", () => resolveSearchQnaRequest({ keyword: "리스", rows: "5" } as Record<string, unknown>), "rows", "정수"],
   ] as const)("rejects invalid integer %s", (_name, run, parameter, messageIncludes) => {
     expectInvalid(run, { parameter, messageIncludes });
   });

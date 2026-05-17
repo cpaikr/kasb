@@ -35,6 +35,8 @@ export const resolveSearchStandardsRequest = (
 
 export const SearchStandardItemSchema = Schema.Struct({
   stdNum: Schema.String,
+  standardTitle: Schema.optional(Schema.String),
+  standardKind: Schema.optional(Schema.String),
   matchCount: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)),
   references: Schema.Struct({ apiUrl: Schema.String }),
 });
@@ -47,6 +49,7 @@ export const SearchStandardsResultSchema = Schema.Struct({
     totalStandardCount: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)),
     returnedCount: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)),
     standards: Schema.Array(SearchStandardItemSchema),
+    suggestedKeywords: Schema.Array(Schema.String),
   }),
   metadata: ResultMetadataSchema,
   references: Schema.Struct({ searchUrl: Schema.String }),

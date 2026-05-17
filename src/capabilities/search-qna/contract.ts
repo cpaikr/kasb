@@ -11,7 +11,7 @@ import { ResultMetadataSchema } from "../types.ts";
 
 const fields = new Set(["keyword", "page", "rows", "types"]);
 
-export const SearchQnasRequestSchema = Schema.Struct({
+export const SearchQnaRequestSchema = Schema.Struct({
   keyword: Schema.String.pipe(Schema.minLength(1)),
   page: Schema.optionalWith(
     Schema.Int.pipe(Schema.greaterThanOrEqualTo(1), Schema.lessThanOrEqualTo(1000)),
@@ -23,12 +23,12 @@ export const SearchQnasRequestSchema = Schema.Struct({
   ),
   types: Schema.optional(Schema.String),
 });
-export type SearchQnasRawInput = typeof SearchQnasRequestSchema.Encoded;
-export type SearchQnasRequest = typeof SearchQnasRequestSchema.Type;
+export type SearchQnaRawInput = typeof SearchQnaRequestSchema.Encoded;
+export type SearchQnaRequest = typeof SearchQnaRequestSchema.Type;
 
-export const resolveSearchQnasRequest = (
-  input: Partial<SearchQnasRawInput> & Record<string, unknown>,
-): SearchQnasRequest => {
+export const resolveSearchQnaRequest = (
+  input: Partial<SearchQnaRawInput> & Record<string, unknown>,
+): SearchQnaRequest => {
   assertObjectInput(input);
   assertNoUnknownKeys(input, fields);
   const types = readOptionalString(input, "types");
@@ -54,9 +54,9 @@ export const QnaSearchItemSchema = Schema.Struct({
 });
 export type QnaSearchItem = typeof QnaSearchItemSchema.Type;
 
-export const SearchQnasResultSchema = Schema.Struct({
+export const SearchQnaResultSchema = Schema.Struct({
   result: Schema.Struct({
-    request: SearchQnasRequestSchema,
+    request: SearchQnaRequestSchema,
     items: Schema.Array(QnaSearchItemSchema),
     returnedCount: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)),
     countByType: Schema.Record({ key: Schema.String, value: Schema.Number }),
@@ -70,4 +70,4 @@ export const SearchQnasResultSchema = Schema.Struct({
     }),
   ),
 });
-export type SearchQnasResult = typeof SearchQnasResultSchema.Type;
+export type SearchQnaResult = typeof SearchQnaResultSchema.Type;

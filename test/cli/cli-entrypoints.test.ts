@@ -70,7 +70,7 @@ describe("CLI entrypoints", () => {
     expect(stdout).toContain("get-standard-structure [options]");
     expect(stdout).toContain("get-section [options]");
     expect(stdout).toContain("get-paragraph [options]");
-    expect(stdout).toContain("search-qnas [options]");
+    expect(stdout).toContain("search-qna [options]");
     expect(stdout).toContain("get-qna [options]");
   });
 
@@ -114,7 +114,7 @@ describe("CLI entrypoints", () => {
     ["get-standard-structure", "--std-num <text>"],
     ["get-section", "--index-document-id <text>"],
     ["get-paragraph", "--para-num <text>"],
-    ["search-qnas", "--rows <number>"],
+    ["search-qna", "--rows <number>"],
     ["get-qna", "--doc-number <text>"],
   ] as const)("bundled CLI accepts documented %s command", (command, expectedFlag) => {
     const result = runEntrypoint(nodeRuntime, builtEntrypoint, [command, "--help"]);

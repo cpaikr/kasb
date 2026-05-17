@@ -6,7 +6,7 @@ import { defaultGetParagraphOperation } from "../src/app/get-paragraph.ts";
 import { defaultGetQnaOperation } from "../src/app/get-qna.ts";
 import { defaultGetSectionOperation } from "../src/app/get-section.ts";
 import { defaultGetStandardStructureOperation } from "../src/app/get-standard-structure.ts";
-import { defaultSearchQnasOperation } from "../src/app/search-qnas.ts";
+import { defaultSearchQnaOperation } from "../src/app/search-qna.ts";
 import { defaultSearchStandardsOperation } from "../src/app/search-standards.ts";
 import { KasbFailure } from "../src/capabilities/types.ts";
 
@@ -22,7 +22,7 @@ const makeFixtureMap = (): Map<string, unknown> => new Map([
   ["/api/standard-indexes/1116/searchWord?searchWord=%EB%A6%AC%EC%8A%A4", readFixture("fixtures/kasb/standard-indexes-1116-search-lease.json")],
   ["/api/paragraphs/1116/ZB2hJW", readFixture("fixtures/kasb/section-1116-ZB2hJW.json")],
   ["/api/paragraphs/content/1116/23", readFixture("fixtures/kasb/paragraph-1116-23.json")],
-  ["/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=5", readFixture("fixtures/kasb/search-qnas-lease.json")],
+  ["/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=5", readFixture("fixtures/kasb/search-qna-lease.json")],
   ["/api/qnas/v2/SSI-35629", readFixture("fixtures/kasb/qna-SSI-35629.json")],
   ["/api/paragraphs/1116/19970f", { status: 200, clauses: [], mainTitle: null }],
 ]);
@@ -57,6 +57,34 @@ describe("KASB provider operations", () => {
     expect(result.result.returnedCount).toBe(2);
     expect(result.result.standards[0]?.stdNum).toBe("1017");
     expect(result.warnings[0]?.code).toBe("truncated_results");
+  });
+
+  test("enriches standard search rows with available titles", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set("/api/standard?searchWord=%EB%A6%AC%EC%8A%A4", {
+      standards: { totalCount: 519, stdCountArr: [{ key: "1116", doc_count: 519 }] },
+    });
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchStandardsOperation.execute({ keyword: "리스", limit: 1 });
+
+    expect(result.result.standards[0]).toMatchObject({
+      stdNum: "1116",
+      standardTitle: "기업회계기준서 제1116호 리스",
+      standardKind: "k-ifrs-standard",
+    });
+  });
+
+  test("suggests broader standard keywords for narrow terms", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(`/api/standard?searchWord=${encodeURIComponent("장기종업원급여")}`, {
+      standards: { totalCount: 0, stdCountArr: [] },
+    });
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchStandardsOperation.execute({ keyword: "장기종업원급여" });
+
+    expect(result.result.suggestedKeywords).toContain("종업원급여");
   });
 
   test("returns section identifiers from the captured structure fixture", async () => {
@@ -116,6 +144,21 @@ describe("KASB provider operations", () => {
     expect(result.warnings.map((warning) => warning.code)).toContain("source_html_preserved");
   });
 
+  test("fetches a section by structure ref", async () => {
+    const result = await defaultGetSectionOperation.execute({
+      stdNum: "1116",
+      ref: "1~2",
+    });
+
+    expect(result.result.section).toMatchObject({
+      indexDocumentId: "ZB2hJW",
+      ref: "1~2",
+      title: "목적",
+    });
+    expect(result.references.indexDocumentId).toBe("ZB2hJW");
+    expect(result.result.clauses.map((clause) => clause.paraNum)).toEqual(["1", "2"]);
+  });
+
   test("rejects a route-facing titleDocumentId that is not a section id", async () => {
     await expect(
       defaultGetSectionOperation.execute({ stdNum: "1116", indexDocumentId: "19970f" }),
@@ -131,7 +174,7 @@ describe("KASB provider operations", () => {
   });
 
   test("searches Q&A documents from the qnas fixture", async () => {
-    const result = await defaultSearchQnasOperation.execute({ keyword: "리스", rows: 5 });
+    const result = await defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5 });
 
     expect(result.result.returnedCount).toBe(5);
     expect(result.result.items[0]?.docNumber).toBe("IFRSIC2207E");
@@ -286,7 +329,7 @@ describe("KASB provider operations", () => {
     });
     useFixtureMap(fixtures);
 
-    await expect(defaultSearchQnasOperation.execute({ keyword: "리스", rows: 5 })).rejects.toMatchObject({
+    await expect(defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5 })).rejects.toMatchObject({
       code: "source_changed",
     } satisfies Partial<KasbFailure>);
   });

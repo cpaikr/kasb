@@ -6,6 +6,8 @@ The product provides a Bun/TypeScript capability core for `https://db.kasb.or.kr
 
 Current status: the first CLI implementation exists for standards search, structure lookup, section retrieval, paragraph retrieval, Q&A search, and Q&A document retrieval. Deterministic coverage uses captured fixtures; hardening and review fixes are in progress.
 
+Recent CLI usability improvements include successful `kasb help <command>` handling, `search-qna --limit` as a `--rows` alias, best-effort standard titles in `search-standards`, broader keyword suggestions, and `get-section --ref` for direct ref-based section lookup.
+
 KASB public API behavior can drift. Keep source claims evidence-backed and update the research note when live behavior changes.
 
 ## Core Stance
@@ -50,6 +52,7 @@ For historical planning context, see [ROADMAP.md](ROADMAP.md) and [PRMOPT.md](PR
 - [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md): v1 capability contract
 - [docs/specs/](docs/specs/README.md): stable capability specs
 - [docs/tools/](docs/tools/foundations.md): shared tool-design guidance
+- [docs/tools/cli-tryouts.md](docs/tools/cli-tryouts.md): live CLI examples agents can run while dogfooding usage
 
 ## Commands
 

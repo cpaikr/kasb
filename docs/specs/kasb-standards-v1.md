@@ -112,8 +112,10 @@ Examples:
 | `search-standards` | `keyword` | `--keyword` |
 | `get-standard-structure` | `stdNum` | `--std-num` |
 | `get-section` | `indexDocumentId` | `--index-document-id` |
+| `get-section` | `ref` | `--ref` |
 | `get-paragraph` | `paraNum` | `--para-num` |
-| `search-qnas` | `keyword` | `--keyword` |
+| `search-qna` | `keyword` | `--keyword` |
+| `search-qna` | `rows` | `--rows`, `--limit` alias |
 | `get-qna` | `docNumber` | `--doc-number` |
 
 ### Success Envelope
@@ -165,7 +167,7 @@ Every operation output mode still emits a JSON envelope:
 - `inputs`
   `keyword`, optional `limit`
 - `output`
-  Matching standards with `stdNum`, match counts, display metadata available from the source, and source references.
+  Matching standards with `stdNum`, match counts, best-effort `standardTitle` / `standardKind`, broader `suggestedKeywords`, and source references.
 - `warnings`
   `truncated_results`, `source_metadata_incomplete`
 - `failure cases`
@@ -206,11 +208,11 @@ Implementation notes:
 - `purpose`
   Fetch one section by the retrieval id the source actually uses for content lookup.
 - `inputs`
-  `stdNum`, `indexDocumentId`, optional `keyword`
+  `stdNum`, either `indexDocumentId` or `ref`, optional `keyword`
 - `output`
-  Section metadata plus ordered title/paragraph clauses. Title clauses may include source title text.
+  Section metadata plus ordered title/paragraph clauses. Title clauses may include source title text. Ref-based lookups return the resolved `indexDocumentId` in references and section metadata.
 - `warnings`
-  `empty_section`, `partial_clause_normalization`, `source_html_preserved`
+  `ambiguous_ref_resolved`, `empty_section`, `partial_clause_normalization`, `source_html_preserved`
 - `failure cases`
   `invalid_input`, `not_found`, `source_unavailable`, `source_changed`, `partial_retrieval`
 - `safety class`
@@ -219,6 +221,8 @@ Implementation notes:
 Implementation notes:
 
 - Use `GET /api/paragraphs/{stdNum}/{indexDocumentId}`.
+- For `ref` input, resolve the ref through `GET /api/standard-indexes/{stdNum}` first, then fetch the resolved section id.
+- If multiple structure nodes share a ref, choose the most specific deepest node and return `ambiguous_ref_resolved`.
 - Map optional public `keyword` to source parameter `searchWord`.
 - Include the source `searchWord` parameter only when requested.
 - If the section response is empty and the requested id is not present in the standard structure, surface a typed failure instead of silently treating the response as a valid empty section.
@@ -245,12 +249,12 @@ Implementation notes:
 - Normalize the direct paragraph response into a single exact result or a typed `not_found` failure.
 - Direct paragraph lookup should not require the caller to know the section id.
 
-### `search-qnas`
+### `search-qna`
 
 - `purpose`
   Find KASB Q&A and interpretation material relevant to a keyword.
 - `inputs`
-  `keyword`, optional `page`, optional `rows`, optional source-facing `types` CSV
+  `keyword`, optional `page`, optional `rows`, optional source-facing `types` CSV. The CLI also accepts `--limit` as an alias for `rows`.
 - `output`
   Matching Q&A records with `docNumber`, source type, title, snippet, tags, source links, and count metadata.
 - `warnings`
@@ -300,6 +304,7 @@ The CLI should:
 - write failure envelopes to `stderr` with a nonzero exit code and empty `stdout`
 - do not mix human-readable diagnostics into operation output; any diagnostic mode must stay parseable, such as JSON lines on `stderr` or a separate diagnostic file
 - keep help text, examples, and output presentation outside capability contracts
+- make `kasb help <command>` and `<command> --help` both exit successfully without JSON failure envelopes
 
 Success envelope shape:
 

@@ -15,7 +15,7 @@ Do not put product vision, stack discussion, or open-ended source investigation 
 ## Current Specs
 
 - [kasb-standards-v1.md](kasb-standards-v1.md)
-  v1 KASB capabilities: `search-standards`, `get-standard-structure`, `get-section`, `get-paragraph`, `search-qnas`, and `get-qna`.
+  v1 KASB capabilities: `search-standards`, `get-standard-structure`, `get-section`, `get-paragraph`, `search-qna`, and `get-qna`.
 
 ## Conventions
 

@@ -26,8 +26,18 @@ describe("kasb CLI", () => {
     expect(stdout).toContain("get-standard-structure [options]");
     expect(stdout).toContain("get-section [options]");
     expect(stdout).toContain("get-paragraph [options]");
-    expect(stdout).toContain("search-qnas [options]");
+    expect(stdout).toContain("search-qna [options]");
     expect(stdout).toContain("get-qna [options]");
+  });
+
+  test("prints help subcommand without a JSON failure", () => {
+    const result = runCli(["help", "search-standards"]);
+    const stdout = decode(result.stdout);
+
+    expect(result.exitCode).toBe(0);
+    expect(decode(result.stderr)).toBe("");
+    expect(stdout).toContain("Usage: kasb search-standards [options]");
+    expect(stdout).toContain("--limit <number>");
   });
 
   test("prints command help when no command options are passed", () => {
@@ -76,7 +86,7 @@ describe("kasb CLI", () => {
     ["get-standard-structure", ["get-standard-structure", "--keyword", "리스"], "stdNum", "--std-num"],
     ["get-section", ["get-section", "--std-num", "1116"], "indexDocumentId", "--index-document-id"],
     ["get-paragraph", ["get-paragraph", "--std-num", "1116"], "paraNum", "--para-num"],
-    ["search-qnas", ["search-qnas", "--rows", "5"], "keyword", "--keyword"],
+    ["search-qna", ["search-qna", "--limit", "5"], "keyword", "--keyword"],
     ["get-qna", ["get-qna", "--keyword", "리스"], "docNumber", "--doc-number"],
   ] as const)("maps %s required-option failures to CLI flags", (_command, argv, parameter, flag) => {
     const result = runCli(argv);
@@ -93,8 +103,8 @@ describe("kasb CLI", () => {
 
   test.each([
     ["search-standards", ["search-standards", "--keyword", "리스", "--limit", "1.5"], "1.5"],
-    ["search-qnas page", ["search-qnas", "--keyword", "리스", "--page", "abc"], "abc"],
-    ["search-qnas rows", ["search-qnas", "--keyword", "리스", "--rows", "-1"], "-1"],
+    ["search-qna page", ["search-qna", "--keyword", "리스", "--page", "abc"], "abc"],
+    ["search-qna rows", ["search-qna", "--keyword", "리스", "--rows", "-1"], "-1"],
   ] as const)("rejects non-integer CLI flags for %s", (_label, argv, value) => {
     const result = runCli(argv);
     const envelope = JSON.parse(decode(result.stderr)) as {
