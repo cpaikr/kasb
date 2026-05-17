@@ -15,7 +15,7 @@ The tool should:
 - normalize upstream responses into traceable success envelopes
 - surface typed failures for invalid input, missing ids, source unavailability, source drift, and partial retrieval
 - provide a thin Commander CLI over the shared capability core
-- always emit JSON from the CLI: success envelopes on `stdout`, failure envelopes on `stderr`
+- emit JSON for CLI operation results: success envelopes on `stdout`, failure envelopes on `stderr`
 
 ## Accepted Stack
 
@@ -28,8 +28,8 @@ Follow `../darty` for the core app shape:
 - Bun test runner
 - native `fetch` for KASB JSON API calls
 - success-only result schemas plus typed failures
-- always-JSON CLI output, including failures
-- CLI help/examples/output controls kept transport-local
+- JSON CLI operation output, including failures
+- CLI help/examples/output controls kept transport-local; Commander help remains human-readable
 
 KASB-specific handling:
 

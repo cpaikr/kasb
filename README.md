@@ -4,7 +4,7 @@ Read-only KASB standards CLI, following the app design used in `../darty`.
 
 The product provides a Bun/TypeScript capability core for `https://db.kasb.or.kr/api/` and a thin Commander CLI for local and agent use.
 
-Current status: the first CLI implementation exists with fixture-backed standards search, structure lookup, section retrieval, paragraph retrieval, Q&A search, and Q&A document retrieval. Hardening and review fixes are in progress.
+Current status: the first CLI implementation exists for standards search, structure lookup, section retrieval, paragraph retrieval, Q&A search, and Q&A document retrieval. Deterministic coverage uses captured fixtures; hardening and review fixes are in progress.
 
 KASB public API behavior can drift. Keep source claims evidence-backed and update the research note when live behavior changes.
 
@@ -21,7 +21,7 @@ KASB public API behavior can drift. Keep source claims evidence-backed and updat
 ## Read In This Order
 
 1. [ARCHITECTURE.md](ARCHITECTURE.md)
-   Target repo shape, document ownership, and Darty-parity implementation boundaries.
+   Implemented system shape, document ownership, and Darty-parity implementation boundaries.
 2. [VISION.md](VISION.md)
    Product goal, scope, principles, and non-goals.
 3. [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md)

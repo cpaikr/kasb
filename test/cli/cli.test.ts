@@ -70,4 +70,40 @@ describe("kasb CLI", () => {
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.message).toContain("unknown command 'missing-command'");
   });
+
+  test.each([
+    ["search-standards", ["search-standards", "--limit", "1"], "keyword", "--keyword"],
+    ["get-standard-structure", ["get-standard-structure", "--keyword", "리스"], "stdNum", "--std-num"],
+    ["get-section", ["get-section", "--std-num", "1116"], "indexDocumentId", "--index-document-id"],
+    ["get-paragraph", ["get-paragraph", "--std-num", "1116"], "paraNum", "--para-num"],
+    ["search-qnas", ["search-qnas", "--rows", "5"], "keyword", "--keyword"],
+    ["get-qna", ["get-qna", "--keyword", "리스"], "docNumber", "--doc-number"],
+  ] as const)("maps %s required-option failures to CLI flags", (_command, argv, parameter, flag) => {
+    const result = runCli(argv);
+    const envelope = JSON.parse(decode(result.stderr)) as {
+      readonly failure: { readonly code: string; readonly parameter?: string; readonly message: string };
+    };
+
+    expect(result.exitCode).toBe(1);
+    expect(decode(result.stdout)).toBe("");
+    expect(envelope.failure.code).toBe("invalid_input");
+    expect(envelope.failure.parameter).toBe(parameter);
+    expect(envelope.failure.message).toContain(flag);
+  });
+
+  test.each([
+    ["search-standards", ["search-standards", "--keyword", "리스", "--limit", "1.5"], "1.5"],
+    ["search-qnas page", ["search-qnas", "--keyword", "리스", "--page", "abc"], "abc"],
+    ["search-qnas rows", ["search-qnas", "--keyword", "리스", "--rows", "-1"], "-1"],
+  ] as const)("rejects non-integer CLI flags for %s", (_label, argv, value) => {
+    const result = runCli(argv);
+    const envelope = JSON.parse(decode(result.stderr)) as {
+      readonly failure: { readonly code: string; readonly message: string };
+    };
+
+    expect(result.exitCode).toBe(1);
+    expect(decode(result.stdout)).toBe("");
+    expect(envelope.failure.code).toBe("invalid_input");
+    expect(envelope.failure.message).toContain(value);
+  });
 });

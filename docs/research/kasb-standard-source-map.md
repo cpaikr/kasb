@@ -114,7 +114,7 @@ Observed endpoints:
 - `GET /api/standard-indexes/{stdNum}`
   Flat structural index with `indexDocumentId`, `level`, `documentType`, and `parentDocumentIds`.
 - `GET /api/standard-indexes/{stdNum}/searchWord?searchWord={term}`
-  Search-filtered index tree.
+  Search metadata for index nodes. Observed response shape contains `searchedUniqueKeys` and `searchedIndexCountMap`, not `standardIndexes[]`.
 - `GET /api/standard-indexes/{stdNum}/first-document-id`
   First retrieval-facing `indexDocumentId`.
 - `GET /api/standard-indexes/{stdNum}/html-type/{documentType}`
@@ -184,6 +184,8 @@ Observed response shapes:
   Returns nested `titles[]` with title text, `ref`, sequencing fields, and route-facing `documentId`.
 - `/api/standard-indexes/{stdNum}`
   Returns `standardIndexes[]` as a flat graph with `parentDocumentIds`.
+- `/api/standard-indexes/{stdNum}/searchWord?searchWord={term}`
+  Returns `searchedUniqueKeys[]` plus `searchedIndexCountMap`, where keys are retrieval `indexDocumentId` values and the source may include a string `"null"` bucket for unmatched hits.
 - `/api/paragraphs/{stdNum}/{indexDocumentId}`
   Returns `status`, `clauses`, `mainTitle`, `mainTitleLevel`, and `mainTitleSort`.
 - `/api/paragraphs/content/{stdNum}/{paraNum}`

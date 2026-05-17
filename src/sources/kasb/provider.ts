@@ -76,7 +76,9 @@ const searchStandards: SearchStandardsProvider["search"] = async (request) => {
   const items = stdCountArr
     .map((item) => toSearchStandardItem(item, sourceUrl))
     .filter((item): item is SearchStandardItem => item !== undefined);
+  assertAnyNormalized(stdCountArr, items, sourceUrl, "기준서 검색 결과 필드가 변경되었습니다.");
   const limitedItems = items.slice(0, request.limit);
+  const incomplete = items.length !== stdCountArr.length;
 
   return {
     result: {
@@ -86,12 +88,16 @@ const searchStandards: SearchStandardsProvider["search"] = async (request) => {
       returnedCount: limitedItems.length,
       standards: limitedItems,
     },
-    metadata: metadata(sourceUrl, items.length === stdCountArr.length ? "complete" : "partial"),
+    metadata: metadata(sourceUrl, incomplete ? "partial" : "complete"),
     references: { searchUrl: sourceUrl },
-    warnings:
-      limitedItems.length < items.length
-        ? [{ code: "truncated_results", message: `검색 결과를 ${request.limit}개로 제한했습니다.` }]
-        : [],
+    warnings: [
+      ...(limitedItems.length < items.length
+        ? [{ code: "truncated_results" as const, message: `검색 결과를 ${request.limit}개로 제한했습니다.` }]
+        : []),
+      ...(incomplete
+        ? [{ code: "source_metadata_incomplete" as const, message: "일부 기준서 검색 행을 정규화할 수 없어 제외했습니다." }]
+        : []),
+    ],
   };
 };
 
@@ -111,34 +117,79 @@ const toSearchStandardItem = (
 };
 
 const getStandardStructure: GetStandardStructureProvider["getStructure"] = async (request) => {
-  const sourceUrl = standardIndexesUrl(request.stdNum, request.keyword);
-  const payload = asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "standard indexes");
-  const sourceItems = asArray(payload.standardIndexes, sourceUrl, "standardIndexes");
-  const sections = sourceItems
-    .map((item) => toSectionNode(item, sourceUrl))
+  const baseSourceUrl = standardIndexesUrl(request.stdNum);
+  const sourceUrl = request.keyword === undefined ? baseSourceUrl : standardIndexesUrl(request.stdNum, request.keyword);
+  const payload = asRecord(await fetchKasbJson(baseSourceUrl), baseSourceUrl, "standard indexes");
+  const sourceItems = asArray(payload.standardIndexes, baseSourceUrl, "standardIndexes");
+  const baseSections = sourceItems
+    .map((item) => toSectionNode(item, baseSourceUrl, request.stdNum))
     .filter((item): item is StandardSectionNode => item !== undefined);
+  assertAnyNormalized(sourceItems, baseSections, baseSourceUrl, "기준서 구조 행 필드가 변경되었습니다.");
+  const incomplete = baseSections.length !== sourceItems.length;
 
-  if (sections.length === 0) {
+  if (baseSections.length === 0) {
     throw new ProviderFailure({
       code: "not_found",
       message: `기준서 ${request.stdNum}의 구조를 찾을 수 없습니다.`,
       retryable: false,
-      sourceUrl,
+      sourceUrl: baseSourceUrl,
     });
   }
 
+  const sections = request.keyword === undefined
+    ? baseSections
+    : filterSectionsBySearchMetadata(
+        baseSections,
+        asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "standard index search"),
+        sourceUrl,
+      );
+
   return {
     result: { request, sections, returnedCount: sections.length },
-    metadata: metadata(sourceUrl, sections.length === sourceItems.length ? "complete" : "partial"),
+    metadata: metadata(sourceUrl, incomplete ? "partial" : "complete"),
     references: { stdNum: request.stdNum, structureUrl: sourceUrl },
-    warnings:
-      request.keyword === undefined
+    warnings: [
+      ...(request.keyword === undefined
         ? []
-        : [{ code: "search_filtered_structure", message: "keyword가 적용된 구조 결과입니다." }],
+        : [{ code: "search_filtered_structure" as const, message: "keyword가 적용된 구조 결과입니다." }]),
+      ...(incomplete
+        ? [{ code: "source_metadata_incomplete" as const, message: "일부 기준서 구조 행을 정규화할 수 없어 제외했습니다." }]
+        : []),
+    ],
   };
 };
 
-const toSectionNode = (value: unknown, sourceUrl: string): StandardSectionNode | undefined => {
+const filterSectionsBySearchMetadata = (
+  sections: readonly StandardSectionNode[],
+  payload: Record<string, unknown>,
+  sourceUrl: string,
+): StandardSectionNode[] => {
+  const searchedIndexCountMap = asRecord(payload.searchedIndexCountMap, sourceUrl, "searchedIndexCountMap");
+  const knownIndexDocumentIds = new Set(sections.map((section) => section.indexDocumentId));
+  const matchedIndexDocumentIds = new Set<string>();
+
+  for (const [indexDocumentId, count] of Object.entries(searchedIndexCountMap)) {
+    if (indexDocumentId === "null") continue;
+    const matchCount = optionalNumber(count);
+    if (matchCount === undefined) {
+      throw sourceChanged(sourceUrl, "검색된 기준서 구조 행의 match count가 변경되었습니다.");
+    }
+    if (!knownIndexDocumentIds.has(indexDocumentId)) {
+      throw sourceChanged(sourceUrl, "검색된 기준서 구조 행의 documentId가 기준서 구조와 일치하지 않습니다.");
+    }
+    if (matchCount > 0) {
+      matchedIndexDocumentIds.add(indexDocumentId);
+    }
+  }
+
+  return sections.filter((section) => matchedIndexDocumentIds.has(section.indexDocumentId));
+};
+
+const toSectionNode = (
+  value: unknown,
+  sourceUrl: string,
+  expectedStdNum: string,
+): StandardSectionNode | undefined => {
   if (!asSoftRecord(value)) return undefined;
   const indexDocumentId = toStringValue(value.documentId);
   const stdNum = toStringValue(value.stdNum);
@@ -146,6 +197,9 @@ const toSectionNode = (value: unknown, sourceUrl: string): StandardSectionNode |
   const level = optionalNumber(value.level);
   if (indexDocumentId === undefined || stdNum === undefined || title === undefined || level === undefined) {
     return undefined;
+  }
+  if (stdNum !== expectedStdNum) {
+    throw sourceChanged(sourceUrl, "기준서 구조 행의 stdNum이 요청과 일치하지 않습니다.");
   }
   const parentDocumentIds = Array.isArray(value.parentDocumentIds)
     ? value.parentDocumentIds.map(toStringValue).filter((item): item is string => item !== undefined)
@@ -171,6 +225,8 @@ const getSection: GetSectionProvider["getSection"] = async (request) => {
   const clauses = sourceClauses
     .map((item) => toSectionClause(item, sourceUrl, request.stdNum, request.indexDocumentId))
     .filter((item): item is SectionClause => item !== undefined);
+  assertAnyNormalized(sourceClauses, clauses, sourceUrl, "섹션 문단 행 필드가 변경되었습니다.");
+  const incomplete = clauses.length !== sourceClauses.length;
 
   if (clauses.length === 0) {
     const structureUrl = standardIndexesUrl(request.stdNum);
@@ -202,10 +258,13 @@ const getSection: GetSectionProvider["getSection"] = async (request) => {
       },
       clauses,
     },
-    metadata: metadata(sourceUrl, clauses.length === sourceClauses.length ? "complete" : "partial"),
+    metadata: metadata(sourceUrl, incomplete ? "partial" : "complete"),
     references: { stdNum: request.stdNum, indexDocumentId: request.indexDocumentId, sectionUrl: sourceUrl },
     warnings: [
       ...(clauses.length === 0 ? [{ code: "empty_section" as const, message: "섹션에 문단이 없습니다." }] : []),
+      ...(incomplete
+        ? [{ code: "partial_clause_normalization" as const, message: "일부 섹션 문단 행을 정규화할 수 없어 제외했습니다." }]
+        : []),
       { code: "source_html_preserved" as const, message: "paraContent HTML 조각을 원문 그대로 보존했습니다." },
     ],
   };
@@ -218,15 +277,32 @@ const toSectionClause = (
   indexDocumentIdFallback: string,
 ): SectionClause | undefined => {
   if (!asSoftRecord(value)) return undefined;
-  const stdNum = toStringValue(value.stdNum) ?? stdNumFallback;
-  const indexDocumentId = toStringValue(value.documentId) ?? indexDocumentIdFallback;
+  const explicitStdNum = toStringValue(value.stdNum);
+  const explicitIndexDocumentId = toStringValue(value.documentId);
+  if (explicitStdNum !== undefined && explicitStdNum !== stdNumFallback) {
+    throw sourceChanged(sourceUrl, "섹션 문단 행의 stdNum이 요청과 일치하지 않습니다.");
+  }
+  const stdNum = explicitStdNum ?? stdNumFallback;
+  const indexDocumentId = explicitIndexDocumentId ?? indexDocumentIdFallback;
   const paraNum = toStringValue(value.paraNum);
+  const title = optionalString(value.title);
   const paraContent = optionalString(value.paraContent);
   const fullContent = optionalString(value.fullContent) ?? (paraContent === undefined ? undefined : stripHtml(paraContent));
   const uniqueKey = toStringValue(value.uniqueKey);
   const sort = optionalNumber(value.sort);
   const faqDocNumbers = optionalString(value.faqDocNumbers);
   const faqCount = optionalNumber(value.faqCount);
+  if (
+    explicitIndexDocumentId === undefined &&
+    paraNum === undefined &&
+    paraContent === undefined &&
+    fullContent === undefined &&
+    uniqueKey === undefined &&
+    title === undefined &&
+    optionalString(value.type) === undefined
+  ) {
+    return undefined;
+  }
   const kind = paraNum === undefined ? "title" : "paragraph";
   if (stdNum.length === 0 || indexDocumentId.length === 0) {
     throw sourceChanged(sourceUrl, "문단 식별자를 정규화할 수 없습니다.");
@@ -235,6 +311,7 @@ const toSectionClause = (
     kind,
     stdNum,
     indexDocumentId,
+    ...(title === undefined ? {} : { title }),
     ...(uniqueKey === undefined ? {} : { uniqueKey }),
     ...(paraNum === undefined ? {} : { paraNum }),
     ...(paraContent === undefined ? {} : { paraContent }),
@@ -259,6 +336,13 @@ const getParagraph: GetParagraphProvider["getParagraph"] = async (request) => {
     });
   }
   const paragraph = toParagraph(first, sourceUrl);
+  if (
+    paragraph.stdNum !== request.stdNum ||
+    paragraph.paraNum !== request.paraNum ||
+    paragraph.uniqueKey !== `${request.stdNum}-${request.paraNum}`
+  ) {
+    throw sourceChanged(sourceUrl, "문단 응답 식별자가 요청과 일치하지 않습니다.");
+  }
   return {
     result: { request, paragraph },
     metadata: metadata(sourceUrl),
@@ -319,6 +403,8 @@ const searchQnas: SearchQnasProvider["search"] = async (request) => {
   const items = sourceItems
     .map((item) => toQnaSearchItem(item, sourceUrl))
     .filter((item): item is QnaSearchItem => item !== undefined);
+  assertAnyNormalized(sourceItems, items, sourceUrl, "Q&A 검색 결과 필드가 변경되었습니다.");
+  const incomplete = items.length !== sourceItems.length;
   const countByType = asSoftRecord(payload.facilityQnaCountData)
     ? Object.fromEntries(
         Object.entries(payload.facilityQnaCountData).filter((entry): entry is [string, number] =>
@@ -329,9 +415,14 @@ const searchQnas: SearchQnasProvider["search"] = async (request) => {
 
   return {
     result: { request, items, returnedCount: items.length, countByType },
-    metadata: metadata(sourceUrl, items.length === sourceItems.length ? "complete" : "partial"),
+    metadata: metadata(sourceUrl, incomplete ? "partial" : "complete"),
     references: { searchUrl: sourceUrl },
-    warnings: [{ code: "source_html_preserved", message: "검색 하이라이트 HTML은 plain text로 정규화했습니다." }],
+    warnings: [
+      ...(incomplete
+        ? [{ code: "source_metadata_incomplete" as const, message: "일부 Q&A 검색 행을 정규화할 수 없어 제외했습니다." }]
+        : []),
+      { code: "source_html_preserved", message: "검색 하이라이트 HTML은 plain text로 정규화했습니다." },
+    ],
   };
 };
 
@@ -375,6 +466,9 @@ const getQna: GetQnaProvider["getQna"] = async (request) => {
     });
   }
   const qna = toQna(sourceQna, sourceUrl);
+  if (qna.docNumber !== request.docNumber) {
+    throw sourceChanged(sourceUrl, "Q&A 응답 식별자가 요청과 일치하지 않습니다.");
+  }
   return {
     result: { request, qna },
     metadata: metadata(sourceUrl),
@@ -420,6 +514,17 @@ const toQna = (value: unknown, sourceUrl: string): Qna => {
     ...(prevDocNumber === undefined ? {} : { prevDocNumber }),
     ...(nextDocNumber === undefined ? {} : { nextDocNumber }),
   };
+};
+
+const assertAnyNormalized = (
+  sourceItems: readonly unknown[],
+  normalizedItems: readonly unknown[],
+  sourceUrl: string,
+  message: string,
+): void => {
+  if (sourceItems.length > 0 && normalizedItems.length === 0) {
+    throw sourceChanged(sourceUrl, message);
+  }
 };
 
 const asSoftRecord = (value: unknown): value is Record<string, unknown> =>

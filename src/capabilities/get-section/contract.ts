@@ -33,6 +33,7 @@ export const resolveGetSectionRequest = (
 
 export const SectionClauseSchema = Schema.Struct({
   kind: Schema.Literal("paragraph", "title", "unknown"),
+  title: Schema.optional(Schema.String),
   uniqueKey: Schema.optional(Schema.String),
   stdNum: Schema.String,
   paraNum: Schema.optional(Schema.String),

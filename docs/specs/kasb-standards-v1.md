@@ -148,9 +148,9 @@ Allowed public failure codes:
 
 ### Output Modes
 
-The first implementation supports structured output. Summary and raw projections may be CLI output options only when they do not change the core result contract or the always-JSON CLI rule.
+The first implementation supports structured output. Summary and raw projections may be CLI output options only when they do not change the core result contract or the JSON CLI operation-output rule.
 
-Every output mode still emits a JSON envelope:
+Every operation output mode still emits a JSON envelope:
 
 - `structured`: schema-first `result` payload for downstream use
 - `summary`: concise JSON `result` projection over the structured result
@@ -208,7 +208,7 @@ Implementation notes:
 - `inputs`
   `stdNum`, `indexDocumentId`, optional `keyword`
 - `output`
-  Section metadata plus ordered clauses and paragraph rows.
+  Section metadata plus ordered title/paragraph clauses. Title clauses may include source title text.
 - `warnings`
   `empty_section`, `partial_clause_normalization`, `source_html_preserved`
 - `failure cases`
@@ -250,7 +250,7 @@ Implementation notes:
 - `purpose`
   Find KASB Q&A and interpretation material relevant to a keyword.
 - `inputs`
-  `keyword`, optional `page`, optional `rows`, optional source `types` CSV
+  `keyword`, optional `page`, optional `rows`, optional source-facing `types` CSV
 - `output`
   Matching Q&A records with `docNumber`, source type, title, snippet, tags, source links, and count metadata.
 - `warnings`
@@ -264,7 +264,7 @@ Implementation notes:
 
 - Use `GET /api/qnas/v2?types={csv}&searchWord={keyword}&page={page}&rows={rows}`.
 - Default observed public `types` to `11,12,13,14,15,24,25`.
-- Keep type numbers source-facing until a later spec promotes semantic type names.
+- Treat `types` as an explicit v1 exception to the usual semantic-field rule; keep type numbers source-facing until a later spec promotes semantic type names.
 
 ### `get-qna`
 
@@ -295,7 +295,7 @@ The CLI should:
 
 - expose one command per v1 operation
 - accept kebab-case flags
-- always emit JSON, including failures
+- emit JSON for operation success and failure output; Commander help may remain human-readable
 - write success envelopes to `stdout` with exit code `0`
 - write failure envelopes to `stderr` with a nonzero exit code and empty `stdout`
 - do not mix human-readable diagnostics into operation output; any diagnostic mode must stay parseable, such as JSON lines on `stderr` or a separate diagnostic file

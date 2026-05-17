@@ -56,14 +56,14 @@ CLI smoke tests should assert stream and exit behavior:
 - success: exit code `0`, JSON envelope on `stdout`, empty `stderr`
 - failure: nonzero exit code, empty `stdout`, JSON failure envelope on `stderr`
 
-Initial deterministic scenarios:
+Initial deterministic CLI/test scenarios, before adding `evals/` artifacts:
 
 - search `리스` and identify standard `1116`
 - retrieve the structure for `1116` and find `ZB2hJW`
 - fetch section `1116 / ZB2hJW` and cite paragraphs `1` and `2`
 - fetch paragraph `1116 / 23` by exact paragraph reference
 
-Future agentic eval examples:
+Future agentic eval examples for `evals/`:
 
 - "Find the KASB paragraph most relevant to leases and cite the paragraph number."
 - "Retrieve the section that contains paragraphs 1 and 2 of K-IFRS 1116."

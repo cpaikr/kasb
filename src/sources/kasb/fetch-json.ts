@@ -24,7 +24,19 @@ export const fetchKasbJson = async (sourceUrl: string): Promise<unknown> => {
       });
     }
 
-    return await response.json();
+    try {
+      return await response.json();
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        throw new ProviderFailure({
+          code: "source_changed",
+          message: "KASB API가 JSON이 아닌 응답을 반환했습니다.",
+          retryable: false,
+          sourceUrl,
+        });
+      }
+      throw error;
+    }
   } catch (error) {
     if (error instanceof ProviderFailure) {
       throw error;

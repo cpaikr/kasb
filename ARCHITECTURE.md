@@ -128,9 +128,9 @@ Keep two schema families separate:
 - [docs/tools/](docs/tools/foundations.md)
   Shared single-tool design guidance.
 - [PRMOPT.md](PRMOPT.md)
-  Working brief for accepted stack and implementation choices.
+  Historical implementation context for the accepted stack and first scaffold choices.
 - [ROADMAP.md](ROADMAP.md)
-  Strategic sequencing.
+  Historical phased direction and broad release sequencing.
 - [TODO.md](TODO.md)
   Ordered near-term queue.
 - [PLAN.md](PLAN.md)
@@ -151,7 +151,7 @@ Keep two schema families separate:
 
 - Public JSON request fields use camelCase; CLI flags use kebab-case.
 - The success result schema contains `result`, `metadata`, `references`, and `warnings`; typed failures are separate from success schemas.
-- Source adapters may know raw KASB fields; public capabilities expose only stable semantic fields.
+- Source adapters may know raw KASB fields; public capabilities expose stable semantic fields unless the spec explicitly promotes a source-facing exception, such as `search-qnas.types`.
 - Provider implementations return capability-shaped results, not raw source payloads.
 - CLI commands import app/capability surfaces, not `sources/kasb/*` internals.
 - CLI help, examples, and presentation options stay CLI-local.
