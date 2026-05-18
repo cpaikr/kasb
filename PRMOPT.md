@@ -1,6 +1,6 @@
 # PRMOPT
 
-This file is historical implementation context for the first CLI scaffold. Current architecture, contracts, and active work are authoritative in [ARCHITECTURE.md](ARCHITECTURE.md), [docs/specs/](docs/specs/README.md), [TODO.md](TODO.md), [PLAN.md](PLAN.md), and code.
+This file is historical implementation context for the first CLI scaffold. Current architecture, contracts, and active work are authoritative in [ARCHITECTURE.md](ARCHITECTURE.md), [docs/specs/](docs/specs/README.md), [TODO.md](TODO.md), and code.
 
 The project follows `../darty` unless a KASB-specific constraint justifies a different path.
 
@@ -126,4 +126,4 @@ The Bun/TypeScript repo-local implementation now exists:
 - captured KASB fixtures and fixture-backed tests
 - subprocess CLI tests and gated live checks
 
-Use [PLAN.md](PLAN.md) and [TODO.md](TODO.md) for active hardening work.
+Use [TODO.md](TODO.md) for active hardening work.

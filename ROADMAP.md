@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap records the path from docs-only planning to the first Darty-shaped CLI implementation. It is historical context plus broad release direction; use [TODO.md](TODO.md) and [PLAN.md](PLAN.md) for active work.
+This roadmap records the path from docs-only planning to the first Darty-shaped CLI implementation. It is historical context plus broad release direction; use [TODO.md](TODO.md) for active work.
 
 ## Completed
 
@@ -11,7 +11,7 @@ Delivered:
 - docs state that `kasb-standards` follows `../darty`
 - accepted stack is Bun, strict TypeScript, Effect Schema, Commander, Bun test, and native fetch
 - public contract naming is camelCase JSON plus kebab-case CLI
-- TODO and PLAN point to implementation hardening rather than open-ended design
+- TODO points to implementation hardening rather than open-ended design
 
 ### Phase 1: Scaffold Core Shape
 

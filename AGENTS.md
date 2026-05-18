@@ -4,7 +4,7 @@
 
 - This repo is for a read-only KASB standards CLI, not a generic Markdown guide.
 - The app design should follow `../darty`: a behavior-first capability core, thin CLI transport, explicit source adapters, and typed contract/error boundaries.
-- The first CLI implementation now exists. Treat broad docs as product and architecture guidance, while `PLAN.md` and `TODO.md` track active hardening work.
+- The first CLI implementation now exists. Treat broad docs as product and architecture guidance, while `TODO.md` tracks active hardening work.
 
 ## Read First
 
@@ -46,7 +46,6 @@ Expected implementation stack, matching `../darty` unless a later decision chang
 - Stable capability contracts: `docs/specs/`
 - Tool-design rules shared across capabilities: `docs/tools/`
 - Current work queue: `TODO.md`
-- Active implementation plan: `PLAN.md`
 
 ## Working Rules
 

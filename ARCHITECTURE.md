@@ -133,8 +133,6 @@ Keep two schema families separate:
   Historical phased direction and broad release sequencing.
 - [TODO.md](TODO.md)
   Ordered near-term queue.
-- [PLAN.md](PLAN.md)
-  One active detailed implementation plan.
 - `src/`
   Implementation root for the KASB capability core, source adapters, app composition, and CLI.
 
@@ -145,7 +143,7 @@ Keep two schema families separate:
 3. For source behavior, read [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md).
 4. For capability contracts, read [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md).
 5. For app layout and layer boundaries, use this file and keep parity with `../darty` where it still fits KASB.
-6. For one active job, use [PLAN.md](PLAN.md); keep the ordered queue in [TODO.md](TODO.md).
+6. For active work, use the ordered queue in [TODO.md](TODO.md).
 
 ## Invariants
 
