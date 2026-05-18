@@ -254,7 +254,7 @@ Implementation notes:
 - `purpose`
   Find KASB Q&A and interpretation material relevant to a keyword.
 - `inputs`
-  `keyword`, optional `page`, optional `rows`, optional source-facing `types` CSV. The CLI also accepts `--limit` as an alias for `rows`.
+  `keyword`, optional `page`, optional `rows`, optional source-facing numeric `types` CSV. The CLI also accepts `--limit` as an alias for `rows`.
 - `output`
   Matching Q&A records with `docNumber`, source type, title, snippet, tags, source links, and count metadata.
 - `warnings`
@@ -269,6 +269,7 @@ Implementation notes:
 - Use `GET /api/qnas/v2?types={csv}&searchWord={keyword}&page={page}&rows={rows}`.
 - Default observed public `types` to `11,12,13,14,15,24,25`.
 - Treat `types` as an explicit v1 exception to the usual semantic-field rule; keep type numbers source-facing until a later spec promotes semantic type names.
+- Reject malformed non-numeric `types` CSV values as `invalid_input`; normalize spaces around comma-separated numeric ids.
 
 ### `get-qna`
 

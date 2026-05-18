@@ -68,11 +68,11 @@ describe("capability request validation", () => {
   test("requires get-section to receive exactly one section locator", () => {
     expectInvalid(
       () => resolveGetSectionRequest({ stdNum: "1116" }),
-      { parameter: "indexDocumentId", messageIncludes: "indexDocumentId\" 또는 \"ref" },
+      { parameter: "indexDocumentId", messageIncludes: "titleDocumentId" },
     );
     expectInvalid(
       () => resolveGetSectionRequest({ stdNum: "1116", indexDocumentId: "ZB2hJW", ref: "1~2" }),
-      { parameter: "ref", messageIncludes: "동시에 사용할 수 없습니다" },
+      { parameter: "ref", messageIncludes: "정확히 하나만" },
     );
   });
 
@@ -94,6 +94,17 @@ describe("capability request validation", () => {
   test("applies integer defaults", () => {
     expect(resolveSearchStandardsRequest({ keyword: "리스" }).limit).toBe(20);
     expect(resolveSearchQnaRequest({ keyword: "리스" })).toMatchObject({ page: 1, rows: 10 });
+  });
+
+  test("normalizes source-facing Q&A type CSV", () => {
+    expect(resolveSearchQnaRequest({ keyword: "리스", types: " 24, 25 " }).types).toBe("24,25");
+  });
+
+  test("rejects malformed source-facing Q&A type CSV", () => {
+    expectInvalid(
+      () => resolveSearchQnaRequest({ keyword: "리스", types: "24,,25" }),
+      { parameter: "types", messageIncludes: "숫자 Q&A 유형 ID의 CSV" },
+    );
   });
 
   test.each([

@@ -162,7 +162,10 @@ describe("KASB provider operations", () => {
   test("rejects a route-facing titleDocumentId that is not a section id", async () => {
     await expect(
       defaultGetSectionOperation.execute({ stdNum: "1116", indexDocumentId: "19970f" }),
-    ).rejects.toMatchObject({ code: "not_found" } satisfies Partial<KasbFailure>);
+    ).rejects.toMatchObject({
+      code: "not_found",
+      message: expect.stringContaining("titleDocumentId"),
+    });
   });
 
   test("fetches an exact paragraph by stdNum and paraNum", async () => {

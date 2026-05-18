@@ -314,7 +314,7 @@ const resolveSectionLookup = async (request: GetSectionRequest): Promise<Resolve
   if (matches.length === 0) {
     throw new ProviderFailure({
       code: "not_found",
-      message: `기준서 ${request.stdNum}에서 ref ${requestedRef}에 해당하는 섹션을 찾을 수 없습니다.`,
+      message: `기준서 ${request.stdNum}에서 ref ${requestedRef}에 해당하는 섹션을 찾을 수 없습니다. get-standard-structure로 사용 가능한 ref와 indexDocumentId를 다시 확인하세요.`,
       retryable: false,
       sourceUrl,
     });
@@ -356,7 +356,7 @@ const getSection: GetSectionProvider["getSection"] = async (request) => {
     if (!exists) {
       throw new ProviderFailure({
         code: "not_found",
-        message: "요청한 indexDocumentId 또는 ref에 해당하는 섹션을 찾을 수 없습니다.",
+        message: "요청한 indexDocumentId 또는 ref에 해당하는 섹션을 찾을 수 없습니다. get-standard-structure를 실행해 반환된 indexDocumentId를 사용하세요. 브라우저 경로의 titleDocumentId는 v1에서 허용되지 않습니다.",
         retryable: false,
         sourceUrl,
       });

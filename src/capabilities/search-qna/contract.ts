@@ -7,9 +7,10 @@ import {
   readOptionalString,
   readRequiredString,
 } from "../request-validation.ts";
-import { DocNumberSchema, ResultMetadataSchema, SourceUrlSchema } from "../types.ts";
+import { DocNumberSchema, InvalidCapabilityRequest, ResultMetadataSchema, SourceUrlSchema } from "../types.ts";
 
 const fields = new Set(["keyword", "page", "rows", "types"]);
+const observedDefaultTypes = "11,12,13,14,15,24,25";
 
 export const SearchQnaRequestSchema = Schema.Struct({
   keyword: Schema.String.pipe(Schema.minLength(1)).annotations({
@@ -31,8 +32,8 @@ export const SearchQnaRequestSchema = Schema.Struct({
     examples: [5, 10],
   }),
   types: Schema.optional(Schema.String.annotations({
-    description: "Source-facing Q&A type id CSV. Defaults to observed public types 11,12,13,14,15,24,25 when omitted.",
-    examples: ["11,12,13,14,15,24,25"],
+    description: "Source-facing numeric Q&A type id CSV. Defaults to observed public types 11,12,13,14,15,24,25 when omitted; override only when you know the KASB source type ids to include.",
+    examples: [observedDefaultTypes, "24,25"],
   })),
 });
 export type SearchQnaRawInput = typeof SearchQnaRequestSchema.Encoded;
@@ -43,13 +44,25 @@ export const resolveSearchQnaRequest = (
 ): SearchQnaRequest => {
   assertObjectInput(input);
   assertNoUnknownKeys(input, fields);
-  const types = readOptionalString(input, "types");
+  const types = normalizeQnaTypes(readOptionalString(input, "types"));
   return {
     keyword: readRequiredString(input, "keyword"),
     page: readOptionalInteger(input, "page", { defaultValue: 1, min: 1, max: 1000 }),
     rows: readOptionalInteger(input, "rows", { defaultValue: 10, min: 1, max: 50 }),
     ...(types === undefined ? {} : { types }),
   };
+};
+
+const normalizeQnaTypes = (types: string | undefined): string | undefined => {
+  if (types === undefined) return undefined;
+  const typeIds = types.split(",").map((typeId) => typeId.trim());
+  if (typeIds.some((typeId) => !/^\d+$/u.test(typeId))) {
+    throw new InvalidCapabilityRequest({
+      parameter: "types",
+      message: `매개변수 "types"은(는) 숫자 Q&A 유형 ID의 CSV여야 합니다. 기본 관찰값은 ${observedDefaultTypes}입니다.`,
+    });
+  }
+  return typeIds.join(",");
 };
 
 export const QnaSearchItemSchema = Schema.Struct({

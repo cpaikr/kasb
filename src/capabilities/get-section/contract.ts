@@ -24,7 +24,7 @@ export const GetSectionRequestSchema = Schema.Struct({
   }),
   indexDocumentId: Schema.optional(IndexDocumentIdSchema),
   ref: Schema.optional(Schema.String.pipe(Schema.minLength(1)).annotations({
-    description: "Section ref/range from get-standard-structure used as an alternate lookup when indexDocumentId is unknown.",
+    description: "Section ref/range from get-standard-structure used as an alternate lookup when indexDocumentId is unknown; do not send it together with indexDocumentId.",
     examples: ["1~2", "153~158", "22~30"],
   })),
   keyword: Schema.optional(Schema.String.annotations({
@@ -46,13 +46,13 @@ export const resolveGetSectionRequest = (
   if (indexDocumentId === undefined && ref === undefined) {
     throw new InvalidCapabilityRequest({
       parameter: "indexDocumentId",
-      message: "필수 매개변수 \"indexDocumentId\" 또는 \"ref\" 중 하나가 필요합니다.",
+      message: "필수 매개변수 \"indexDocumentId\" 또는 \"ref\" 중 정확히 하나가 필요합니다. \"indexDocumentId\"는 get-standard-structure 결과에서 가져오며, 브라우저 경로의 titleDocumentId는 사용할 수 없습니다.",
     });
   }
   if (indexDocumentId !== undefined && ref !== undefined) {
     throw new InvalidCapabilityRequest({
       parameter: "ref",
-      message: "매개변수 \"indexDocumentId\"와 \"ref\"는 동시에 사용할 수 없습니다.",
+      message: "매개변수 \"indexDocumentId\"와 \"ref\" 중 정확히 하나만 사용할 수 있습니다.",
     });
   }
   return {

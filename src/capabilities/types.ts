@@ -17,12 +17,12 @@ export const StdNumSchema = Schema.String.pipe(Schema.minLength(1)).annotations(
 });
 
 export const IndexDocumentIdSchema = Schema.String.pipe(Schema.minLength(1)).annotations({
-  description: "Retrieval-facing section id returned by get-standard-structure; browser route titleDocumentId values are not accepted.",
+  description: "Retrieval-facing section id returned by get-standard-structure and accepted by get-section; browser route titleDocumentId values are not accepted.",
   examples: ["ZB2hJW"],
 });
 
 export const ParaNumSchema = Schema.String.pipe(Schema.minLength(1)).annotations({
-  description: "Paragraph reference within one standard, including numeric, Korean-prefixed, appendix, and basis-for-conclusions forms.",
+  description: "Paragraph reference within one standard; accepts numeric, Korean-prefixed, appendix, and basis-for-conclusions forms for get-paragraph.",
   examples: ["23", "한2.1", "B3", "BC240A"],
 });
 
