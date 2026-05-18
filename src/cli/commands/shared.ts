@@ -3,6 +3,7 @@ import { Command } from "commander";
 import {
   buildCliNameByOptionKey,
   configureCliTransport,
+  createOutputOption,
   createPrettyOption,
   createRegisteredOption,
   extractCliOptions,
@@ -11,6 +12,7 @@ import {
   renderInvalidInputCliErrorMessage,
   splitCliCommandOptions,
   type CliOptions as SharedCliOptions,
+  type CliOutputMode,
   type ParsedCliCommand,
   type RegisteredOption,
 } from "../command-helpers.ts";
@@ -27,6 +29,8 @@ export type CliCommandSpec<Key extends string, RawInput, Result> = {
     readonly description: string;
     readonly integer?: boolean;
   }[];
+  readonly outputModes?: readonly CliOutputMode[];
+  readonly summarizeResult?: (result: Result) => unknown;
   readonly runOperation: (input: Partial<RawInput> & Record<string, unknown>) => Promise<Result>;
   readonly writeStdout: (text: string) => void;
 };
@@ -34,7 +38,7 @@ export type CliCommandSpec<Key extends string, RawInput, Result> = {
 export type BuiltCliCommand<Key extends string, RawInput> = {
   readonly command: Command;
   readonly renderErrorMessage: (error: unknown) => string | undefined;
-  readonly parse: (options: SharedCliOptions<Key | "pretty">) => ParsedCliCommand<RawInput>;
+  readonly parse: (options: SharedCliOptions<Key | "pretty" | "output">) => ParsedCliCommand<RawInput>;
 };
 
 export const buildOperationCommand = <Key extends string, RawInput, Result>(
@@ -43,8 +47,8 @@ export const buildOperationCommand = <Key extends string, RawInput, Result>(
   const registeredOptions = buildRegisteredOptions(spec);
   const cliNameByOptionKey = buildCliNameByOptionKey(registeredOptions);
 
-  const toCommand = (options: SharedCliOptions<Key | "pretty">): ParsedCliCommand<RawInput> =>
-    splitCliCommandOptions<RawInput, Key | "pretty">(options, ["pretty"]);
+  const toCommand = (options: SharedCliOptions<Key | "pretty" | "output">): ParsedCliCommand<RawInput> =>
+    splitCliCommandOptions<RawInput, Key | "pretty" | "output">(options, ["pretty", "output"]);
 
   const command = configureCliTransport(new Command(spec.operationName))
     .summary(spec.summary)
@@ -70,7 +74,10 @@ export const buildOperationCommand = <Key extends string, RawInput, Result>(
     const parsed = toCommand(options);
     return spec
       .runOperation(parsed.request)
-      .then((result) => spec.writeStdout(renderCliJson(result, parsed.output)));
+      .then((result) => {
+        const projectedResult = projectResult(result, parsed.output.output, spec.summarizeResult);
+        spec.writeStdout(renderCliJson(projectedResult, parsed.output));
+      });
   });
 
   return {
@@ -83,9 +90,9 @@ export const buildOperationCommand = <Key extends string, RawInput, Result>(
 
 const buildRegisteredOptions = <Key extends string, RawInput, Result>(
   spec: CliCommandSpec<Key, RawInput, Result>,
-): readonly RegisteredOption<Key | "pretty">[] => [
+): readonly RegisteredOption<Key | "pretty" | "output">[] => [
   ...spec.options.map((option) =>
-    createRegisteredOption<Key | "pretty">(
+    createRegisteredOption<Key | "pretty" | "output">(
       option.key,
       option.flags,
       option.description,
@@ -94,8 +101,31 @@ const buildRegisteredOptions = <Key extends string, RawInput, Result>(
         : undefined,
     ),
   ),
+  ...(spec.outputModes === undefined ? [] : [createOutputOption()]),
   createPrettyOption(),
 ];
+
+const projectResult = <Result>(
+  result: Result,
+  outputMode: CliOutputMode,
+  summarizeResult: ((result: Result) => unknown) | undefined,
+): Result | unknown => {
+  if (outputMode !== "summary" || summarizeResult === undefined || !isResultEnvelope(result)) return result;
+  return { ...result, result: summarizeResult(result) };
+};
+
+const isResultEnvelope = (value: unknown): value is {
+  readonly result: unknown;
+  readonly metadata: unknown;
+  readonly references: unknown;
+  readonly warnings: unknown;
+} =>
+  value !== null &&
+  typeof value === "object" &&
+  "result" in value &&
+  "metadata" in value &&
+  "references" in value &&
+  "warnings" in value;
 
 const renderSupplementalHelp = <Key extends string, RawInput, Result>(
   spec: CliCommandSpec<Key, RawInput, Result>,

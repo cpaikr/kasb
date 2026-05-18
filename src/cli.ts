@@ -25,6 +25,11 @@ const writeStderr = (text: string) => {
 
 const shouldPrettyPrintJson = (argv: readonly string[]): boolean => argv.includes("--pretty");
 
+const detailOutputModes = ["summary", "structured", "raw"] as const;
+
+const truncate = (value: string, maxLength: number): string =>
+  value.length <= maxLength ? value : `${value.slice(0, maxLength).trimEnd()}…`;
+
 const searchStandardsCommand = buildOperationCommand<
   keyof SearchStandardsRawInput,
   SearchStandardsRawInput,
@@ -55,7 +60,20 @@ const getStandardStructureCommand = buildOperationCommand<
     { key: "stdNum", flags: "--std-num <text>", description: "[필수] 기준서 번호입니다. 예: 1116" },
     { key: "keyword", flags: "--keyword <text>", description: "[선택] 구조를 검색어로 필터링합니다." },
   ],
+  notes: ["큰 구조 결과는 --output summary로 indexDocumentId, title, ref 중심의 compact JSON을 받을 수 있습니다."],
   examples: [{ description: "제1116호 리스 기준서 구조를 조회합니다.", argv: ["--std-num", "1116"] }],
+  outputModes: detailOutputModes,
+  summarizeResult: (output) => ({
+    request: output.result.request,
+    returnedCount: output.result.returnedCount,
+    sections: output.result.sections.map((section) => ({
+      indexDocumentId: section.indexDocumentId,
+      title: section.title,
+      ref: section.ref,
+      level: section.level,
+      ...(section.documentType === undefined ? {} : { documentType: section.documentType }),
+    })),
+  }),
   runOperation: (input) => defaultGetStandardStructureOperation.execute(input),
   writeStdout,
 });
@@ -79,6 +97,18 @@ const getSectionCommand = buildOperationCommand<
     { description: "제1116호 목적 섹션을 조회합니다.", argv: ["--std-num", "1116", "--index-document-id", "ZB2hJW"] },
     { description: "제1019호 기타장기종업원급여 섹션을 ref로 조회합니다.", argv: ["--std-num", "1019", "--ref", "153~158"] },
   ],
+  outputModes: detailOutputModes,
+  summarizeResult: (output) => ({
+    request: output.result.request,
+    section: output.result.section,
+    clauses: output.result.clauses.map((clause) => ({
+      kind: clause.kind,
+      ...(clause.title === undefined ? {} : { title: clause.title }),
+      ...(clause.paraNum === undefined ? {} : { paraNum: clause.paraNum }),
+      ...(clause.uniqueKey === undefined ? {} : { uniqueKey: clause.uniqueKey }),
+      ...(clause.fullContent === undefined ? {} : { fullContent: clause.fullContent }),
+    })),
+  }),
   runOperation: (input) => defaultGetSectionOperation.execute(input),
   writeStdout,
 });
@@ -115,7 +145,24 @@ const searchQnaCommand = buildOperationCommand<
     { key: "rows", flags: "--limit <number>", description: "[별칭] --rows와 같습니다.", integer: true },
     { key: "types", flags: "--types <csv>", description: "[선택] 숫자 Q&A 유형 ID CSV입니다. 기본값: 11,12,13,14,15,24,25" },
   ],
+  notes: ["--output summary는 외부 contentLink와 긴 source-adjacent 필드를 제외하고 docNumber 중심으로 보여줍니다."],
   examples: [{ description: "리스 관련 Q&A를 검색합니다.", argv: ["--keyword", "리스", "--limit", "5"] }],
+  outputModes: detailOutputModes,
+  summarizeResult: (output) => ({
+    request: output.result.request,
+    returnedCount: output.result.returnedCount,
+    countByType: output.result.countByType,
+    items: output.result.items.map((item) => ({
+      docNumber: item.docNumber,
+      type: item.type,
+      title: item.title,
+      snippet: truncate(item.snippet, 240),
+      tags: item.tags,
+      deprecated: item.deprecated,
+      ...(item.publishDate === undefined ? {} : { publishDate: item.publishDate }),
+      ...(item.prefix === undefined ? {} : { prefix: item.prefix }),
+    })),
+  }),
   runOperation: (input) => defaultSearchQnaOperation.execute(input),
   writeStdout,
 });
@@ -132,7 +179,24 @@ const getQnaCommand = buildOperationCommand<
     { key: "docNumber", flags: "--doc-number <text>", description: "[필수] Q&A 문서 번호입니다. 예: SSI-35629" },
     { key: "keyword", flags: "--keyword <text>", description: "[선택] 원천 API 하이라이트 검색어입니다." },
   ],
+  notes: ["--output summary는 contentHtml/relStds를 제외하고 본문 preview와 follow-up docNumber만 반환합니다."],
   examples: [{ description: "신속처리질의 문서를 조회합니다.", argv: ["--doc-number", "SSI-35629"] }],
+  outputModes: detailOutputModes,
+  summarizeResult: (output) => ({
+    request: output.result.request,
+    qna: {
+      docNumber: output.result.qna.docNumber,
+      type: output.result.qna.type,
+      title: output.result.qna.title,
+      fullContentPreview: truncate(output.result.qna.fullContent, 1_000),
+      tags: output.result.qna.tags,
+      deprecated: output.result.qna.deprecated,
+      ...(output.result.qna.reference === undefined ? {} : { reference: output.result.qna.reference }),
+      ...(output.result.qna.publishDate === undefined ? {} : { publishDate: output.result.qna.publishDate }),
+      ...(output.result.qna.prevDocNumber === undefined ? {} : { prevDocNumber: output.result.qna.prevDocNumber }),
+      ...(output.result.qna.nextDocNumber === undefined ? {} : { nextDocNumber: output.result.qna.nextDocNumber }),
+    },
+  }),
   runOperation: (input) => defaultGetQnaOperation.execute(input),
   writeStdout,
 });

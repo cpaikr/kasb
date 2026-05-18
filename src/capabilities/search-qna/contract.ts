@@ -124,7 +124,7 @@ export const SearchQnaResultSchema = Schema.Struct({
   references: Schema.Struct({ searchUrl: SourceUrlSchema }).annotations({ description: "Operation-level source reference for the Q&A search." }),
   warnings: Schema.Array(
     Schema.Struct({
-      code: Schema.Literal("source_html_preserved", "source_metadata_incomplete"),
+      code: Schema.Literal("source_metadata_incomplete"),
       message: Schema.String.annotations({ description: "Human-readable warning detail." }),
     }),
   ),

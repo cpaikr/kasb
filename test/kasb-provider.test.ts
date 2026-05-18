@@ -141,7 +141,8 @@ describe("KASB provider operations", () => {
 
     expect(result.result.section.title).toBe("목적");
     expect(result.result.clauses.map((clause) => clause.paraNum)).toEqual(["1", "2"]);
-    expect(result.warnings.map((warning) => warning.code)).toContain("source_html_preserved");
+    expect(result.warnings.map((warning) => warning.code)).not.toContain("source_html_preserved");
+    expect(result.metadata.content?.htmlFields).toContain("result.clauses[].paraContent");
   });
 
   test("fetches a section by structure ref", async () => {

@@ -123,9 +123,9 @@ Examples:
 Each operation returns a success envelope with:
 
 - `result`: operation-specific payload
-- `metadata`: source endpoint, timing, normalization notes, and completeness flags
+- `metadata`: source endpoint, timing, routine content-format notes, and completeness flags
 - `references`: citeable identifiers and source URLs surfaced at the operation level
-- `warnings`: non-fatal partial retrieval, normalization uncertainty, source drift hints, or fallback use
+- `warnings`: non-fatal partial retrieval, normalization uncertainty, source drift hints, ambiguity, empty sections, truncation, or fallback use
 
 The success schema does not contain an `error` field.
 
@@ -150,13 +150,13 @@ Allowed public failure codes:
 
 ### Output Modes
 
-The first implementation supports structured output. Summary and raw projections may be CLI output options only when they do not change the core result contract or the JSON CLI operation-output rule.
+The first implementation supports structured output by default. High-volume CLI commands (`get-standard-structure`, `get-section`, `search-qna`, and `get-qna`) also accept `--output summary|structured|raw` without changing the shared capability contracts or the JSON CLI operation-output rule.
 
 Every operation output mode still emits a JSON envelope:
 
 - `structured`: schema-first `result` payload for downstream use
-- `summary`: concise JSON `result` projection over the structured result
-- `raw`: selected upstream payload fragments inside the JSON `result` for debugging, not the default public shape
+- `summary`: concise JSON `result` projection over the structured result; operation-level `metadata`, `references`, and `warnings` are preserved
+- `raw`: the richest available structured envelope, including preserved source HTML fields already normalized into the public result shape
 
 ## 6. Operations
 
@@ -212,7 +212,7 @@ Implementation notes:
 - `output`
   Section metadata plus ordered title/paragraph clauses. Title clauses may include source title text. Ref-based lookups return the resolved `indexDocumentId` in references and section metadata.
 - `warnings`
-  `ambiguous_ref_resolved`, `empty_section`, `partial_clause_normalization`, `source_html_preserved`
+  `ambiguous_ref_resolved`, `empty_section`, `partial_clause_normalization`
 - `failure cases`
   `invalid_input`, `not_found`, `source_unavailable`, `source_changed`, `partial_retrieval`
 - `safety class`
@@ -227,6 +227,7 @@ Implementation notes:
 - Include the source `searchWord` parameter only when requested.
 - If the section response is empty and the requested id is not present in the standard structure, surface a typed failure instead of silently treating the response as a valid empty section.
 - Treat route-facing `titleDocumentId` values as invalid public input unless a later spec adds an explicit mapping operation.
+- Record routine `paraContent` HTML preservation in `metadata.content`, not as a warning.
 
 ### `get-paragraph`
 
@@ -237,7 +238,7 @@ Implementation notes:
 - `output`
   One paragraph record with `paraNum`, `uniqueKey`, `fullContent`, `paraContent`, and parent `indexDocumentId`.
 - `warnings`
-  `source_html_preserved`, `paragraph_metadata_incomplete`
+  `paragraph_metadata_incomplete`
 - `failure cases`
   `invalid_input`, `not_found`, `source_unavailable`, `source_changed`
 - `safety class`
@@ -248,6 +249,8 @@ Implementation notes:
 - Use `GET /api/paragraphs/content/{stdNum}/{paraNum}`.
 - Normalize the direct paragraph response into a single exact result or a typed `not_found` failure.
 - Direct paragraph lookup should not require the caller to know the section id.
+- Reject paragraph ranges such as `22~30` as `invalid_input` and direct callers to `get-section --ref`.
+- Record routine `paraContent` HTML preservation in `metadata.content`, not as a warning.
 
 ### `search-qna`
 
@@ -258,7 +261,7 @@ Implementation notes:
 - `output`
   Matching Q&A records with `docNumber`, source type, title, snippet, tags, source links, and count metadata.
 - `warnings`
-  `source_html_preserved`, `source_metadata_incomplete`
+  `source_metadata_incomplete`
 - `failure cases`
   `invalid_input`, `source_unavailable`, `source_changed`
 - `safety class`
@@ -270,6 +273,7 @@ Implementation notes:
 - Default observed public `types` to `11,12,13,14,15,24,25`.
 - Treat `types` as an explicit v1 exception to the usual semantic-field rule; keep type numbers source-facing until a later spec promotes semantic type names.
 - Reject malformed non-numeric `types` CSV values as `invalid_input`; normalize spaces around comma-separated numeric ids.
+- Record routine highlight HTML-to-text normalization in `metadata.content`, not as a warning.
 
 ### `get-qna`
 
@@ -280,7 +284,7 @@ Implementation notes:
 - `output`
   One Q&A record with `docNumber`, title, full plain content, optional HTML content, related standards HTML, tags, adjacent document numbers, and source links.
 - `warnings`
-  `source_html_preserved`, `source_metadata_incomplete`
+  `source_metadata_incomplete`
 - `failure cases`
   `invalid_input`, `not_found`, `source_unavailable`, `source_changed`
 - `safety class`
@@ -291,6 +295,8 @@ Implementation notes:
 - Use `GET /api/qnas/v2/{docNumber}`.
 - Include source `searchWord` only when optional `keyword` is supplied.
 - Treat `contentHtml` and related-standards fragments as source HTML; preserve them rather than inventing lossy citations.
+- Reject numeric-only `docNumber` values as `invalid_input` and direct callers to recover the full identifier through `search-qna`.
+- Record routine HTML preservation in `metadata.content`, not as a warning.
 
 ## 7. CLI Transport
 

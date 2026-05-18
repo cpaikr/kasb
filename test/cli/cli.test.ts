@@ -40,15 +40,18 @@ describe("kasb CLI", () => {
     expect(stdout).toContain("--limit <number>");
   });
 
-  test("prints command help when no command options are passed", () => {
-    const result = runCli(["get-paragraph"]);
+  test.each([
+    ["get-paragraph", "--para-num <text>"],
+    ["get-section", "--output <mode>"],
+  ] as const)("prints %s help when no command options are passed", (command, expectedOption) => {
+    const result = runCli([command]);
     const stdout = decode(result.stdout);
 
     expect(result.exitCode).toBe(0);
     expect(decode(result.stderr)).toBe("");
-    expect(stdout).toContain("Usage: kasb get-paragraph [options]");
+    expect(stdout).toContain(`Usage: kasb ${command} [options]`);
     expect(stdout).toContain("--std-num <text>");
-    expect(stdout).toContain("--para-num <text>");
+    expect(stdout).toContain(expectedOption);
   });
 
   test("writes JSON failures to stderr and leaves stdout empty", () => {
@@ -99,6 +102,18 @@ describe("kasb CLI", () => {
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.parameter).toBe(parameter);
     expect(envelope.failure.message).toContain(flag);
+  });
+
+  test("documents output detail modes for high-volume commands", () => {
+    for (const command of ["get-standard-structure", "get-section", "search-qna", "get-qna"]) {
+      const result = runCli(["help", command]);
+      const stdout = decode(result.stdout);
+
+      expect(result.exitCode).toBe(0);
+      expect(decode(result.stderr)).toBe("");
+      expect(stdout).toContain("--output <mode>");
+      expect(stdout).toContain("summary, structured, raw");
+    }
   });
 
   test.each([

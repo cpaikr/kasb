@@ -139,7 +139,6 @@ export const GetSectionResultSchema = Schema.Struct({
         "ambiguous_ref_resolved",
         "empty_section",
         "partial_clause_normalization",
-        "source_html_preserved",
       ),
       message: Schema.String.annotations({ description: "Human-readable warning detail." }),
     }),

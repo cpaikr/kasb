@@ -107,6 +107,20 @@ describe("capability request validation", () => {
     );
   });
 
+  test("rejects paragraph ranges with a get-section recovery hint", () => {
+    expectInvalid(
+      () => resolveGetParagraphRequest({ stdNum: "1116", paraNum: "22~30" }),
+      { parameter: "paraNum", messageIncludes: "get-section --ref" },
+    );
+  });
+
+  test("rejects numeric-only Q&A doc numbers with a search-qna recovery hint", () => {
+    expectInvalid(
+      () => resolveGetQnaRequest({ docNumber: "35629" }),
+      { parameter: "docNumber", messageIncludes: "search-qna" },
+    );
+  });
+
   test.each([
     ["search-standards limit", () => resolveSearchStandardsRequest({ keyword: "리스", limit: 1.5 }), "limit", "정수"],
     ["search-qna page", () => resolveSearchQnaRequest({ keyword: "리스", page: 0 }), "page", "1 이상 1000 이하"],

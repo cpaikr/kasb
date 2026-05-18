@@ -65,6 +65,19 @@ export const ResultMetadataSchema = Schema.Struct({
     description: "Whether the returned payload is complete or only partially normalized/retrieved.",
     examples: ["complete"],
   }),
+  content: Schema.optional(Schema.Struct({
+    htmlFields: Schema.optional(Schema.Array(Schema.String).annotations({
+      description: "Result field paths that intentionally preserve source HTML fragments for verification.",
+      examples: [["result.paragraph.paraContent"]],
+    })),
+    textFields: Schema.optional(Schema.Array(Schema.String).annotations({
+      description: "Result field paths normalized to plain text from source HTML or source rich text.",
+      examples: [["result.paragraph.fullContent"]],
+    })),
+    notes: Schema.optional(Schema.Array(Schema.String).annotations({
+      description: "Routine content-format notes that are not action-worthy warnings.",
+    })),
+  }).annotations({ description: "Content formatting metadata for expected HTML preservation or text normalization." })),
 }).annotations({ description: "Operation metadata about source access and normalization completeness." });
 export type ResultMetadata = typeof ResultMetadataSchema.Type;
 

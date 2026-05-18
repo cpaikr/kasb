@@ -93,6 +93,16 @@ Success criteria:
 
 ## Output shape and diagnostics
 
+Status: completed for the first high-volume CLI pass.
+
+Implemented outcomes:
+
+- Added `--output summary|structured|raw` to `get-standard-structure`, `get-section`, `search-qna`, and `get-qna` while preserving structured output as the default.
+- Summary mode projects smaller `result` payloads while preserving operation-level `metadata`, `references`, and `warnings`.
+- Reclassified routine HTML preservation and highlight normalization from warnings into `metadata.content` notes.
+- Added local recovery hints for paragraph ranges and numeric-only Q&A document numbers.
+- Updated the v1 spec, README stream contract, and tests for the new diagnostics behavior.
+
 ### 5. Add explicit response detail controls
 
 The docs mention `summary`, `structured`, and `raw`, but the CLI currently only supports `--pretty`. Some outputs can become large, especially full structures, sections, and Q&A documents.

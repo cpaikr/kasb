@@ -7,6 +7,7 @@ import {
 } from "../request-validation.ts";
 import {
   IndexDocumentIdSchema,
+  InvalidCapabilityRequest,
   ParaNumSchema,
   ResultMetadataSchema,
   SourceUrlSchema,
@@ -30,9 +31,16 @@ export const resolveGetParagraphRequest = (
 ): GetParagraphRequest => {
   assertObjectInput(input);
   assertNoUnknownKeys(input, fields);
+  const paraNum = readRequiredString(input, "paraNum");
+  if (paraNum.includes("~")) {
+    throw new InvalidCapabilityRequest({
+      parameter: "paraNum",
+      message: "매개변수 \"paraNum\"은(는) 정확한 문단 번호 하나여야 합니다. 문단 범위는 get-section --ref로 조회하세요.",
+    });
+  }
   return {
     stdNum: readRequiredString(input, "stdNum"),
-    paraNum: readRequiredString(input, "paraNum"),
+    paraNum,
   };
 };
 
@@ -86,7 +94,7 @@ export const GetParagraphResultSchema = Schema.Struct({
   }).annotations({ description: "Operation-level citation and source reference for the paragraph." }),
   warnings: Schema.Array(
     Schema.Struct({
-      code: Schema.Literal("source_html_preserved", "paragraph_metadata_incomplete"),
+      code: Schema.Literal("paragraph_metadata_incomplete"),
       message: Schema.String.annotations({ description: "Human-readable warning detail." }),
     }),
   ),

@@ -35,11 +35,16 @@ const observedSourceBehavior = {
   apiBase: "https://db.kasb.or.kr/api",
 } as const;
 
-const metadata = (endpoint: string, completeness: "complete" | "partial" = "complete"): ResultMetadata => ({
+const metadata = (
+  endpoint: string,
+  completeness: "complete" | "partial" = "complete",
+  content?: ResultMetadata["content"],
+): ResultMetadata => ({
   fetchedAt: new Date().toISOString(),
   source: { system: "kasb", endpoint },
   sourceBehavior: observedSourceBehavior,
   completeness,
+  ...(content === undefined ? {} : { content }),
 });
 
 export const kasbSearchStandardsProvider: SearchStandardsProvider = {
@@ -207,9 +212,20 @@ const getStandardStructure: GetStandardStructureProvider["getStructure"] = async
         sourceUrl,
       );
 
+  const hasHtmlTitle = sections.some((section) => /<[^>]+>/u.test(section.title));
+
   return {
     result: { request, sections, returnedCount: sections.length },
-    metadata: metadata(sourceUrl, incomplete ? "partial" : "complete"),
+    metadata: metadata(
+      sourceUrl,
+      incomplete ? "partial" : "complete",
+      hasHtmlTitle
+        ? {
+            htmlFields: ["result.sections[].title"],
+            notes: ["일부 구조 title은 KASB 원천 HTML 조각을 보존합니다."],
+          }
+        : undefined,
+    ),
     references: { stdNum: request.stdNum, structureUrl: sourceUrl },
     warnings: [
       ...(request.keyword === undefined
@@ -378,7 +394,11 @@ const getSection: GetSectionProvider["getSection"] = async (request) => {
       },
       clauses,
     },
-    metadata: metadata(sourceUrl, incomplete ? "partial" : "complete"),
+    metadata: metadata(sourceUrl, incomplete ? "partial" : "complete", {
+      htmlFields: ["result.clauses[].paraContent"],
+      textFields: ["result.clauses[].fullContent"],
+      notes: ["paraContent는 원천 HTML 조각이며 fullContent는 plain text 정규화 결과입니다."],
+    }),
     references: { stdNum: request.stdNum, indexDocumentId: lookup.indexDocumentId, sectionUrl: sourceUrl },
     warnings: [
       ...(lookup.ambiguousRef === true
@@ -388,7 +408,6 @@ const getSection: GetSectionProvider["getSection"] = async (request) => {
       ...(incomplete
         ? [{ code: "partial_clause_normalization" as const, message: "일부 섹션 문단 행을 정규화할 수 없어 제외했습니다." }]
         : []),
-      { code: "source_html_preserved" as const, message: "paraContent HTML 조각을 원문 그대로 보존했습니다." },
     ],
   };
 };
@@ -468,7 +487,11 @@ const getParagraph: GetParagraphProvider["getParagraph"] = async (request) => {
   }
   return {
     result: { request, paragraph },
-    metadata: metadata(sourceUrl),
+    metadata: metadata(sourceUrl, "complete", {
+      htmlFields: ["result.paragraph.paraContent"],
+      textFields: ["result.paragraph.fullContent"],
+      notes: ["paraContent는 원천 HTML 조각이며 fullContent는 plain text 정규화 결과입니다."],
+    }),
     references: {
       stdNum: paragraph.stdNum,
       paraNum: paragraph.paraNum,
@@ -476,7 +499,7 @@ const getParagraph: GetParagraphProvider["getParagraph"] = async (request) => {
       indexDocumentId: paragraph.indexDocumentId,
       paragraphUrl: sourceUrl,
     },
-    warnings: [{ code: "source_html_preserved", message: "paraContent HTML 조각을 원문 그대로 보존했습니다." }],
+    warnings: [],
   };
 };
 
@@ -538,13 +561,15 @@ const searchQna: SearchQnaProvider["search"] = async (request) => {
 
   return {
     result: { request, items, returnedCount: items.length, countByType },
-    metadata: metadata(sourceUrl, incomplete ? "partial" : "complete"),
+    metadata: metadata(sourceUrl, incomplete ? "partial" : "complete", {
+      textFields: ["result.items[].title", "result.items[].snippet"],
+      notes: ["검색 하이라이트 HTML은 title과 snippet의 plain text로 정규화합니다."],
+    }),
     references: { searchUrl: sourceUrl },
     warnings: [
       ...(incomplete
         ? [{ code: "source_metadata_incomplete" as const, message: "일부 Q&A 검색 행을 정규화할 수 없어 제외했습니다." }]
         : []),
-      { code: "source_html_preserved", message: "검색 하이라이트 HTML은 plain text로 정규화했습니다." },
     ],
   };
 };
@@ -594,9 +619,13 @@ const getQna: GetQnaProvider["getQna"] = async (request) => {
   }
   return {
     result: { request, qna },
-    metadata: metadata(sourceUrl),
+    metadata: metadata(sourceUrl, "complete", {
+      htmlFields: ["result.qna.contentHtml", "result.qna.relStds"],
+      textFields: ["result.qna.fullContent"],
+      notes: ["contentHtml과 relStds는 원천 HTML 조각이며 fullContent는 원천 plain text 본문입니다."],
+    }),
     references: { docNumber: qna.docNumber, qnaUrl: sourceUrl },
-    warnings: [{ code: "source_html_preserved", message: "contentHtml과 relStds HTML 조각을 원문 그대로 보존했습니다." }],
+    warnings: [],
   };
 };
 

@@ -6,7 +6,7 @@ import {
   readOptionalString,
   readRequiredString,
 } from "../request-validation.ts";
-import { DocNumberSchema, ResultMetadataSchema, SourceUrlSchema } from "../types.ts";
+import { DocNumberSchema, InvalidCapabilityRequest, ResultMetadataSchema, SourceUrlSchema } from "../types.ts";
 
 const fields = new Set(["docNumber", "keyword"]);
 
@@ -26,8 +26,15 @@ export const resolveGetQnaRequest = (
   assertObjectInput(input);
   assertNoUnknownKeys(input, fields);
   const keyword = readOptionalString(input, "keyword");
+  const docNumber = readRequiredString(input, "docNumber");
+  if (/^\d+$/u.test(docNumber)) {
+    throw new InvalidCapabilityRequest({
+      parameter: "docNumber",
+      message: "매개변수 \"docNumber\"은(는) KASB Q&A의 전체 문서 번호여야 합니다. 숫자만 있는 값은 보통 부족합니다. search-qna로 전체 docNumber(예: SSI-35629)를 확인한 뒤 get-qna에 전달하세요.",
+    });
+  }
   return {
-    docNumber: readRequiredString(input, "docNumber"),
+    docNumber,
     ...(keyword === undefined ? {} : { keyword }),
   };
 };
@@ -97,7 +104,7 @@ export const GetQnaResultSchema = Schema.Struct({
   }).annotations({ description: "Operation-level source reference for the Q&A document." }),
   warnings: Schema.Array(
     Schema.Struct({
-      code: Schema.Literal("source_html_preserved", "source_metadata_incomplete"),
+      code: Schema.Literal("source_metadata_incomplete"),
       message: Schema.String.annotations({ description: "Human-readable warning detail." }),
     }),
   ),

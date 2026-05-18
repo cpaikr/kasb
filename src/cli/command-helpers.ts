@@ -17,7 +17,12 @@ export const configureCliTransport = (command: Command): Command =>
     writeErr: () => undefined,
   });
 
-export type CliJsonOptions = { readonly pretty: boolean };
+export type CliOutputMode = "summary" | "structured" | "raw";
+
+export type CliJsonOptions = {
+  readonly pretty: boolean;
+  readonly output: CliOutputMode;
+};
 
 export type ParsedCliCommand<RequestInput> = {
   readonly request: Partial<RequestInput> & Record<string, unknown>;
@@ -57,6 +62,11 @@ export const createRegisteredOption = <Key extends string>(
 export const createPrettyOption = (): RegisteredOption<"pretty"> =>
   createRegisteredOption("pretty", "--pretty", "사람이 읽기 쉬운 들여쓰기 JSON으로 출력합니다.");
 
+export const createOutputOption = (): RegisteredOption<"output"> =>
+  createRegisteredOption("output", "--output <mode>", "출력 상세도를 선택합니다: summary, structured, raw. 기본값은 structured입니다.", (option) =>
+    option.choices(["summary", "structured", "raw"]),
+  );
+
 export const extractCliOptions = <Key extends string>(
   rawOptions: Record<string, unknown>,
   registeredOptions: readonly RegisteredOption<Key>[],
@@ -74,11 +84,15 @@ export const extractCliOptions = <Key extends string>(
 export const buildCliNameByOptionKey = <Key extends string>(
   registeredOptions: readonly RegisteredOption<Key>[],
 ): Partial<Record<Key, string>> => {
-  const cliNameByKey: Partial<Record<Key, string>> = {};
+  const cliNamesByKey = new Map<Key, string[]>();
   for (const option of registeredOptions) {
-    cliNameByKey[option.key] ??= option.cliName;
+    const cliNames = cliNamesByKey.get(option.key) ?? [];
+    cliNames.push(option.cliName);
+    cliNamesByKey.set(option.key, cliNames);
   }
-  return cliNameByKey;
+  return Object.fromEntries(
+    [...cliNamesByKey.entries()].map(([key, cliNames]) => [key, cliNames.join("/")]),
+  ) as Partial<Record<Key, string>>;
 };
 
 export const renderInvalidInputCliErrorMessage = <Key extends string>(
@@ -109,7 +123,10 @@ export const splitCliCommandOptions = <RequestInput, Key extends string>(
   );
   return {
     request: request as Partial<RequestInput> & Record<string, unknown>,
-    output: { pretty: options.pretty === true },
+    output: {
+      pretty: options.pretty === true,
+      output: isCliOutputMode(options.output) ? options.output : "structured",
+    },
   };
 };
 
@@ -137,6 +154,9 @@ export const renderCliJson = (
   value: unknown,
   options: Partial<CliJsonOptions> = {},
 ): string => JSON.stringify(value, undefined, options.pretty === true ? 2 : undefined);
+
+const isCliOutputMode = (value: unknown): value is CliOutputMode =>
+  value === "summary" || value === "structured" || value === "raw";
 
 export const renderCliFailureJson = (
   error: unknown,
