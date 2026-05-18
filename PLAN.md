@@ -4,46 +4,31 @@ This plan applies Anthropic's "Writing effective tools for agents" guidance to t
 
 Work through the sections in order. Items within the same section are good candidates to implement together because they touch the same contract, eval, diagnostics, or transport boundary.
 
-## Schema and input contract work
+## Completed schema and input contract work
 
 ### 2. Make `get-section` input rules explicit
 
-`get-section` currently requires exactly one of `indexDocumentId` or `ref` at runtime, but the exported schema only makes `stdNum` required.
+Status: completed.
 
-- Make the XOR rule visible in exported tool metadata or JSON Schema where practical.
-- Clarify that `indexDocumentId` comes from `get-standard-structure`.
-- Clarify that browser-route `titleDocumentId` values are not accepted.
-- Keep runtime validation as the source of truth and keep its error messages aligned with the schema.
+Implemented outcomes:
 
-Success criteria:
-
-- Agents know they must pass either `indexDocumentId` or `ref`, not both.
-- Invalid calls fail with a parameter-specific `invalid_input` response.
-- Tool metadata and runtime behavior do not contradict each other.
+- Exported JSON Schema now exposes the `get-section` locator XOR rule for `indexDocumentId` vs `ref`.
+- `indexDocumentId` descriptions point agents back to `get-standard-structure` and its `titleDocumentId` field.
+- Runtime validation keeps parameter-specific `invalid_input` failures for missing or conflicting section locators.
+- Tests cover the exported XOR metadata and request-validation behavior.
 
 ### 9. Improve source-shaped inputs only where agents struggle
 
-`../darty/PLAN.md` flags cryptic source codes. KASB has fewer exposed source-shaped fields, but some still need care.
+Status: completed for the currently evidenced schema/input-contract work.
 
-Focus fields:
+Implemented outcomes:
 
-- `types` in `search-qna`
-- `indexDocumentId` in section retrieval
-- `ref` as an alternate section lookup
-- appendix-style `paraNum` values such as `한2.1`, `B3`, `BC240A`
+- `search-qna.types` now documents the observed default Q&A type set and emits a numeric CSV JSON Schema pattern aligned with runtime validation.
+- `indexDocumentId`, `ref`, and appendix-style `paraNum` examples/descriptions are richer in exported schemas.
+- `types` remains source-facing; no semantic enum or lookup capability was added without eval evidence.
+- Tests cover the important identifier examples, Q&A type metadata, and malformed `types` rejection.
 
-Possible improvements:
-
-- Add richer field descriptions and examples.
-- Document the default Q&A `types` set and when to override it.
-- Keep `types` source-facing unless a stable semantic enum is evidence-backed.
-- Consider lookup/list capabilities only if evals show repeated code-discovery failures.
-
-Success criteria:
-
-- Agents can use common filters and identifiers without guessing.
-- Invalid-code or stale-id errors provide actionable correction hints.
-- Source-shaped fields remain explicit where exact KASB behavior matters.
+Further lookup/list capabilities remain deferred until evals show repeated code-discovery failures.
 
 ## Eval baseline and feedback loop
 
