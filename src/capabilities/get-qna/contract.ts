@@ -6,13 +6,16 @@ import {
   readOptionalString,
   readRequiredString,
 } from "../request-validation.ts";
-import { ResultMetadataSchema } from "../types.ts";
+import { DocNumberSchema, ResultMetadataSchema, SourceUrlSchema } from "../types.ts";
 
 const fields = new Set(["docNumber", "keyword"]);
 
 export const GetQnaRequestSchema = Schema.Struct({
-  docNumber: Schema.String.pipe(Schema.minLength(1)),
-  keyword: Schema.optional(Schema.String),
+  docNumber: DocNumberSchema,
+  keyword: Schema.optional(Schema.String.annotations({
+    description: "Optional keyword for source-side Q&A highlighting; mapped to searchWord.",
+    examples: ["리스"],
+  })),
 });
 export type GetQnaRawInput = typeof GetQnaRequestSchema.Encoded;
 export type GetQnaRequest = typeof GetQnaRequestSchema.Type;
@@ -30,37 +33,72 @@ export const resolveGetQnaRequest = (
 };
 
 export const QnaSchema = Schema.Struct({
-  docNumber: Schema.String,
-  id: Schema.optional(Schema.Number),
-  type: Schema.Number,
-  title: Schema.String,
-  reference: Schema.optional(Schema.String),
-  fullContent: Schema.String,
-  contentHtml: Schema.optional(Schema.String),
-  relStds: Schema.optional(Schema.String),
-  tags: Schema.Array(Schema.String),
-  contentLink: Schema.optional(Schema.String),
-  publishDate: Schema.optional(Schema.String),
-  deprecated: Schema.Boolean,
-  prevDocNumber: Schema.optional(Schema.String),
-  nextDocNumber: Schema.optional(Schema.String),
-});
+  docNumber: DocNumberSchema,
+  id: Schema.optional(Schema.Number.annotations({
+    description: "Internal numeric source id when supplied by the Q&A API; use docNumber for public retrieval.",
+    examples: [4717],
+  })),
+  type: Schema.Number.annotations({
+    description: "Source-facing Q&A type id.",
+    examples: [15],
+  }),
+  title: Schema.String.annotations({
+    description: "Q&A document title with source highlights normalized to text.",
+    examples: ["리스 개시일과 계약일"],
+  }),
+  reference: Schema.optional(Schema.String.annotations({
+    description: "Source reference text when provided by the Q&A document.",
+  })),
+  fullContent: Schema.String.annotations({
+    description: "Plain-text Q&A body normalized from the source.",
+  }),
+  contentHtml: Schema.optional(Schema.String.annotations({
+    description: "Source Q&A HTML body preserved for verification when returned by the API.",
+  })),
+  relStds: Schema.optional(Schema.String.annotations({
+    description: "Source related-standards HTML fragment preserved when returned by the API.",
+  })),
+  tags: Schema.Array(Schema.String.annotations({
+    description: "Source tag attached to the Q&A document.",
+    examples: ["리스개시일"],
+  })).annotations({ description: "Q&A source tags." }),
+  contentLink: Schema.optional(Schema.String.annotations({
+    description: "Source-provided content link when available; may point outside the KASB JSON API.",
+    examples: ["https://facility-qnas.s3.ap-northeast-2.amazonaws.com/kasb/quick/kifrs/html/35629.html"],
+  })),
+  publishDate: Schema.optional(Schema.String.annotations({
+    description: "Source publication date string when available.",
+    examples: ["2019-12-23T15:00:00.000Z"],
+  })),
+  deprecated: Schema.Boolean.annotations({
+    description: "Whether the source marks this Q&A document as deprecated or superseded.",
+    examples: [false],
+  }),
+  prevDocNumber: Schema.optional(DocNumberSchema.annotations({
+    description: "Previous adjacent Q&A document number supplied by the source when available.",
+    examples: ["SSI-35627"],
+  })),
+  nextDocNumber: Schema.optional(DocNumberSchema.annotations({
+    description: "Next adjacent Q&A document number supplied by the source when available.",
+    examples: ["SSI-35628"],
+  })),
+}).annotations({ description: "Full Q&A document result." });
 export type Qna = typeof QnaSchema.Type;
 
 export const GetQnaResultSchema = Schema.Struct({
   result: Schema.Struct({
-    request: GetQnaRequestSchema,
+    request: GetQnaRequestSchema.annotations({ description: "Normalized request that produced this result." }),
     qna: QnaSchema,
-  }),
+  }).annotations({ description: "Q&A document retrieval payload." }),
   metadata: ResultMetadataSchema,
   references: Schema.Struct({
-    docNumber: Schema.String,
-    qnaUrl: Schema.String,
-  }),
+    docNumber: DocNumberSchema,
+    qnaUrl: SourceUrlSchema,
+  }).annotations({ description: "Operation-level source reference for the Q&A document." }),
   warnings: Schema.Array(
     Schema.Struct({
       code: Schema.Literal("source_html_preserved", "source_metadata_incomplete"),
-      message: Schema.String,
+      message: Schema.String.annotations({ description: "Human-readable warning detail." }),
     }),
   ),
 });

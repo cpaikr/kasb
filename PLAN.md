@@ -6,25 +6,6 @@ Work through the sections in order. Items within the same section are good candi
 
 ## Schema and input contract work
 
-### 1. Enrich capability schemas for agent use
-
-Current CLI help is useful, but exported JSON Schemas are sparse. If these schemas are used by eval tooling or a future tool adapter, agents need the schema itself to explain intent, identifiers, and follow-up paths.
-
-- Add descriptions and examples to every request field and important result field.
-- Explain KASB-specific identifiers in schema annotations:
-  - `stdNum`: standard number, e.g. `1116`
-  - `indexDocumentId`: retrieval-facing section id from `get-standard-structure`
-  - `paraNum`: paragraph reference, e.g. `23`, `한2.1`, `B3`, `BC240A`
-  - `docNumber`: Q&A document id, e.g. `SSI-35629`
-- Keep raw source fields internal unless the v1 spec explicitly exposes them.
-- Keep descriptions concise; do not turn schemas into prompt dumps.
-
-Success criteria:
-
-- Exported JSON Schemas are useful without reading CLI help.
-- Agents can identify the correct operation and parameters from schema metadata.
-- Schema descriptions match the public contract in `docs/specs/kasb-standards-v1.md`.
-
 ### 2. Make `get-section` input rules explicit
 
 `get-section` currently requires exactly one of `indexDocumentId` or `ref` at runtime, but the exported schema only makes `stdNum` required.
