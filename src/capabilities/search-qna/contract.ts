@@ -11,6 +11,7 @@ import { DocNumberSchema, InvalidCapabilityRequest, ResultMetadataSchema, Source
 
 const fields = new Set(["keyword", "page", "rows", "types"]);
 const observedDefaultTypes = "11,12,13,14,15,24,25";
+const qnaTypesCsvPattern = /^\s*(?:\d+\s*(?:,\s*\d+\s*)*)?$/u;
 
 export const SearchQnaRequestSchema = Schema.Struct({
   keyword: Schema.String.pipe(Schema.minLength(1)).annotations({
@@ -31,7 +32,7 @@ export const SearchQnaRequestSchema = Schema.Struct({
     description: "Number of Q&A rows to return per page, from 1 to 50. CLI --limit is an alias for this field.",
     examples: [5, 10],
   }),
-  types: Schema.optional(Schema.String.annotations({
+  types: Schema.optional(Schema.String.pipe(Schema.pattern(qnaTypesCsvPattern)).annotations({
     description: "Source-facing numeric Q&A type id CSV. Defaults to observed public types 11,12,13,14,15,24,25 when omitted; override only when you know the KASB source type ids to include.",
     examples: [observedDefaultTypes, "24,25"],
   })),

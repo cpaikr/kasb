@@ -54,6 +54,7 @@ type JsonObjectSchema = {
   readonly properties?: Record<string, unknown>;
   readonly description?: string;
   readonly examples?: readonly unknown[];
+  readonly pattern?: string;
   readonly oneOf?: readonly JsonObjectSchema[];
   readonly not?: JsonObjectSchema;
 };
@@ -119,8 +120,10 @@ describe("capability JSON Schema exports", () => {
     expect(propertyAt(getSectionInput, ["indexDocumentId"]).description).toContain("titleDocumentId");
     expect(propertyAt(getParagraphInput, ["paraNum"]).examples).toEqual(["23", "한2.1", "B3", "BC240A"]);
     expect(propertyAt(getQnaInput, ["docNumber"]).examples).toEqual(["SSI-35629"]);
-    expect(propertyAt(searchQnaInput, ["types"]).description).toContain("11,12,13,14,15,24,25");
-    expect(propertyAt(searchQnaInput, ["types"]).description).toContain("numeric Q&A type id CSV");
+    const qnaTypes = propertyAt(searchQnaInput, ["types"]);
+    expect(qnaTypes.description).toContain("11,12,13,14,15,24,25");
+    expect(qnaTypes.description).toContain("numeric Q&A type id CSV");
+    expect(qnaTypes.pattern).toBe("^\\s*(?:\\d+\\s*(?:,\\s*\\d+\\s*)*)?$");
   });
 
   test("get-section input schema exposes the section-locator XOR rule", () => {
