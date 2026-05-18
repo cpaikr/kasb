@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.2 (2026-05-18)
+
+
+### Documentation
+
+* slim the npm package README
+
 ## 0.0.1 (2026-05-17)
 
 
