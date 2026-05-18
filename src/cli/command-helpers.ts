@@ -62,9 +62,9 @@ export const createRegisteredOption = <Key extends string>(
 export const createPrettyOption = (): RegisteredOption<"pretty"> =>
   createRegisteredOption("pretty", "--pretty", "사람이 읽기 쉬운 들여쓰기 JSON으로 출력합니다.");
 
-export const createOutputOption = (): RegisteredOption<"output"> =>
-  createRegisteredOption("output", "--output <mode>", "출력 상세도를 선택합니다: summary, structured, raw. 기본값은 structured입니다.", (option) =>
-    option.choices(["summary", "structured", "raw"]),
+export const createOutputOption = (outputModes: readonly CliOutputMode[]): RegisteredOption<"output"> =>
+  createRegisteredOption("output", "--output <mode>", `출력 상세도를 선택합니다: ${outputModes.join(", ")}. 기본값은 structured입니다.`, (option) =>
+    option.choices([...outputModes]),
   );
 
 export const extractCliOptions = <Key extends string>(

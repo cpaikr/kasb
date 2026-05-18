@@ -101,7 +101,7 @@ const buildRegisteredOptions = <Key extends string, RawInput, Result>(
         : undefined,
     ),
   ),
-  ...(spec.outputModes === undefined ? [] : [createOutputOption()]),
+  ...(spec.outputModes === undefined ? [] : [createOutputOption(spec.outputModes)]),
   createPrettyOption(),
 ];
 
