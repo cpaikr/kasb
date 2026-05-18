@@ -1,8 +1,12 @@
 # Agent Tool Improvement Plan
 
-This plan applies Anthropic's "Writing effective tools for agents" guidance to the current KASB CLI capabilities. Work through the items in order. Items adapted from `../darty/PLAN.md` are included only where they fit this repo's CLI-only product boundary.
+This plan applies Anthropic's "Writing effective tools for agents" guidance to the current KASB CLI capabilities. Items adapted from `../darty/PLAN.md` are included only where they fit this repo's CLI-only product boundary.
 
-## 1. Enrich capability schemas for agent use
+Work through the sections in order. Items within the same section are good candidates to implement together because they touch the same contract, eval, diagnostics, or transport boundary.
+
+## Schema and input contract work
+
+### 1. Enrich capability schemas for agent use
 
 Current CLI help is useful, but exported JSON Schemas are sparse. If these schemas are used by eval tooling or a future tool adapter, agents need the schema itself to explain intent, identifiers, and follow-up paths.
 
@@ -21,7 +25,7 @@ Success criteria:
 - Agents can identify the correct operation and parameters from schema metadata.
 - Schema descriptions match the public contract in `docs/specs/kasb-standards-v1.md`.
 
-## 2. Make `get-section` input rules explicit
+### 2. Make `get-section` input rules explicit
 
 `get-section` currently requires exactly one of `indexDocumentId` or `ref` at runtime, but the exported schema only makes `stdNum` required.
 
@@ -36,7 +40,33 @@ Success criteria:
 - Invalid calls fail with a parameter-specific `invalid_input` response.
 - Tool metadata and runtime behavior do not contradict each other.
 
-## 3. Add an internal typed tool-use eval track without changing the public product
+### 9. Improve source-shaped inputs only where agents struggle
+
+`../darty/PLAN.md` flags cryptic source codes. KASB has fewer exposed source-shaped fields, but some still need care.
+
+Focus fields:
+
+- `types` in `search-qna`
+- `indexDocumentId` in section retrieval
+- `ref` as an alternate section lookup
+- appendix-style `paraNum` values such as `한2.1`, `B3`, `BC240A`
+
+Possible improvements:
+
+- Add richer field descriptions and examples.
+- Document the default Q&A `types` set and when to override it.
+- Keep `types` source-facing unless a stable semantic enum is evidence-backed.
+- Consider lookup/list capabilities only if evals show repeated code-discovery failures.
+
+Success criteria:
+
+- Agents can use common filters and identifiers without guessing.
+- Invalid-code or stale-id errors provide actionable correction hints.
+- Source-shaped fields remain explicit where exact KASB behavior matters.
+
+## Eval baseline and feedback loop
+
+### 3. Add an internal typed tool-use eval track without changing the public product
 
 `../darty/PLAN.md` recommends agent-native typed tool definitions. For this repo, public MCP/Pi-native tools are out of scope, but a typed eval harness can still test the capability schemas directly.
 
@@ -52,7 +82,7 @@ Success criteria:
 - Capability/tool ergonomics can be tested without subprocess noise.
 - No new public transport is introduced.
 
-## 4. Add scenario evals for multi-step KASB research
+### 4. Add scenario evals for multi-step KASB research
 
 Current tests are strong for contracts and fixtures, but the repo needs realistic agent workflow evals like Anthropic recommends. Add these before larger response-shape changes so later changes can be measured.
 
@@ -79,7 +109,25 @@ Success criteria:
 - Failures reveal whether the issue is naming, schema design, output shape, or source behavior.
 - Held-out scenarios are kept separate from scenarios used to tune descriptions.
 
-## 5. Add explicit response detail controls
+### 8. Review descriptions and schemas after eval failures
+
+Use eval transcripts to improve tool ergonomics instead of guessing.
+
+- Look for wrong operation selection.
+- Look for invalid parameter patterns.
+- Look for repeated broad searches where a narrower call should work.
+- Look for outputs where the model misses the next useful reference.
+- Update descriptions, validation messages, result shapes, or examples based on concrete failures.
+
+Success criteria:
+
+- Description changes are backed by eval evidence.
+- Invalid calls and unnecessary follow-up calls decrease.
+- Tool specs stay compact and accurate.
+
+## Output shape and diagnostics
+
+### 5. Add explicit response detail controls
 
 The docs mention `summary`, `structured`, and `raw`, but the CLI currently only supports `--pretty`. Some outputs can become large, especially full structures, sections, and Q&A documents.
 
@@ -104,7 +152,7 @@ Success criteria:
 - All modes still emit a JSON envelope with `result`, `metadata`, `references`, and `warnings`.
 - Output-mode behavior is covered by CLI and capability tests.
 
-## 6. Reclassify routine format notes vs real warnings
+### 6. Reclassify routine format notes vs real warnings
 
 Some current warnings describe expected behavior, not exceptional conditions. For agents, warnings should mean "pay attention" rather than "this field contains HTML as designed."
 
@@ -120,7 +168,7 @@ Success criteria:
 - Agents do not need to special-case normal output-format notes as warnings.
 - Warning names and messages accurately describe what happened.
 
-## 7. Improve recovery hints in failures
+### 7. Improve recovery hints in failures
 
 Typed failures exist, but recovery guidance can be more actionable for agents.
 
@@ -136,47 +184,9 @@ Success criteria:
 - Failure messages identify the bad parameter or source URL when known.
 - No human-readable diagnostics leak into operation `stdout`.
 
-## 8. Review descriptions and schemas after eval failures
+## Deferred transport naming
 
-Use eval transcripts to improve tool ergonomics instead of guessing.
-
-- Look for wrong operation selection.
-- Look for invalid parameter patterns.
-- Look for repeated broad searches where a narrower call should work.
-- Look for outputs where the model misses the next useful reference.
-- Update descriptions, validation messages, result shapes, or examples based on concrete failures.
-
-Success criteria:
-
-- Description changes are backed by eval evidence.
-- Invalid calls and unnecessary follow-up calls decrease.
-- Tool specs stay compact and accurate.
-
-## 9. Improve source-shaped inputs only where agents struggle
-
-`../darty/PLAN.md` flags cryptic source codes. KASB has fewer exposed source-shaped fields, but some still need care.
-
-Focus fields:
-
-- `types` in `search-qna`
-- `indexDocumentId` in section retrieval
-- `ref` as an alternate section lookup
-- appendix-style `paraNum` values such as `한2.1`, `B3`, `BC240A`
-
-Possible improvements:
-
-- Add richer field descriptions and examples.
-- Document the default Q&A `types` set and when to override it.
-- Keep `types` source-facing unless a stable semantic enum is evidence-backed.
-- Consider lookup/list capabilities only if evals show repeated code-discovery failures.
-
-Success criteria:
-
-- Agents can use common filters and identifiers without guessing.
-- Invalid-code or stale-id errors provide actionable correction hints.
-- Source-shaped fields remain explicit where exact KASB behavior matters.
-
-## 10. Decide future exposed namespacing only if a new transport is approved
+### 10. Decide future exposed namespacing only if a new transport is approved
 
 `../darty/PLAN.md` recommends namespacing future exposed tool names. This applies only if product docs later approve MCP, Pi-native, SDK, or another agent-native transport.
 
