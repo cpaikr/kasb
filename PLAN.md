@@ -34,19 +34,14 @@ Further lookup/list capabilities remain deferred until evals show repeated code-
 
 ### 3. Add an internal typed tool-use eval track without changing the public product
 
-`../darty/PLAN.md` recommends agent-native typed tool definitions. For this repo, public MCP/Pi-native tools are out of scope, but a typed eval harness can still test the capability schemas directly.
+Status: completed.
 
-- Keep the product CLI-only.
-- Add internal eval definitions that map directly to `src/app/*` operations instead of CLI argv.
-- Test typed parameters separately from CLI syntax.
-- Ensure typed eval calls return the shared capability envelopes.
-- Keep CLI evals for command discoverability and stream/exit behavior.
+Implemented outcomes:
 
-Success criteria:
-
-- CLI syntax reasoning is isolated to CLI evals.
-- Capability/tool ergonomics can be tested without subprocess noise.
-- No new public transport is introduced.
+- Added `evals/typed-tools.ts` with internal typed eval definitions backed directly by `src/app/*` operations.
+- Typed eval schemas and execution functions reuse the app-layer operation schemas and shared capability envelopes.
+- Tests verify semantic JSON parameters stay separate from CLI flag syntax and that typed calls avoid subprocess behavior.
+- CLI evals/tests remain responsible for command discoverability, stream behavior, and exit behavior.
 
 ### 4. Add scenario evals for multi-step KASB research
 
