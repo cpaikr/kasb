@@ -88,8 +88,11 @@ One source of truth should provide:
 - runtime validation shape
 - TypeScript request/result types
 - success result schema
-- JSON Schema for CLI-facing specs
+- JSON Schema for CLI-facing specs and internal agent-eval tool definitions
 - typed failure mapping
+
+`src/app/agent-tools.ts` exposes internal `kasb_*` tool definitions over the same app operations for eval/tool-use experiments.
+This is not a new public transport; CLI commands and operation ids remain the stable public surface.
 
 What stays CLI-local:
 
@@ -153,6 +156,7 @@ Keep two schema families separate:
 - Provider implementations return capability-shaped results, not raw source payloads.
 - CLI commands import app/capability surfaces, not `sources/kasb/*` internals.
 - CLI help, examples, and presentation options stay CLI-local.
+- Internal agent-eval tool names use the `kasb_*` namespace while preserving existing operation ids and CLI command names.
 - CLI success output is JSON on `stdout`; CLI failure output is JSON on `stderr` with nonzero exit code and empty `stdout`.
 - MCP, SDK, Pi-native tools, database persistence, and background ingestion are not current implementation targets.
 - Mark source observations as observed, inferred, or unverified when they affect contracts.

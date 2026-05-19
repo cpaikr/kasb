@@ -4,24 +4,27 @@ This plan applies Anthropic's "Writing effective tools for agents" guidance to t
 
 Work through the sections in order. Items within the same section are good candidates to implement together because they touch the same contract, eval, diagnostics, or transport boundary.
 
-## Deferred transport naming
+## Internal agent-eval tool naming
 
-### 10. Decide future exposed namespacing only if a new transport is approved
+### 10. Namespace internal tool definitions without renaming the CLI
 
-`../darty/PLAN.md` recommends namespacing future exposed tool names. This applies only if product docs later approve MCP, Pi-native, SDK, or another agent-native transport.
+Status: executed for the internal agent-eval seam. No public non-CLI transport has been added.
 
-- Do not rename current CLI commands for namespacing alone.
-- If a future transport is approved, prefer names that remain distinct in a large toolset, for example:
+`../darty/PLAN.md` recommends namespacing exposed agent-native tool names. KASB now applies that pattern only to internal tool-like definitions used by evals:
+
+- Keep current CLI commands unchanged.
+- Keep internal capability operation names stable.
+- Use namespaced internal tool names where a model receives typed tools directly:
   - `kasb_search_standards`
   - `kasb_get_standard_structure`
   - `kasb_get_section`
   - `kasb_get_paragraph`
   - `kasb_search_qna`
   - `kasb_get_qna`
-- Keep internal capability operation names stable unless a separate rename is justified.
+- Treat MCP, Pi-native, SDK, or another public agent-native transport as still out of scope unless product docs change.
 
 Success criteria:
 
-- Future tool names do not collide with browser, filesystem, web search, or other regulatory tools.
+- Tool-like eval names do not collide with browser, filesystem, web search, or other regulatory tools.
 - Names make the expected resource and action obvious before reading the full schema.
-- Current CLI-only scope remains intact.
+- Current CLI-only public scope remains intact.

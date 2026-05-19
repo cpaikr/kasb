@@ -135,19 +135,19 @@ export const kasbScenarioEvals: readonly KasbScenarioEval[] = [
     steps: [
       {
         id: "search-lease-standards",
-        tool: "search-standards",
+        tool: "kasb_search_standards",
         input: { keyword: "리스", limit: 40 },
         purpose: "Find the lease standard among source-ranked standard search results.",
       },
       {
         id: "get-1116-structure",
-        tool: "get-standard-structure",
+        tool: "kasb_get_standard_structure",
         input: { stdNum: "1116" },
         purpose: "Expose retrieval-facing section ids before exact content lookup.",
       },
       {
         id: "get-1116-23",
-        tool: "get-paragraph",
+        tool: "kasb_get_paragraph",
         input: { stdNum: "1116", paraNum: "23" },
         purpose: "Fetch the target paragraph by stable citation fields.",
       },
@@ -190,13 +190,13 @@ export const kasbScenarioEvals: readonly KasbScenarioEval[] = [
     steps: [
       {
         id: "get-1116-structure",
-        tool: "get-standard-structure",
+        tool: "kasb_get_standard_structure",
         input: { stdNum: "1116" },
         purpose: "Find the section node whose ref covers paragraphs 1 and 2.",
       },
       {
         id: "get-purpose-by-ref",
-        tool: "get-section",
+        tool: "kasb_get_section",
         input: { stdNum: "1116", ref: "1~2" },
         purpose: "Fetch the section through the public ref locator when indexDocumentId is not yet known.",
       },
@@ -237,13 +237,13 @@ export const kasbScenarioEvals: readonly KasbScenarioEval[] = [
     steps: [
       {
         id: "search-lease-qna",
-        tool: "search-qna",
+        tool: "kasb_search_qna",
         input: { keyword: "리스", rows: 5 },
         purpose: "Find lease Q&A document numbers.",
       },
       {
         id: "get-ssi-35629",
-        tool: "get-qna",
+        tool: "kasb_get_qna",
         input: { docNumber: "SSI-35629" },
         purpose: "Retrieve a full Q&A document by a cited search result docNumber.",
       },
@@ -279,13 +279,13 @@ export const kasbScenarioEvals: readonly KasbScenarioEval[] = [
     steps: [
       {
         id: "get-1116-23",
-        tool: "get-paragraph",
+        tool: "kasb_get_paragraph",
         input: { stdNum: "1116", paraNum: "23" },
         purpose: "Fetch the first paragraph for comparison by exact citation key.",
       },
       {
         id: "get-1116-b3",
-        tool: "get-paragraph",
+        tool: "kasb_get_paragraph",
         input: { stdNum: "1116", paraNum: "B3" },
         purpose: "Fetch the appendix paragraph for comparison by exact citation key.",
       },
@@ -327,21 +327,21 @@ export const kasbScenarioEvals: readonly KasbScenarioEval[] = [
     steps: [
       {
         id: "bad-title-document-id",
-        tool: "get-section",
+        tool: "kasb_get_section",
         input: { stdNum: "1116", indexDocumentId: "19970f" },
         purpose: "Probe a common route-id mistake so the failure can guide recovery.",
         expectFailure: { code: "not_found" },
       },
       {
         id: "recover-with-structure",
-        tool: "get-standard-structure",
+        tool: "kasb_get_standard_structure",
         input: { stdNum: "1116" },
         purpose: "Recover by asking for retrieval-facing section ids.",
         retryAfterStepId: "bad-title-document-id",
       },
       {
         id: "retry-purpose-section",
-        tool: "get-section",
+        tool: "kasb_get_section",
         input: { stdNum: "1116", indexDocumentId: "ZB2hJW" },
         purpose: "Retry with the correct retrieval-facing id.",
         retryAfterStepId: "bad-title-document-id",

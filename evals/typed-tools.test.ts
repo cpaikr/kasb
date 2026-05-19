@@ -74,26 +74,26 @@ describe("internal typed eval tools", () => {
     const tools = defaultKasbTypedEvalTools;
 
     expect(tools.map((tool) => tool.name)).toEqual([
-      "search-standards",
-      "get-standard-structure",
-      "get-section",
-      "get-paragraph",
-      "search-qna",
-      "get-qna",
+      "kasb_search_standards",
+      "kasb_get_standard_structure",
+      "kasb_get_section",
+      "kasb_get_paragraph",
+      "kasb_search_qna",
+      "kasb_get_qna",
     ]);
     expect(new Set(tools.map((tool) => tool.name)).size).toBe(tools.length);
     expect(tools.every((tool) => tool.description.length > 0)).toBe(true);
-    expect(tools.find((tool) => tool.name === "get-section")?.description).toContain("indexDocumentId");
-    expect(tools.find((tool) => tool.name === "get-section")?.description).toContain("titleDocumentId");
-    expect(tools.find((tool) => tool.name === "search-standards")?.description).toContain("keyword");
-    expect(tools.find((tool) => tool.name === "search-standards")?.description).toContain("not query");
-    expect(tools.find((tool) => tool.name === "search-qna")?.description).toContain("rows rather than CLI --limit");
+    expect(tools.find((tool) => tool.name === "kasb_get_section")?.description).toContain("indexDocumentId");
+    expect(tools.find((tool) => tool.name === "kasb_get_section")?.description).toContain("titleDocumentId");
+    expect(tools.find((tool) => tool.name === "kasb_search_standards")?.description).toContain("keyword");
+    expect(tools.find((tool) => tool.name === "kasb_search_standards")?.description).toContain("not query");
+    expect(tools.find((tool) => tool.name === "kasb_search_qna")?.description).toContain("rows rather than CLI --limit");
   });
 
   test("maps definitions directly to app-layer schemas and executors", () => {
     const tools = createKasbTypedEvalTools();
-    const searchStandards = tools.find((tool) => tool.name === "search-standards");
-    const getSection = tools.find((tool) => tool.name === "get-section");
+    const searchStandards = tools.find((tool) => tool.name === "kasb_search_standards");
+    const getSection = tools.find((tool) => tool.name === "kasb_get_section");
 
     expect(searchStandards?.inputJsonSchema).toBe(defaultSearchStandardsOperation.inputJsonSchema);
     expect(searchStandards?.resultJsonSchema).toBe(defaultSearchStandardsOperation.resultJsonSchema);
@@ -104,7 +104,7 @@ describe("internal typed eval tools", () => {
   });
 
   test("keeps typed parameters separate from CLI flag syntax", async () => {
-    const getSection = defaultKasbTypedEvalTools.find((tool) => tool.name === "get-section");
+    const getSection = defaultKasbTypedEvalTools.find((tool) => tool.name === "kasb_get_section");
 
     expect(propertyNames(getSection?.inputJsonSchema ?? {})).toEqual([
       "indexDocumentId",
@@ -115,7 +115,7 @@ describe("internal typed eval tools", () => {
     expect(propertyNames(getSection?.inputJsonSchema ?? {})).not.toContain("std-num");
 
     await expect(
-      executeKasbTypedEvalTool(defaultKasbTypedEvalTools, "get-paragraph", {
+      executeKasbTypedEvalTool(defaultKasbTypedEvalTools, "kasb_get_paragraph", {
         "std-num": "1116",
         "para-num": "23",
       }),
@@ -128,42 +128,42 @@ describe("internal typed eval tools", () => {
   test("executes every typed tool through app operations and returns shared envelopes", async () => {
     const smokeCases = [
       {
-        name: "search-standards",
+        name: "kasb_search_standards",
         input: { keyword: "리스", limit: 1 },
         assertEnvelope: (envelope: SharedEnvelope) => {
           expect((envelope.result as { readonly returnedCount: number }).returnedCount).toBe(1);
         },
       },
       {
-        name: "get-standard-structure",
+        name: "kasb_get_standard_structure",
         input: { stdNum: "1116" },
         assertEnvelope: (envelope: SharedEnvelope) => {
           expect((envelope.references as { readonly stdNum: string }).stdNum).toBe("1116");
         },
       },
       {
-        name: "get-section",
+        name: "kasb_get_section",
         input: { stdNum: "1116", indexDocumentId: "ZB2hJW" },
         assertEnvelope: (envelope: SharedEnvelope) => {
           expect((envelope.references as { readonly indexDocumentId: string }).indexDocumentId).toBe("ZB2hJW");
         },
       },
       {
-        name: "get-paragraph",
+        name: "kasb_get_paragraph",
         input: { stdNum: "1116", paraNum: "23" },
         assertEnvelope: (envelope: SharedEnvelope) => {
           expect((envelope.references as { readonly paraNum: string }).paraNum).toBe("23");
         },
       },
       {
-        name: "search-qna",
+        name: "kasb_search_qna",
         input: { keyword: "리스", rows: 5 },
         assertEnvelope: (envelope: SharedEnvelope) => {
           expect((envelope.result as { readonly returnedCount: number }).returnedCount).toBeGreaterThan(0);
         },
       },
       {
-        name: "get-qna",
+        name: "kasb_get_qna",
         input: { docNumber: "SSI-35629" },
         assertEnvelope: (envelope: SharedEnvelope) => {
           expect((envelope.references as { readonly docNumber: string }).docNumber).toBe("SSI-35629");
