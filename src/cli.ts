@@ -201,7 +201,34 @@ const getQnaCommand = buildOperationCommand<
   writeStdout,
 });
 
+const cliCommands = [
+  searchStandardsCommand,
+  getStandardStructureCommand,
+  getSectionCommand,
+  getParagraphCommand,
+  searchQnaCommand,
+  getQnaCommand,
+] as const;
+
+const renderCommandErrorMessage = (operationName: string | undefined, error: unknown): string | undefined => {
+  const scopedCommand = cliCommands.find((item) => item.command.name() === operationName);
+  return scopedCommand?.renderErrorMessage(error);
+};
+
 const rootHelpNotes = `
+워크플로:
+  # 기준서 검색 → 구조 확인 → 섹션 조회
+  kasb search-standards --keyword 리스 --limit 40
+  kasb get-standard-structure --std-num 1116 --output summary
+  kasb get-section --std-num 1116 --ref 9~17 --output summary
+
+  # 정확한 문단 직접 조회
+  kasb get-paragraph --std-num 1116 --para-num 23
+
+  # Q&A 검색 → 문서 조회
+  kasb search-qna --keyword 리스 --limit 5 --output summary
+  kasb get-qna --doc-number SSI-35629 --output summary
+
 주의사항:
   - 이 도구는 db.kasb.or.kr의 공개 읽기 API를 호출합니다.
   - 기준서 본문은 /standard/, Q&A 자료는 /qnas/ 화면에서 관찰한 API를 사용합니다.
@@ -225,18 +252,13 @@ if (process.argv.length <= 2) {
   program.outputHelp();
 } else {
   program.parseAsync(process.argv).catch((error) => {
-    const cliMessage =
-      searchStandardsCommand.renderErrorMessage(error) ??
-      getStandardStructureCommand.renderErrorMessage(error) ??
-      getSectionCommand.renderErrorMessage(error) ??
-      getParagraphCommand.renderErrorMessage(error) ??
-      searchQnaCommand.renderErrorMessage(error) ??
-      getQnaCommand.renderErrorMessage(error);
+    const operationName = process.argv[2];
+    const cliMessage = renderCommandErrorMessage(operationName, error);
 
     writeStderr(
       renderCliFailureJson(error, {
         ...(cliMessage === undefined ? {} : { message: cliMessage }),
-        ...(process.argv[2] === undefined ? {} : { operation: process.argv[2] }),
+        ...(operationName === undefined ? {} : { operation: operationName }),
         pretty: shouldPrettyPrintJson(process.argv),
       }),
     );

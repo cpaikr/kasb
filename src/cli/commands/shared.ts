@@ -10,6 +10,7 @@ import {
   parseIntegerCliOption,
   renderCliJson,
   renderInvalidInputCliErrorMessage,
+  renderUnknownOptionCliErrorMessage,
   splitCliCommandOptions,
   type CliOptions as SharedCliOptions,
   type CliOutputMode,
@@ -84,6 +85,7 @@ export const buildOperationCommand = <Key extends string, RawInput, Result>(
     command,
     parse: toCommand,
     renderErrorMessage: (error) =>
+      renderUnknownOptionCliErrorMessage(error, registeredOptions) ??
       renderInvalidInputCliErrorMessage(error as { code: string; message: string; parameter?: string }, cliNameByOptionKey),
   };
 };

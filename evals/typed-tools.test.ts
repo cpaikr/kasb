@@ -86,6 +86,8 @@ describe("internal typed eval tools", () => {
     expect(tools.find((tool) => tool.name === "get-section")?.description).toContain("indexDocumentId");
     expect(tools.find((tool) => tool.name === "get-section")?.description).toContain("titleDocumentId");
     expect(tools.find((tool) => tool.name === "search-standards")?.description).toContain("keyword");
+    expect(tools.find((tool) => tool.name === "search-standards")?.description).toContain("not query");
+    expect(tools.find((tool) => tool.name === "search-qna")?.description).toContain("rows rather than CLI --limit");
   });
 
   test("maps definitions directly to app-layer schemas and executors", () => {

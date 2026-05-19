@@ -50,6 +50,8 @@ const suggestAllowedKey = (key: string, allowedKeys: ReadonlySet<string>): strin
 };
 
 const semanticAliases: Record<string, string> = {
+  limit: "rows",
+  query: "keyword",
   searchWord: "keyword",
 };
 

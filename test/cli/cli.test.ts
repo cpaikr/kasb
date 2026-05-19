@@ -28,6 +28,9 @@ describe("kasb CLI", () => {
     expect(stdout).toContain("get-paragraph [options]");
     expect(stdout).toContain("search-qna [options]");
     expect(stdout).toContain("get-qna [options]");
+    expect(stdout).toContain("워크플로:");
+    expect(stdout).toContain("kasb get-standard-structure --std-num 1116 --output summary");
+    expect(stdout).toContain("kasb search-qna --keyword 리스 --limit 5 --output summary");
   });
 
   test("prints help subcommand without a JSON failure", () => {
@@ -70,6 +73,45 @@ describe("kasb CLI", () => {
     expect(envelope.failure.message).toContain('필수 옵션 "--para-num"');
     expect(envelope.metadata.cliTransportVersion).toBe("1");
     expect(envelope.metadata.operation).toBe("get-paragraph");
+  });
+
+  test.each(["--query", "--search-word"] as const)("suggests command-local alternative for %s", (option) => {
+    const result = runCli(["search-qna", option, "리스"]);
+    const envelope = JSON.parse(decode(result.stderr)) as {
+      readonly failure: { readonly code: string; readonly message: string };
+    };
+
+    expect(result.exitCode).toBe(1);
+    expect(decode(result.stdout)).toBe("");
+    expect(envelope.failure.code).toBe("invalid_input");
+    expect(envelope.failure.message).toContain(`unknown option '${option}'`);
+    expect(envelope.failure.message).toContain("--keyword");
+  });
+
+  test("does not suggest options from a different command", () => {
+    const result = runCli(["get-paragraph", "--query", "리스"]);
+    const envelope = JSON.parse(decode(result.stderr)) as {
+      readonly failure: { readonly code: string; readonly message: string };
+    };
+
+    expect(result.exitCode).toBe(1);
+    expect(decode(result.stdout)).toBe("");
+    expect(envelope.failure.code).toBe("invalid_input");
+    expect(envelope.failure.message).toContain("unknown option '--query'");
+    expect(envelope.failure.message).not.toContain("--keyword");
+  });
+
+  test("does not suggest command-local options for root-level unknown options", () => {
+    const result = runCli(["--query", "리스"]);
+    const envelope = JSON.parse(decode(result.stderr)) as {
+      readonly failure: { readonly code: string; readonly message: string };
+    };
+
+    expect(result.exitCode).toBe(1);
+    expect(decode(result.stdout)).toBe("");
+    expect(envelope.failure.code).toBe("invalid_input");
+    expect(envelope.failure.message).toContain("unknown option '--query'");
+    expect(envelope.failure.message).not.toContain("--keyword");
   });
 
   test("renders unknown commands as JSON failures on stderr", () => {

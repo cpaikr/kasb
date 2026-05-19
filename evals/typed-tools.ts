@@ -66,7 +66,7 @@ const typedEvalTool = <
 export const createKasbTypedEvalTools = (operations: KasbAppOperations = defaultKasbAppOperations) => [
   typedEvalTool(
     operations.searchStandards,
-    "Search KASB standards with typed JSON fields keyword and optional limit; do not use CLI flags or source searchWord.",
+    "Search KASB standards with typed JSON fields keyword and optional limit; use keyword, not query, CLI flags, or source searchWord.",
   ),
   typedEvalTool(
     operations.getStandardStructure,
@@ -82,7 +82,7 @@ export const createKasbTypedEvalTools = (operations: KasbAppOperations = default
   ),
   typedEvalTool(
     operations.searchQna,
-    "Search KASB Q&A documents with typed JSON fields keyword, page, rows, and optional numeric types CSV; do not use CLI --limit here.",
+    "Search KASB Q&A documents with typed JSON fields keyword, page, rows, and optional numeric types CSV; use keyword, not query, and use rows rather than CLI --limit here.",
   ),
   typedEvalTool(
     operations.getQna,

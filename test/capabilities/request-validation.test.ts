@@ -53,6 +53,14 @@ describe("capability request validation", () => {
       { parameter: "searchWord", messageIncludes: "keyword" },
     );
     expectInvalid(
+      () => resolveSearchQnaRequest({ query: "리스" }),
+      { parameter: "query", messageIncludes: "keyword" },
+    );
+    expectInvalid(
+      () => resolveSearchQnaRequest({ keyword: "리스", limit: 5 }),
+      { parameter: "limit", messageIncludes: "rows" },
+    );
+    expectInvalid(
       () => resolveGetSectionRequest({ stdNum: "1116", titleDocumentId: "19970f" }),
       { parameter: "titleDocumentId", messageIncludes: "브라우저 경로용 ID" },
     );

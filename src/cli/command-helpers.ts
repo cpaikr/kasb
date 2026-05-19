@@ -113,6 +113,33 @@ export const renderInvalidInputCliErrorMessage = <Key extends string>(
   return message;
 };
 
+export const renderUnknownOptionCliErrorMessage = <Key extends string>(
+  error: unknown,
+  registeredOptions: readonly RegisteredOption<Key>[],
+): string | undefined => {
+  const message = toErrorMessage(error);
+  const unknownOption = message.match(/unknown option '([^']+)'/u)?.[1];
+  if (unknownOption === undefined) return undefined;
+
+  const suggestedOption = suggestCliOption(unknownOption, registeredOptions);
+  if (suggestedOption === undefined) return undefined;
+  return `${message}. 대신 ${suggestedOption} 옵션을 사용하세요.`;
+};
+
+const suggestCliOption = <Key extends string>(
+  unknownOption: string,
+  registeredOptions: readonly RegisteredOption<Key>[],
+): string | undefined => {
+  const candidates = cliOptionAliases[unknownOption] ?? [];
+  const knownOptions = new Set(registeredOptions.map((option) => option.cliName));
+  return candidates.find((candidate) => knownOptions.has(candidate));
+};
+
+const cliOptionAliases: Record<string, readonly string[]> = {
+  "--query": ["--keyword"],
+  "--search-word": ["--keyword"],
+};
+
 export const splitCliCommandOptions = <RequestInput, Key extends string>(
   options: CliOptions<Key>,
   outputKeys: readonly Key[],
