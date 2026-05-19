@@ -4,24 +4,6 @@ This plan applies Anthropic's "Writing effective tools for agents" guidance to t
 
 Work through the sections in order. Items within the same section are good candidates to implement together because they touch the same contract, eval, diagnostics, or transport boundary.
 
-## Eval feedback loop
-
-### 8. Review descriptions and schemas after eval failures
-
-Use eval transcripts to improve tool ergonomics instead of guessing:
-
-- Look for wrong operation selection.
-- Look for new invalid parameter patterns.
-- Look for repeated broad searches where a narrower call should work.
-- Look for outputs where the model misses the next useful reference.
-- Update descriptions, validation messages, result shapes, or examples based on concrete failures.
-
-Success criteria:
-
-- Description changes are backed by eval evidence.
-- Invalid calls and unnecessary follow-up calls decrease.
-- Tool specs stay compact and accurate.
-
 ## Deferred transport naming
 
 ### 10. Decide future exposed namespacing only if a new transport is approved
