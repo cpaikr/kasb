@@ -4,63 +4,14 @@ This plan applies Anthropic's "Writing effective tools for agents" guidance to t
 
 Work through the sections in order. Items within the same section are good candidates to implement together because they touch the same contract, eval, diagnostics, or transport boundary.
 
-## Completed schema and input contract work
-
-### 2. Make `get-section` input rules explicit
-
-Status: completed.
-
-Implemented outcomes:
-
-- Exported JSON Schema now exposes the `get-section` locator XOR rule for `indexDocumentId` vs `ref`.
-- `indexDocumentId` descriptions point agents back to `get-standard-structure` and its `titleDocumentId` field.
-- Runtime validation keeps parameter-specific `invalid_input` failures for missing or conflicting section locators.
-- Tests cover the exported XOR metadata and request-validation behavior.
-
-### 9. Improve source-shaped inputs only where agents struggle
-
-Status: completed for the currently evidenced schema/input-contract work.
-
-Implemented outcomes:
-
-- `search-qna.types` now documents the observed default Q&A type set and emits a numeric CSV JSON Schema pattern aligned with runtime validation.
-- `indexDocumentId`, `ref`, and appendix-style `paraNum` examples/descriptions are richer in exported schemas.
-- `types` remains source-facing; no semantic enum or lookup capability was added without eval evidence.
-- Tests cover the important identifier examples, Q&A type metadata, and malformed `types` rejection.
-
-Further lookup/list capabilities remain deferred until evals show repeated code-discovery failures.
-
-## Eval baseline and feedback loop
-
-### 3. Add an internal typed tool-use eval track without changing the public product
-
-Status: completed.
-
-Implemented outcomes:
-
-- Added `evals/typed-tools.ts` with internal typed eval definitions backed directly by `src/app/*` operations.
-- Typed eval schemas and execution functions reuse the app-layer operation schemas and shared capability envelopes.
-- Tests verify semantic JSON parameters stay separate from CLI flag syntax and that typed calls avoid subprocess behavior.
-- CLI evals/tests remain responsible for command discoverability, stream behavior, and exit behavior.
-
-### 4. Add scenario evals for multi-step KASB research
-
-Status: completed.
-
-Implemented outcomes:
-
-- Added `evals/scenarios.ts` with multi-step workflow scenarios over the internal typed tool track.
-- Covered lease standard discovery, section retrieval for paragraphs `1` and `2`, Q&A search-to-detail retrieval, paragraph comparison for `23` and `B3`, and recovery from a route-facing `titleDocumentId`.
-- Scenario runs track task success, tool-call count, failed and invalid calls, retry calls, runtime, output bytes as a token proxy, and reference-field availability.
-- Split scenarios into `tuning` and `held-out` categories so future description/schema tuning has separate regression coverage.
-- Added fixture-backed tests for scenario definitions, deterministic success, and recovery metrics.
+## Eval feedback loop
 
 ### 8. Review descriptions and schemas after eval failures
 
-Use eval transcripts to improve tool ergonomics instead of guessing.
+Use eval transcripts to improve tool ergonomics instead of guessing:
 
 - Look for wrong operation selection.
-- Look for invalid parameter patterns.
+- Look for new invalid parameter patterns.
 - Look for repeated broad searches where a narrower call should work.
 - Look for outputs where the model misses the next useful reference.
 - Update descriptions, validation messages, result shapes, or examples based on concrete failures.
@@ -70,19 +21,6 @@ Success criteria:
 - Description changes are backed by eval evidence.
 - Invalid calls and unnecessary follow-up calls decrease.
 - Tool specs stay compact and accurate.
-
-## Output shape and diagnostics
-
-Status: completed for the first high-volume CLI pass.
-
-Implemented outcomes:
-
-- Added `--output summary|structured|raw` to `get-standard-structure`, `get-section`, `search-qna`, and `get-qna` while preserving structured output as the default.
-- Summary mode projects smaller `result` payloads while preserving operation-level `metadata`, `references`, and `warnings`.
-- Output-mode option generation now honors each command's configured mode list instead of accepting unsupported modes by default.
-- Reclassified routine HTML preservation and highlight normalization from warnings into `metadata.content` notes.
-- Added local recovery hints for paragraph ranges and numeric-only Q&A document numbers.
-- Updated the v1 spec, README stream contract, and tests for the new diagnostics behavior.
 
 ## Deferred transport naming
 

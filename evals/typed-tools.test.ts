@@ -83,6 +83,9 @@ describe("internal typed eval tools", () => {
     ]);
     expect(new Set(tools.map((tool) => tool.name)).size).toBe(tools.length);
     expect(tools.every((tool) => tool.description.length > 0)).toBe(true);
+    expect(tools.find((tool) => tool.name === "get-section")?.description).toContain("indexDocumentId");
+    expect(tools.find((tool) => tool.name === "get-section")?.description).toContain("titleDocumentId");
+    expect(tools.find((tool) => tool.name === "search-standards")?.description).toContain("keyword");
   });
 
   test("maps definitions directly to app-layer schemas and executors", () => {

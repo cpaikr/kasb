@@ -43,6 +43,21 @@ describe("capability request validation", () => {
     );
   });
 
+  test("suggests typed JSON field names for common invalid parameter patterns", () => {
+    expectInvalid(
+      () => resolveGetParagraphRequest({ "std-num": "1116", "para-num": "23" }),
+      { parameter: "std-num", messageIncludes: "stdNum" },
+    );
+    expectInvalid(
+      () => resolveSearchStandardsRequest({ searchWord: "리스" }),
+      { parameter: "searchWord", messageIncludes: "keyword" },
+    );
+    expectInvalid(
+      () => resolveGetSectionRequest({ stdNum: "1116", titleDocumentId: "19970f" }),
+      { parameter: "titleDocumentId", messageIncludes: "브라우저 경로용 ID" },
+    );
+  });
+
   const requiredStringCases: readonly {
     readonly name: string;
     readonly resolver: Resolver<unknown>;

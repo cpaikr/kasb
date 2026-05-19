@@ -19,11 +19,42 @@ export const assertNoUnknownKeys = (
     if (!allowedKeys.has(key)) {
       throw new InvalidCapabilityRequest({
         parameter: key,
-        message: `알 수 없는 매개변수입니다: "${key}".`,
+        message: unknownKeyMessage(key, allowedKeys),
       });
     }
   }
 };
+
+const unknownKeyMessage = (key: string, allowedKeys: ReadonlySet<string>): string => {
+  const base = `알 수 없는 매개변수입니다: "${key}".`;
+  const suggestion = suggestAllowedKey(key, allowedKeys);
+  if (suggestion !== undefined) {
+    return `${base} 이 typed API는 JSON 필드 "${suggestion}"을(를) 사용합니다.`;
+  }
+  if (key === "titleDocumentId" && allowedKeys.has("indexDocumentId")) {
+    return `${base} titleDocumentId는 브라우저 경로용 ID라서 사용할 수 없습니다. get-standard-structure가 반환한 indexDocumentId를 사용하세요.`;
+  }
+  return base;
+};
+
+const suggestAllowedKey = (key: string, allowedKeys: ReadonlySet<string>): string | undefined => {
+  const alias = semanticAliases[key];
+  if (alias !== undefined && allowedKeys.has(alias)) return alias;
+
+  const normalizedCandidates = [toCamelCase(key), key.toLowerCase()];
+  for (const allowedKey of allowedKeys) {
+    if (normalizedCandidates.includes(allowedKey)) return allowedKey;
+    if (allowedKey.toLowerCase() === key.toLowerCase()) return allowedKey;
+  }
+  return undefined;
+};
+
+const semanticAliases: Record<string, string> = {
+  searchWord: "keyword",
+};
+
+const toCamelCase = (key: string): string =>
+  key.replace(/[-_]+([a-zA-Z0-9])/gu, (_match, next: string) => next.toUpperCase());
 
 export const readRequiredString = (
   input: Record<string, unknown>,

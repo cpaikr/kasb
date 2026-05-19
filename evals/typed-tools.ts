@@ -66,27 +66,27 @@ const typedEvalTool = <
 export const createKasbTypedEvalTools = (operations: KasbAppOperations = defaultKasbAppOperations) => [
   typedEvalTool(
     operations.searchStandards,
-    "Search KASB standards by semantic typed parameters, without CLI argv parsing.",
+    "Search KASB standards with typed JSON fields keyword and optional limit; do not use CLI flags or source searchWord.",
   ),
   typedEvalTool(
     operations.getStandardStructure,
-    "Retrieve a standard's structure and section identifiers by typed parameters.",
+    "Retrieve a standard's structure with typed JSON field stdNum and optional keyword; use returned indexDocumentId values for get-section.",
   ),
   typedEvalTool(
     operations.getSection,
-    "Retrieve one standard section by indexDocumentId or ref using typed parameters.",
+    "Retrieve one standard section with typed JSON field stdNum and exactly one of indexDocumentId or ref; do not use browser titleDocumentId values.",
   ),
   typedEvalTool(
     operations.getParagraph,
-    "Retrieve one exact paragraph by stdNum and paraNum using typed parameters.",
+    "Retrieve one exact paragraph with typed JSON fields stdNum and paraNum; use get-section with ref for paragraph ranges.",
   ),
   typedEvalTool(
     operations.searchQna,
-    "Search KASB Q&A documents by semantic typed parameters, without CLI argv parsing.",
+    "Search KASB Q&A documents with typed JSON fields keyword, page, rows, and optional numeric types CSV; do not use CLI --limit here.",
   ),
   typedEvalTool(
     operations.getQna,
-    "Retrieve one KASB Q&A document by docNumber using typed parameters.",
+    "Retrieve one KASB Q&A document with typed JSON field docNumber and optional keyword; docNumber comes from search-qna.",
   ),
 ] as const;
 
