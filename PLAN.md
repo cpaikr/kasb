@@ -45,30 +45,15 @@ Implemented outcomes:
 
 ### 4. Add scenario evals for multi-step KASB research
 
-Current tests are strong for contracts and fixtures, but the repo needs realistic agent workflow evals like Anthropic recommends. Add these before larger response-shape changes so later changes can be measured.
+Status: completed.
 
-Add scenario evals under `evals/` using tasks from `docs/tools/cli-tryouts.md`, such as:
+Implemented outcomes:
 
-- Search `리스`, identify standard `1116`, retrieve relevant structure, then cite paragraph `23`.
-- Retrieve the section containing paragraphs `1` and `2` of K-IFRS 1116.
-- Find Q&A documents about `리스` and fetch a cited `docNumber`.
-- Compare paragraphs `23` and `B3` without browser navigation.
-- Handle a wrong `titleDocumentId` by recovering through `get-standard-structure`.
-
-Track metrics:
-
-- task success
-- tool-call count
-- invalid calls/retries
-- runtime
-- output size or token proxy
-- reference usability
-
-Success criteria:
-
-- Evals represent real standards research tasks, not only one-call smoke tests.
-- Failures reveal whether the issue is naming, schema design, output shape, or source behavior.
-- Held-out scenarios are kept separate from scenarios used to tune descriptions.
+- Added `evals/scenarios.ts` with multi-step workflow scenarios over the internal typed tool track.
+- Covered lease standard discovery, section retrieval for paragraphs `1` and `2`, Q&A search-to-detail retrieval, paragraph comparison for `23` and `B3`, and recovery from a route-facing `titleDocumentId`.
+- Scenario runs track task success, tool-call count, failed and invalid calls, retry calls, runtime, output bytes as a token proxy, and reference-field availability.
+- Split scenarios into `tuning` and `held-out` categories so future description/schema tuning has separate regression coverage.
+- Added fixture-backed tests for scenario definitions, deterministic success, and recovery metrics.
 
 ### 8. Review descriptions and schemas after eval failures
 
