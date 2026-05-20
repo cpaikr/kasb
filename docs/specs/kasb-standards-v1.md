@@ -267,7 +267,7 @@ Implementation notes:
 - `inputs`
   `keyword`, optional `page`, optional `rows`, optional source-facing numeric `types` CSV. The CLI also accepts `--limit` as an alias for `rows`.
 - `output`
-  Matching Q&A records with `docNumber`, source type, title, snippet, tags, source links, per-type counts, and pagination metadata (`totalCount`, `totalPages`, `hasNextPage`, `paginationStatus`).
+  Matching Q&A records with `docNumber`, source type, observed type label, title, snippet, tags, source links, per-type counts, type-label lookup metadata, and pagination metadata (`totalCount`, `totalPages`, `hasNextPage`, `paginationStatus`).
 - `warnings`
   `source_metadata_incomplete`
 - `failure cases`
@@ -280,6 +280,7 @@ Implementation notes:
 - Use `GET /api/qnas/v2?types={csv}&searchWord={keyword}&page={page}&rows={rows}`.
 - Default observed public `types` to `11,12,13,14,15,24,25`.
 - Treat `types` as an explicit v1 exception to the usual semantic-field rule; keep type numbers source-facing until a later spec promotes semantic type names.
+- Return observed labels for known public type ids to make source-facing numbers scannable; labels are descriptive metadata, not accepted semantic inputs.
 - Reject malformed non-numeric `types` CSV values as `invalid_input`; normalize spaces around comma-separated numeric ids.
 - Record routine highlight HTML-to-text normalization in `metadata.content`, not as a warning.
 
@@ -290,7 +291,7 @@ Implementation notes:
 - `inputs`
   `docNumber`, optional `keyword`
 - `output`
-  One Q&A record with `docNumber`, title, full plain content, optional HTML content, related standards HTML, tags, adjacent document numbers, and source links.
+  One Q&A record with `docNumber`, source type, observed type label, title, full plain content, optional HTML content, related standards HTML, tags, adjacent document numbers, and source links.
 - `warnings`
   `source_metadata_incomplete`
 - `failure cases`

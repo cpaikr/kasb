@@ -12,6 +12,7 @@ import type { GetSectionRawInput, GetSectionResult } from "./capabilities/get-se
 import type { GetStandardStructureRawInput, GetStandardStructureResult } from "./capabilities/get-standard-structure/contract.ts";
 import type { SearchQnaRawInput, SearchQnaResult } from "./capabilities/search-qna/contract.ts";
 import type { SearchStandardItem, SearchStandardsRawInput, SearchStandardsResult } from "./capabilities/search-standards/contract.ts";
+import { observedQnaTypeLabels } from "./capabilities/qna-types.ts";
 import { configureCliTransport, renderCliFailureJson, type CliErrorDetails } from "./cli/command-helpers.ts";
 import { buildOperationCommand } from "./cli/commands/shared.ts";
 
@@ -26,6 +27,10 @@ const writeStderr = (text: string) => {
 const shouldPrettyPrintJson = (argv: readonly string[]): boolean => argv.includes("--pretty");
 
 const detailOutputModes = ["summary", "structured", "raw"] as const;
+
+const qnaTypeHelpNote = `Q&A 유형: ${Object.entries(observedQnaTypeLabels)
+  .map(([type, label]) => `${type} ${label.replace(" · ", " ")}`)
+  .join(", ")}.`;
 
 const truncate = (value: string, maxLength: number): string =>
   value.length <= maxLength ? value : `${value.slice(0, maxLength).trimEnd()}…`;
@@ -188,7 +193,7 @@ const searchQnaCommand = buildOperationCommand<
     { key: "rows", flags: "--limit <number>", description: "[별칭] --rows와 같습니다.", integer: true },
     { key: "types", flags: "--types <csv>", description: "[선택] 숫자 Q&A 유형 ID CSV입니다. 기본값: 11,12,13,14,15,24,25" },
   ],
-  notes: ["--output summary는 외부 contentLink와 긴 source-adjacent 필드를 제외하고 docNumber 중심으로 보여줍니다."],
+  notes: [qnaTypeHelpNote, "--output summary는 외부 contentLink와 긴 source-adjacent 필드를 제외하고 docNumber 중심으로 보여줍니다."],
   examples: [{ description: "리스 관련 Q&A를 검색합니다.", argv: ["--keyword", "리스", "--limit", "5"] }],
   outputModes: detailOutputModes,
   summarizeResult: (output) => ({
@@ -199,9 +204,11 @@ const searchQnaCommand = buildOperationCommand<
     hasNextPage: output.result.hasNextPage,
     paginationStatus: output.result.paginationStatus,
     countByType: output.result.countByType,
+    typeLabels: output.result.typeLabels,
     items: output.result.items.map((item) => ({
       docNumber: item.docNumber,
       type: item.type,
+      typeLabel: item.typeLabel,
       title: item.title,
       snippet: truncate(item.snippet, 240),
       tags: item.tags,
@@ -246,6 +253,7 @@ const getQnaCommand = buildOperationCommand<
     qna: {
       docNumber: output.result.qna.docNumber,
       type: output.result.qna.type,
+      typeLabel: output.result.qna.typeLabel,
       title: output.result.qna.title,
       fullContentPreview: truncate(output.result.qna.fullContent, 1_000),
       tags: output.result.qna.tags,

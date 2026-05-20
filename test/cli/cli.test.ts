@@ -147,6 +147,17 @@ describe("kasb CLI", () => {
     expect(envelope.failure.message).toContain(flag);
   });
 
+  test("documents Q&A type labels in search help", () => {
+    const result = runCli(["help", "search-qna"]);
+    const stdout = decode(result.stdout);
+
+    expect(result.exitCode).toBe(0);
+    expect(decode(result.stderr)).toBe("");
+    expect(stdout).toContain("Q&A 유형:");
+    expect(stdout).toContain("15 K-IFRS 신속처리질의");
+    expect(stdout).toContain("24 일반기업회계기준 금융감독원");
+  });
+
   test("documents output detail modes for high-volume commands", () => {
     for (const command of ["get-standard-structure", "get-section", "search-qna", "get-qna"]) {
       const result = runCli(["help", command]);

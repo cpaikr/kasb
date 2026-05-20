@@ -140,7 +140,7 @@ v1 public section retrieval should use `indexDocumentId`. v1 public paragraph re
 Observed endpoints:
 
 - `GET /api/qnas/v2/types`
-  Returns Q&A type metadata. Observed public type ids include `11`, `12`, `13`, `14`, `15`, `24`, and `25`.
+  Returns Q&A type metadata. Observed public type ids include `11`, `12`, `13`, `14`, `15`, `24`, and `25`: `11` K-IFRS 회계기준원, `12` 일반기업회계기준 회계기준원, `13` K-IFRS IFRS 해석위원회 논의결과, `14` 일반기업회계기준 신속처리질의, `15` K-IFRS 신속처리질의, `24` 일반기업회계기준 금융감독원, `25` K-IFRS 금융감독원.
 - `GET /api/qnas/v2/count`
   Returns Q&A counts by type.
 - `GET /api/qnas/v2?types={csv}&searchWord={term}&page={page}&rows={rows}`
@@ -160,6 +160,7 @@ Implementation implication:
 
 - treat Q&A document identity as `docNumber`
 - keep Q&A `type` values source-facing until product docs promote a stable semantic enum
+- expose observed type labels beside source-facing type ids for scanning, without accepting labels as inputs
 - preserve source `contentHtml` and `relStds` as HTML fields when returned, with warnings
 - use `/api/qnas/v2` for read-only Q&A search and detail retrieval
 

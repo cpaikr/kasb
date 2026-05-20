@@ -49,6 +49,10 @@ export const QnaSchema = Schema.Struct({
     description: "Source-facing Q&A type id.",
     examples: [15],
   }),
+  typeLabel: Schema.String.annotations({
+    description: "Observed human-readable Q&A type label derived from the source type metadata.",
+    examples: ["K-IFRS · 신속처리질의"],
+  }),
   title: Schema.String.annotations({
     description: "Q&A document title with source highlights normalized to text.",
     examples: ["리스 개시일과 계약일"],

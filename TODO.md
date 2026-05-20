@@ -6,12 +6,10 @@
   - Evidence from tryouts:
     - Exact Q&A searches for `장기종업원급여`, `기타장기종업원급여`, and related compound terms returned zero, while broader `종업원급여` returned many rows.
     - `리스` Q&A results are relevant but not recent-first; newer issues were buried around items 24, 25, and 48.
-    - Help lists Q&A type numbers but not their meanings.
     - Search snippets can be too long for quick scanning.
   - Useful directions:
     - Add `suggestedKeywords` or fallback hints for zero-result Q&A searches.
     - Add recency controls if source data supports it: `--sort-date desc`, `--from`, `--to`.
-    - Document Q&A type ids in help or expose labels in output.
     - Consider compact result projection for search output: `docNumber`, type label, title, date, tags, short snippet.
 
 - Comparison workflows need metadata/filtering.

@@ -7,10 +7,11 @@ import {
   readOptionalString,
   readRequiredString,
 } from "../request-validation.ts";
+import { defaultObservedQnaTypeIds } from "../qna-types.ts";
 import { DocNumberSchema, InvalidCapabilityRequest, ResultMetadataSchema, SourceUrlSchema } from "../types.ts";
 
 const fields = new Set(["keyword", "page", "rows", "types"]);
-const observedDefaultTypes = "11,12,13,14,15,24,25";
+const observedDefaultTypes = defaultObservedQnaTypeIds.join(",");
 const qnaTypesCsvPattern = /^\s*(?:\d+\s*(?:,\s*\d+\s*)*)?$/u;
 
 export const SearchQnaRequestSchema = Schema.Struct({
@@ -71,6 +72,10 @@ export const QnaSearchItemSchema = Schema.Struct({
   type: Schema.Number.annotations({
     description: "Source-facing Q&A type id.",
     examples: [24],
+  }),
+  typeLabel: Schema.String.annotations({
+    description: "Observed human-readable Q&A type label derived from the source type metadata.",
+    examples: ["K-IFRS · 신속처리질의"],
   }),
   title: Schema.String.annotations({
     description: "Q&A title with source highlights normalized to text.",
@@ -135,6 +140,10 @@ export const SearchQnaResultSchema = Schema.Struct({
       key: Schema.String.annotations({ description: "Source-facing Q&A type id as a string key.", examples: ["24"] }),
       value: Schema.Number.annotations({ description: "Number of matched Q&A records for this type.", examples: [3] }),
     }).annotations({ description: "Source-provided counts grouped by Q&A type id when available." }),
+    typeLabels: Schema.Record({
+      key: Schema.String.annotations({ description: "Source-facing Q&A type id as a string key.", examples: ["15"] }),
+      value: Schema.String.annotations({ description: "Observed human-readable label for the Q&A type id.", examples: ["K-IFRS · 신속처리질의"] }),
+    }).annotations({ description: "Observed labels for public Q&A type ids included in counts or returned items." }),
   }).annotations({ description: "Q&A search payload." }),
   metadata: ResultMetadataSchema,
   references: Schema.Struct({ searchUrl: SourceUrlSchema }).annotations({ description: "Operation-level source reference for the Q&A search." }),

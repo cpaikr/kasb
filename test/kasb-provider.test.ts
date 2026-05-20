@@ -283,7 +283,9 @@ describe("KASB provider operations", () => {
     expect(result.result.hasNextPage).toBe(true);
     expect(result.result.paginationStatus).toBe("known");
     expect(result.result.items[0]?.docNumber).toBe("IFRSIC2207E");
+    expect(result.result.items[0]?.typeLabel).toBe("K-IFRS · IFRS 해석위원회 논의결과");
     expect(result.result.countByType["15"]).toBe(73);
+    expect(result.result.typeLabels["15"]).toBe("K-IFRS · 신속처리질의");
   });
 
   test("derives Q&A pagination totals from requested type buckets", async () => {
@@ -325,6 +327,7 @@ describe("KASB provider operations", () => {
 
     expect(result.result.qna.docNumber).toBe("SSI-35629");
     expect(result.result.qna.tags).toEqual(["리스부채", "리스개시일", "계약일"]);
+    expect(result.result.qna.typeLabel).toBe("K-IFRS · 신속처리질의");
     expect(result.result.qna.title).toBe("리스 개시일과 계약일");
   });
 

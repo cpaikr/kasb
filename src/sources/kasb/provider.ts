@@ -10,6 +10,7 @@ import type { SearchQnaProvider } from "../../capabilities/search-qna/provider.t
 import type { QnaSearchItem } from "../../capabilities/search-qna/contract.ts";
 import type { SearchStandardsProvider } from "../../capabilities/search-standards/provider.ts";
 import type { SearchStandardItem, SearchStandardsRequest } from "../../capabilities/search-standards/contract.ts";
+import { defaultObservedQnaTypeIds, qnaTypeLabel, qnaTypeLabelsFor } from "../../capabilities/qna-types.ts";
 import { ProviderFailure, type ResultMetadata } from "../../capabilities/types.ts";
 import { fetchKasbJson } from "./fetch-json.ts";
 import {
@@ -680,8 +681,11 @@ const searchQna: SearchQnaProvider["search"] = async (request) => {
   const totalPages = totalCount === 0 ? 0 : Math.ceil(totalCount / request.rows);
   const hasNextPage = !countMetadataIncomplete && request.page < totalPages;
 
+  const requestedTypeIds = request.types?.split(",") ?? defaultObservedQnaTypeIds;
+  const typeLabels = qnaTypeLabelsFor(new Set([...requestedTypeIds, ...Object.keys(countByType), ...items.map((item) => String(item.type))]));
+
   return {
-    result: { request, items, returnedCount: items.length, totalCount, totalPages, hasNextPage, paginationStatus, countByType },
+    result: { request, items, returnedCount: items.length, totalCount, totalPages, hasNextPage, paginationStatus, countByType, typeLabels },
     metadata: metadata(sourceUrl, incomplete || countMetadataIncomplete ? "partial" : "complete", {
       textFields: ["result.items[].title", "result.items[].snippet"],
       notes: ["검색 하이라이트 HTML은 title과 snippet의 plain text로 정규화합니다."],
@@ -719,6 +723,7 @@ const toQnaSearchItem = (value: unknown, sourceUrl: string): QnaSearchItem | und
   return {
     docNumber,
     type,
+    typeLabel: qnaTypeLabel(type),
     title: stripHtml(title),
     snippet: stripHtml(snippet),
     tags,
@@ -782,6 +787,7 @@ const toQna = (value: unknown, sourceUrl: string): Qna => {
   return {
     docNumber,
     type,
+    typeLabel: qnaTypeLabel(type),
     title: stripHtml(arrayText(item.title) || optionalString(item.title) || docNumber),
     fullContent,
     tags,
