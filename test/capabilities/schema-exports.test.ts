@@ -54,6 +54,7 @@ type JsonObjectSchema = {
   readonly properties?: Record<string, unknown>;
   readonly description?: string;
   readonly examples?: readonly unknown[];
+  readonly enum?: readonly unknown[];
   readonly pattern?: string;
   readonly oneOf?: readonly JsonObjectSchema[];
   readonly not?: JsonObjectSchema;
@@ -77,6 +78,14 @@ const propertyAt = (schema: JsonObjectSchema, path: readonly string[]): JsonProp
     current = asPropertySchema(next);
   }
   return current;
+};
+
+const arrayItemsAt = (schema: JsonObjectSchema, path: readonly string[]): JsonPropertySchema => {
+  const arraySchema = propertyAt(schema, path);
+  if (arraySchema.items === undefined) {
+    throw new Error(`Missing schema array items path: ${path.join(".")}`);
+  }
+  return asPropertySchema(arraySchema.items);
 };
 
 describe("capability JSON Schema exports", () => {
@@ -149,5 +158,31 @@ describe("capability JSON Schema exports", () => {
     expect(propertyAt(getSectionResult, ["references", "indexDocumentId"]).description).toContain("Retrieval-facing section id");
     expect(propertyAt(getParagraphResult, ["references", "uniqueKey"]).description).toContain("{stdNum}-{paraNum}");
     expect(propertyAt(searchQnaResult, ["result", "items"]).description).toContain("docNumber");
+  });
+
+  test("search-standards result items expose the structure follow-up action schema", () => {
+    const searchStandardsResult = defaultSearchStandardsOperation.resultJsonSchema as JsonObjectSchema;
+    const standardItem = arrayItemsAt(searchStandardsResult, ["result", "standards"]);
+    const nextActions = propertyAt(standardItem, ["nextActions"]);
+    const getStandardStructure = propertyAt(nextActions, ["getStandardStructure"]);
+    const operation = propertyAt(getStandardStructure, ["operation"]);
+    const input = propertyAt(getStandardStructure, ["input"]);
+    const stdNum = propertyAt(input, ["stdNum"]);
+
+    expect(nextActions.type).toBe("object");
+    expect(nextActions.required).toEqual(["getStandardStructure"]);
+    expect(nextActions.additionalProperties).toBe(false);
+    expect(nextActions.description).toContain("follow-up actions");
+    expect(getStandardStructure.type).toBe("object");
+    expect(getStandardStructure.required).toEqual(["operation", "input"]);
+    expect(getStandardStructure.additionalProperties).toBe(false);
+    expect(getStandardStructure.description).toContain("Transport-neutral");
+    expect(operation.enum).toEqual(["get-standard-structure"]);
+    expect(input.type).toBe("object");
+    expect(input.required).toEqual(["stdNum"]);
+    expect(input.additionalProperties).toBe(false);
+    expect(input.description).toContain("Typed input");
+    expect(input.examples).toEqual([{ stdNum: "1116" }]);
+    expect(stdNum.examples).toEqual(["1116"]);
   });
 });

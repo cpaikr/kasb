@@ -22,6 +22,7 @@ const makeCommand = (
   options: {
     readonly outputModes?: readonly CliOutputMode[];
     readonly runCount?: { value: number };
+    readonly projectResult?: (result: FakeResult) => FakeResult;
   } = {},
 ) =>
   buildOperationCommand<keyof FakeInput, FakeInput, FakeResult>({
@@ -31,6 +32,7 @@ const makeCommand = (
     options: [{ key: "id", flags: "--id <text>", description: "Fake id." }],
     outputModes: options.outputModes ?? allOutputModes,
     summarizeResult: (output) => ({ id: output.result.id }),
+    ...(options.projectResult === undefined ? {} : { projectResult: options.projectResult }),
     runOperation: async (input) => {
       if (options.runCount !== undefined) options.runCount.value += 1;
       return {
@@ -79,6 +81,25 @@ describe("CLI output modes", () => {
     const envelope = JSON.parse(writes[0] ?? "") as FakeResult;
 
     expect(envelope.result.rawHtml).toBe("<p>source fragment</p>");
+  });
+
+  test("can add CLI-only result projections before rendering", async () => {
+    const writes: string[] = [];
+    await makeCommand(writes, {
+      projectResult: (output) => ({
+        ...output,
+        result: {
+          ...output.result,
+          nextCommands: { inspect: `fake-operation --id ${output.result.id}` },
+        },
+      }),
+    }).parseAsync(["node", "test", "--id", "abc"], { from: "node" });
+    const envelope = JSON.parse(writes[0] ?? "") as FakeResult & {
+      readonly result: { readonly nextCommands: { readonly inspect: string } };
+    };
+
+    expect(envelope.result.nextCommands.inspect).toBe("fake-operation --id abc");
+    expect(envelope.metadata.source).toBe("fixture");
   });
 
   test("honors a command's configured output-mode choices", async () => {

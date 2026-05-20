@@ -11,7 +11,7 @@ import type { GetQnaRawInput, GetQnaResult } from "./capabilities/get-qna/contra
 import type { GetSectionRawInput, GetSectionResult } from "./capabilities/get-section/contract.ts";
 import type { GetStandardStructureRawInput, GetStandardStructureResult } from "./capabilities/get-standard-structure/contract.ts";
 import type { SearchQnaRawInput, SearchQnaResult } from "./capabilities/search-qna/contract.ts";
-import type { SearchStandardsRawInput, SearchStandardsResult } from "./capabilities/search-standards/contract.ts";
+import type { SearchStandardItem, SearchStandardsRawInput, SearchStandardsResult } from "./capabilities/search-standards/contract.ts";
 import { configureCliTransport, renderCliFailureJson } from "./cli/command-helpers.ts";
 import { buildOperationCommand } from "./cli/commands/shared.ts";
 
@@ -30,6 +30,25 @@ const detailOutputModes = ["summary", "structured", "raw"] as const;
 const truncate = (value: string, maxLength: number): string =>
   value.length <= maxLength ? value : `${value.slice(0, maxLength).trimEnd()}…`;
 
+const renderSearchStandardsCliResult = (output: SearchStandardsResult) => ({
+  ...output,
+  result: {
+    ...output.result,
+    standards: output.result.standards.map((standard) => ({
+      ...standard,
+      nextCommands: renderSearchStandardNextCommands(standard.nextActions),
+    })),
+  },
+});
+
+const renderSearchStandardNextCommands = (nextActions: SearchStandardItem["nextActions"]) => ({
+  getStandardStructure: `kasb ${nextActions.getStandardStructure.operation} --std-num ${shellQuoteCliArg(nextActions.getStandardStructure.input.stdNum)} --output summary`,
+});
+
+const shellQuoteCliArg = (value: string): string => /^[A-Za-z0-9._~:/@%+=,-]+$/u.test(value)
+  ? value
+  : `'${value.replaceAll("'", "'\\''")}'`;
+
 const searchStandardsCommand = buildOperationCommand<
   keyof SearchStandardsRawInput,
   SearchStandardsRawInput,
@@ -45,6 +64,7 @@ const searchStandardsCommand = buildOperationCommand<
   ],
   notes: ["기본 relevance 정렬은 원천 API 순서 대신 기준서 제목 매치와 matchCount를 우선합니다.", "정확한 용어로 결과가 좁을 때는 suggestedKeywords 또는 더 넓은 표준명 용어로 다시 검색하세요. 예: 장기종업원급여 → 종업원급여"],
   examples: [{ description: "리스 관련 기준서를 검색합니다.", argv: ["--keyword", "리스"] }],
+  projectResult: renderSearchStandardsCliResult,
   runOperation: (input) => defaultSearchStandardsOperation.execute(input),
   writeStdout,
 });

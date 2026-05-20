@@ -122,8 +122,16 @@ const toSearchStandardItem = (
     stdNum,
     matchCount,
     references: { apiUrl: standardsSearchUrl(stdNum) === sourceUrl ? sourceUrl : standardIndexesUrl(stdNum) },
+    nextActions: buildSearchStandardNextActions(stdNum),
   };
 };
+
+const buildSearchStandardNextActions = (stdNum: string): SearchStandardItem["nextActions"] => ({
+  getStandardStructure: {
+    operation: "get-standard-structure",
+    input: { stdNum },
+  },
+});
 
 const orderSearchStandardItems = async (
   items: readonly SearchStandardItem[],

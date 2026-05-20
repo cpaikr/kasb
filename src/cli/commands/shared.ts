@@ -32,6 +32,7 @@ export type CliCommandSpec<Key extends string, RawInput, Result> = {
   }[];
   readonly outputModes?: readonly CliOutputMode[];
   readonly summarizeResult?: (result: Result) => unknown;
+  readonly projectResult?: (result: Result) => Result;
   readonly runOperation: (input: Partial<RawInput> & Record<string, unknown>) => Promise<Result>;
   readonly writeStdout: (text: string) => void;
 };
@@ -76,7 +77,8 @@ export const buildOperationCommand = <Key extends string, RawInput, Result>(
     return spec
       .runOperation(parsed.request)
       .then((result) => {
-        const projectedResult = projectResult(result, parsed.output.output, spec.summarizeResult);
+        const transportResult = spec.projectResult?.(result) ?? result;
+        const projectedResult = projectOutputModeResult(transportResult, parsed.output.output, spec.summarizeResult);
         spec.writeStdout(renderCliJson(projectedResult, parsed.output));
       });
   });
@@ -107,7 +109,7 @@ const buildRegisteredOptions = <Key extends string, RawInput, Result>(
   createPrettyOption(),
 ];
 
-const projectResult = <Result>(
+const projectOutputModeResult = <Result>(
   result: Result,
   outputMode: CliOutputMode,
   summarizeResult: ((result: Result) => unknown) | undefined,

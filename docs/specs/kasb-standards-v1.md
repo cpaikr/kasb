@@ -168,7 +168,7 @@ Every operation output mode still emits a JSON envelope:
 - `inputs`
   `keyword`, optional `limit`, optional `sort` (`relevance`, `match-count`, `std-num`, `title`; default `relevance`)
 - `output`
-  Matching standards with `stdNum`, match counts, best-effort `standardTitle` / `standardKind`, broader `suggestedKeywords`, and source references.
+  Matching standards with `stdNum`, match counts, best-effort `standardTitle` / `standardKind`, source references, per-standard transport-neutral `nextActions` for the normal structure lookup follow-up, and broader `suggestedKeywords`.
 - `warnings`
   `truncated_results`, `source_metadata_incomplete`
 - `failure cases`
@@ -181,6 +181,7 @@ Implementation notes:
 - Map public `keyword` to source parameter `searchWord`.
 - Use `GET /api/standard?searchWord={keyword}`.
 - Do not hide the source's match-count behavior; expose enough metadata to explain ranking or truncation.
+- Include a `nextActions.getStandardStructure` action for each result so agent tools can call the follow-up operation without translating API URLs; CLI transport may render that action as `kasb get-standard-structure --std-num ... --output summary`.
 - Default search UX should use relevance ranking rather than source order because observed `/api/standard` order is not `doc_count` relevance order.
 
 ### `get-standard-structure`

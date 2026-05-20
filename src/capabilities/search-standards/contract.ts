@@ -62,6 +62,20 @@ const readSearchStandardsSort = (value: unknown): SearchStandardsSort => {
   });
 };
 
+const SearchStandardNextActionsSchema = Schema.Struct({
+  getStandardStructure: Schema.Struct({
+    operation: Schema.Literal("get-standard-structure").annotations({
+      description: "Capability operation to call next for this standard.",
+    }),
+    input: Schema.Struct({
+      stdNum: StdNumSchema,
+    }).annotations({
+      description: "Typed input for the follow-up structure lookup operation.",
+      examples: [{ stdNum: "1116" }],
+    }),
+  }).annotations({ description: "Transport-neutral follow-up action for inspecting this standard's structure before fetching a section." }),
+}).annotations({ description: "Suggested transport-neutral follow-up actions for this search result." });
+
 export const SearchStandardItemSchema = Schema.Struct({
   stdNum: StdNumSchema,
   standardTitle: Schema.optional(Schema.String.annotations({
@@ -79,7 +93,8 @@ export const SearchStandardItemSchema = Schema.Struct({
   references: Schema.Struct({ apiUrl: SourceUrlSchema }).annotations({
     description: "Source API reference for this standard search item.",
   }),
-}).annotations({ description: "One standard-level search result." });
+  nextActions: SearchStandardNextActionsSchema,
+}).annotations({ description: "One standard-level search result with a suggested structure lookup action." });
 export type SearchStandardItem = typeof SearchStandardItemSchema.Type;
 
 export const SearchStandardsResultSchema = Schema.Struct({

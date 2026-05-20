@@ -7,7 +7,9 @@
   - Remaining useful checks:
     - Monitor live KASB ordering/source drift for ranking regressions.
     - Revisit whether source order deserves an explicit sort mode only if users need to inspect upstream order.
-    - Continue improving title enrichment where source metadata is unavailable.
+    - Investigate noisy keyword-filtered structure results. Agent tryouts found `get-standard-structure --std-num 1115 --keyword 수행의무` returned many body, example, and BC sections; users wanted ranking, limiting, or clearer prioritization before choosing `get-section`.
+    - Continue improving title enrichment where source metadata is unavailable. Agent tryouts saw titleless legacy results such as `1017`, `1018`, and `1011`, which made search results harder to judge.
+    - Investigate Korean spacing normalization or guidance. `장기종업원급여` stayed narrow while `장기 종업원 급여` broadened the result set; `1019` still ranked first, so this needs source-sensitive design rather than an immediate rewrite.
 
 - Help lacks end-to-end workflows.
   - Evidence from tryouts:

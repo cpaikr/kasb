@@ -65,7 +65,16 @@ describe("KASB provider operations", () => {
     expect(result.result.totalMatchCount).toBe(1043);
     expect(result.result.request.sort).toBe("relevance");
     expect(result.result.returnedCount).toBe(2);
-    expect(result.result.standards[0]).toMatchObject({ stdNum: "1116", matchCount: 519 });
+    expect(result.result.standards[0]).toMatchObject({
+      stdNum: "1116",
+      matchCount: 519,
+      nextActions: {
+        getStandardStructure: {
+          operation: "get-standard-structure",
+          input: { stdNum: "1116" },
+        },
+      },
+    });
     expect(result.warnings[0]?.code).toBe("truncated_results");
   });
 
