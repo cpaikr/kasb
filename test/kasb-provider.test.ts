@@ -286,6 +286,29 @@ describe("KASB provider operations", () => {
     expect(result.result.items[0]?.typeLabel).toBe("K-IFRS · IFRS 해석위원회 논의결과");
     expect(result.result.countByType["15"]).toBe(73);
     expect(result.result.typeLabels["15"]).toBe("K-IFRS · 신속처리질의");
+    expect(result.result.suggestedKeywords).toEqual([]);
+  });
+
+  test("suggests broader Q&A keywords when an exact search has no results", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(`/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=${encodeURIComponent("장기종업원급여")}&page=1&rows=10`, {
+      facilityQnas: [],
+      facilityQnaCountData: { "11": 0, "12": 0, "13": 0, "14": 0, "15": 0, "24": 0, "25": 0 },
+    });
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchQnaOperation.execute({ keyword: "장기종업원급여" });
+
+    expect(result.result.returnedCount).toBe(0);
+    expect(result.result.totalCount).toBe(0);
+    expect(result.result.suggestedKeywords).toEqual(["장기 종업원 급여", "종업원급여"]);
+  });
+
+  test("keeps Q&A search snippets short for scanning", async () => {
+    const result = await defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5 });
+
+    expect(result.result.items[0]?.snippet.length).toBeLessThanOrEqual(281);
+    expect(result.result.items[0]?.snippet.endsWith("…")).toBe(true);
   });
 
   test("removes repeated source undefined placeholders from Q&A search snippets", async () => {

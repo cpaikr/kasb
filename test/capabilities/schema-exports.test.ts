@@ -158,6 +158,7 @@ describe("capability JSON Schema exports", () => {
     expect(propertyAt(getSectionResult, ["references", "indexDocumentId"]).description).toContain("Retrieval-facing section id");
     expect(propertyAt(getParagraphResult, ["references", "uniqueKey"]).description).toContain("{stdNum}-{paraNum}");
     expect(propertyAt(searchQnaResult, ["result", "items"]).description).toContain("docNumber");
+    expect(propertyAt(searchQnaResult, ["result", "suggestedKeywords"]).description).toContain("empty or too narrow");
   });
 
   test("search-standards result items expose the structure follow-up action schema", () => {

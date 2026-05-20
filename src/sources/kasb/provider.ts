@@ -685,10 +685,21 @@ const searchQna: SearchQnaProvider["search"] = async (request) => {
   const typeLabels = qnaTypeLabelsFor(new Set([...requestedTypeIds, ...Object.keys(countByType), ...items.map((item) => String(item.type))]));
 
   return {
-    result: { request, items, returnedCount: items.length, totalCount, totalPages, hasNextPage, paginationStatus, countByType, typeLabels },
+    result: {
+      request,
+      items,
+      returnedCount: items.length,
+      totalCount,
+      totalPages,
+      hasNextPage,
+      paginationStatus,
+      countByType,
+      typeLabels,
+      suggestedKeywords: suggestBroaderQnaKeywords(request.keyword, totalCount),
+    },
     metadata: metadata(sourceUrl, incomplete || countMetadataIncomplete ? "partial" : "complete", {
       textFields: ["result.items[].title", "result.items[].snippet"],
-      notes: ["검색 하이라이트 HTML은 title과 snippet의 plain text로 정규화합니다."],
+      notes: ["검색 하이라이트 HTML은 title과 snippet의 plain text로 정규화하고 snippet은 빠른 스캔을 위해 길이를 제한합니다."],
     }),
     references: { searchUrl: sourceUrl },
     warnings: [
@@ -725,7 +736,7 @@ const toQnaSearchItem = (value: unknown, sourceUrl: string): QnaSearchItem | und
     type,
     typeLabel: qnaTypeLabel(type),
     title: stripHtml(title),
-    snippet: normalizeQnaPlainText(stripHtml(snippet)),
+    snippet: truncateQnaSnippet(normalizeQnaPlainText(stripHtml(snippet))),
     tags,
     deprecated: optionalNumber(value.deprecatedYn) === 1,
     ...(contentLink === undefined ? {} : { contentLink }),
@@ -805,6 +816,38 @@ const toQna = (value: unknown, sourceUrl: string): Qna => {
 
 const normalizeQnaPlainText = (value: string): string =>
   value.replace(/(?:\bundefined\b\s*){2,}$/u, "").trim();
+
+const qnaSnippetMaxLength = 280;
+
+const truncateQnaSnippet = (value: string): string =>
+  value.length <= qnaSnippetMaxLength ? value : `${value.slice(0, qnaSnippetMaxLength).trimEnd()}…`;
+
+const suggestBroaderQnaKeywords = (keyword: string, totalCount: number): string[] => {
+  if (totalCount > 0) return [];
+
+  const suggestions = new Set<string>();
+  const normalizedKeyword = keyword.trim();
+  const mappedSuggestions: readonly [string, readonly string[]][] = [
+    ["기타장기종업원급여", ["기타 장기 종업원 급여", "장기종업원급여", "종업원급여"]],
+    ["장기종업원급여", ["장기 종업원 급여", "종업원급여"]],
+    ["장기근속급여", ["장기근속 급여", "종업원급여"]],
+    ["장기근속", ["종업원급여"]],
+  ];
+
+  for (const [narrowKeyword, broaderKeywords] of mappedSuggestions) {
+    if (normalizedKeyword.includes(narrowKeyword)) {
+      for (const broaderKeyword of broaderKeywords) suggestions.add(broaderKeyword);
+    }
+  }
+
+  const withoutAccountingTreatment = normalizedKeyword.replace(/\s*회계처리\s*$/u, "").trim();
+  if (withoutAccountingTreatment.length > 0 && withoutAccountingTreatment !== normalizedKeyword) {
+    suggestions.add(withoutAccountingTreatment);
+  }
+
+  suggestions.delete(normalizedKeyword);
+  return [...suggestions];
+};
 
 const assertAnyNormalized = (
   sourceItems: readonly unknown[],

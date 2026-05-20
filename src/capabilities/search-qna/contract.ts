@@ -144,6 +144,10 @@ export const SearchQnaResultSchema = Schema.Struct({
       key: Schema.String.annotations({ description: "Source-facing Q&A type id as a string key.", examples: ["15"] }),
       value: Schema.String.annotations({ description: "Observed human-readable label for the Q&A type id.", examples: ["K-IFRS · 신속처리질의"] }),
     }).annotations({ description: "Observed labels for public Q&A type ids included in counts or returned items." }),
+    suggestedKeywords: Schema.Array(Schema.String).annotations({
+      description: "Broader or spacing-normalized Q&A keywords to try when an exact search is empty or too narrow.",
+      examples: [["장기 종업원 급여", "종업원급여"]],
+    }),
   }).annotations({ description: "Q&A search payload." }),
   metadata: ResultMetadataSchema,
   references: Schema.Struct({ searchUrl: SourceUrlSchema }).annotations({ description: "Operation-level source reference for the Q&A search." }),

@@ -194,7 +194,7 @@ const searchQnaCommand = buildOperationCommand<
     { key: "rows", flags: "--limit <number>", description: "[별칭] --rows와 같습니다.", integer: true },
     { key: "types", flags: "--types <csv>", description: `[선택] 숫자 Q&A 유형 ID CSV입니다. 기본값: ${qnaDefaultTypesHelpText}` },
   ],
-  notes: [qnaTypeHelpNote, "--output summary는 외부 contentLink와 긴 source-adjacent 필드를 제외하고 docNumber 중심으로 보여줍니다."],
+  notes: [qnaTypeHelpNote, "결과가 0건이면 suggestedKeywords로 더 넓은 검색어 또는 띄어쓰기 변형을 제안합니다.", "--output summary는 외부 contentLink와 긴 source-adjacent 필드를 제외하고 docNumber 중심으로 보여줍니다."],
   examples: [{ description: "리스 관련 Q&A를 검색합니다.", argv: ["--keyword", "리스", "--limit", "5"] }],
   outputModes: detailOutputModes,
   summarizeResult: (output) => ({
@@ -206,12 +206,13 @@ const searchQnaCommand = buildOperationCommand<
     paginationStatus: output.result.paginationStatus,
     countByType: output.result.countByType,
     typeLabels: output.result.typeLabels,
+    suggestedKeywords: output.result.suggestedKeywords,
     items: output.result.items.map((item) => ({
       docNumber: item.docNumber,
       type: item.type,
       typeLabel: item.typeLabel,
       title: item.title,
-      snippet: truncate(item.snippet, 240),
+      snippet: truncate(item.snippet, 160),
       tags: item.tags,
       deprecated: item.deprecated,
       ...(item.publishDate === undefined ? {} : { publishDate: item.publishDate }),
