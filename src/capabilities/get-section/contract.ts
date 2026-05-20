@@ -106,6 +106,14 @@ export const GetSectionResultSchema = Schema.Struct({
     section: Schema.Struct({
       stdNum: StdNumSchema,
       indexDocumentId: IndexDocumentIdSchema,
+      standardTitle: Schema.optional(Schema.String.annotations({
+        description: "Best-effort title of the containing standard when available from the structure index.",
+        examples: ["기업회계기준서 제1116호 리스"],
+      })),
+      standardKind: Schema.optional(Schema.String.annotations({
+        description: "Best-effort standard family or framework label when available from the structure index.",
+        examples: ["k-ifrs-standard"],
+      })),
       title: Schema.String.annotations({
         description: "Resolved section title.",
         examples: ["목적"],
@@ -131,6 +139,22 @@ export const GetSectionResultSchema = Schema.Struct({
   references: Schema.Struct({
     stdNum: StdNumSchema,
     indexDocumentId: IndexDocumentIdSchema,
+    standardTitle: Schema.optional(Schema.String.annotations({
+      description: "Best-effort title of the containing standard when available.",
+      examples: ["기업회계기준서 제1116호 리스"],
+    })),
+    standardKind: Schema.optional(Schema.String.annotations({
+      description: "Best-effort standard family or framework label when available.",
+      examples: ["k-ifrs-standard"],
+    })),
+    sectionTitle: Schema.optional(Schema.String.annotations({
+      description: "Resolved section title when available.",
+      examples: ["목적"],
+    })),
+    sectionRef: Schema.optional(Schema.String.annotations({
+      description: "Resolved section paragraph range or reference label when available.",
+      examples: ["1~2"],
+    })),
     sectionUrl: SourceUrlSchema,
   }).annotations({ description: "Operation-level source reference for the resolved section." }),
   warnings: Schema.Array(

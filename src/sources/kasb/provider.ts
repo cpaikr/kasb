@@ -161,24 +161,76 @@ const addStandardDisplayMetadata = async (
     ...(await getStandardDisplayMetadata(item.stdNum)),
   }));
 
+type StandardDisplayMetadata = Pick<SearchStandardItem, "standardTitle" | "standardKind">;
+
+type StandardStructureSnapshot = {
+  readonly sourceUrl: string;
+  readonly sections: readonly StandardSectionNode[];
+  readonly incomplete: boolean;
+};
+
+type SectionEnrichment = StandardDisplayMetadata & {
+  readonly exists: boolean;
+  readonly title?: string;
+  readonly ref?: string;
+  readonly level?: number;
+  readonly sort?: number;
+};
+
 const getStandardDisplayMetadata = async (
   stdNum: string,
-): Promise<Pick<SearchStandardItem, "standardTitle" | "standardKind">> => {
+): Promise<StandardDisplayMetadata> => {
   try {
-    const sourceUrl = standardIndexesUrl(stdNum);
-    const payload = asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "standard indexes");
-    const sourceItems = asArray(payload.standardIndexes, sourceUrl, "standardIndexes");
-    const sections = sourceItems
-      .map((item) => toSectionNode(item, sourceUrl, stdNum))
-      .filter((item): item is StandardSectionNode => item !== undefined);
-    const standardTitle = sections.find((section) => section.level === 1)?.title;
-    if (standardTitle === undefined) return {};
-    return {
-      standardTitle,
-      standardKind: inferStandardKind(standardTitle),
-    };
+    const snapshot = await fetchStandardStructureSnapshot(stdNum);
+    return getStandardDisplayMetadataFromSections(snapshot.sections);
   } catch {
     return {};
+  }
+};
+
+const fetchStandardStructureSnapshot = async (stdNum: string): Promise<StandardStructureSnapshot> => {
+  const sourceUrl = standardIndexesUrl(stdNum);
+  const payload = asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "standard indexes");
+  const sourceItems = asArray(payload.standardIndexes, sourceUrl, "standardIndexes");
+  const sections = sourceItems
+    .map((item) => toSectionNode(item, sourceUrl, stdNum))
+    .filter((item): item is StandardSectionNode => item !== undefined);
+  assertAnyNormalized(sourceItems, sections, sourceUrl, "기준서 구조 행 필드가 변경되었습니다.");
+  return {
+    sourceUrl,
+    sections,
+    incomplete: sections.length !== sourceItems.length,
+  };
+};
+
+const getStandardDisplayMetadataFromSections = (
+  sections: readonly StandardSectionNode[],
+): StandardDisplayMetadata => {
+  const standardTitle = sections.find((section) => section.level === 1)?.title;
+  if (standardTitle === undefined) return {};
+  return {
+    standardTitle,
+    standardKind: inferStandardKind(standardTitle),
+  };
+};
+
+const getOptionalSectionEnrichment = async (
+  stdNum: string,
+  indexDocumentId: string,
+): Promise<SectionEnrichment | undefined> => {
+  try {
+    const snapshot = await fetchStandardStructureSnapshot(stdNum);
+    const section = snapshot.sections.find((item) => item.indexDocumentId === indexDocumentId);
+    return {
+      ...getStandardDisplayMetadataFromSections(snapshot.sections),
+      exists: section !== undefined,
+      ...(section?.title === undefined ? {} : { title: section.title }),
+      ...(section?.ref === undefined ? {} : { ref: section.ref }),
+      ...(section?.level === undefined ? {} : { level: section.level }),
+      ...(section?.sort === undefined ? {} : { sort: section.sort }),
+    };
+  } catch {
+    return undefined;
   }
 };
 
@@ -298,15 +350,11 @@ const suggestBroaderStandardKeywords = (keyword: string): string[] => {
 };
 
 const getStandardStructure: GetStandardStructureProvider["getStructure"] = async (request) => {
-  const baseSourceUrl = standardIndexesUrl(request.stdNum);
+  const baseSnapshot = await fetchStandardStructureSnapshot(request.stdNum);
+  const baseSourceUrl = baseSnapshot.sourceUrl;
   const sourceUrl = request.keyword === undefined ? baseSourceUrl : standardIndexesUrl(request.stdNum, request.keyword);
-  const payload = asRecord(await fetchKasbJson(baseSourceUrl), baseSourceUrl, "standard indexes");
-  const sourceItems = asArray(payload.standardIndexes, baseSourceUrl, "standardIndexes");
-  const baseSections = sourceItems
-    .map((item) => toSectionNode(item, baseSourceUrl, request.stdNum))
-    .filter((item): item is StandardSectionNode => item !== undefined);
-  assertAnyNormalized(sourceItems, baseSections, baseSourceUrl, "기준서 구조 행 필드가 변경되었습니다.");
-  const incomplete = baseSections.length !== sourceItems.length;
+  const baseSections = baseSnapshot.sections;
+  const incomplete = baseSnapshot.incomplete;
 
   if (baseSections.length === 0) {
     throw new ProviderFailure({
@@ -410,10 +458,12 @@ const toSectionNode = (
   };
 };
 
-type ResolvedSectionLookup = {
+type ResolvedSectionLookup = StandardDisplayMetadata & {
   readonly indexDocumentId: string;
   readonly ref?: string;
   readonly title?: string;
+  readonly level?: number;
+  readonly sort?: number;
   readonly ambiguousRef?: boolean;
 };
 
@@ -431,13 +481,9 @@ const resolveSectionLookup = async (request: GetSectionRequest): Promise<Resolve
     });
   }
 
-  const sourceUrl = standardIndexesUrl(request.stdNum);
-  const payload = asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "standard indexes");
-  const sourceItems = asArray(payload.standardIndexes, sourceUrl, "standardIndexes");
-  const sections = sourceItems
-    .map((item) => toSectionNode(item, sourceUrl, request.stdNum))
-    .filter((item): item is StandardSectionNode => item !== undefined);
-  assertAnyNormalized(sourceItems, sections, sourceUrl, "기준서 구조 행 필드가 변경되었습니다.");
+  const snapshot = await fetchStandardStructureSnapshot(request.stdNum);
+  const sourceUrl = snapshot.sourceUrl;
+  const sections = snapshot.sections;
 
   const matches = sections.filter((section) => normalizeRef(section.ref) === normalizeRef(requestedRef));
   if (matches.length === 0) {
@@ -459,6 +505,9 @@ const resolveSectionLookup = async (request: GetSectionRequest): Promise<Resolve
     indexDocumentId: selected.indexDocumentId,
     ref: selected.ref,
     title: selected.title,
+    level: selected.level,
+    ...(selected.sort === undefined ? {} : { sort: selected.sort }),
+    ...getStandardDisplayMetadataFromSections(sections),
     ...(matches.length > 1 ? { ambiguousRef: true } : {}),
   };
 };
@@ -475,14 +524,12 @@ const getSection: GetSectionProvider["getSection"] = async (request) => {
     .filter((item): item is SectionClause => item !== undefined);
   assertAnyNormalized(sourceClauses, clauses, sourceUrl, "섹션 문단 행 필드가 변경되었습니다.");
   const incomplete = clauses.length !== sourceClauses.length;
+  const sectionEnrichment = await getOptionalSectionEnrichment(request.stdNum, lookup.indexDocumentId);
 
-  if (clauses.length === 0) {
-    const structureUrl = standardIndexesUrl(request.stdNum);
-    const structure = asRecord(await fetchKasbJson(structureUrl), structureUrl, "standard indexes");
-    const exists = asArray(structure.standardIndexes, structureUrl, "standardIndexes").some((item) =>
-      asSoftRecord(item) && toStringValue(item.documentId) === lookup.indexDocumentId,
-    );
-    if (!exists) {
+  if (clauses.length === 0 && sectionEnrichment?.exists !== true) {
+    if (sectionEnrichment === undefined) {
+      await assertSectionExists(request.stdNum, lookup.indexDocumentId, sourceUrl);
+    } else {
       throw new ProviderFailure({
         code: "not_found",
         message: "요청한 indexDocumentId 또는 ref에 해당하는 섹션을 찾을 수 없습니다. get-standard-structure를 실행해 반환된 indexDocumentId를 사용하세요. 브라우저 경로의 titleDocumentId는 v1에서 허용되지 않습니다.",
@@ -492,16 +539,22 @@ const getSection: GetSectionProvider["getSection"] = async (request) => {
     }
   }
 
-  const level = optionalNumber(payload.mainTitleLevel);
-  const sort = optionalNumber(payload.mainTitleSort);
+  const standardTitle = lookup.standardTitle ?? sectionEnrichment?.standardTitle;
+  const standardKind = lookup.standardKind ?? sectionEnrichment?.standardKind;
+  const ref = lookup.ref ?? sectionEnrichment?.ref;
+  const sectionTitle = optionalString(payload.mainTitle) ?? lookup.title ?? sectionEnrichment?.title ?? "";
+  const level = optionalNumber(payload.mainTitleLevel) ?? lookup.level ?? sectionEnrichment?.level;
+  const sort = optionalNumber(payload.mainTitleSort) ?? lookup.sort ?? sectionEnrichment?.sort;
   return {
     result: {
       request,
       section: {
         stdNum: request.stdNum,
         indexDocumentId: lookup.indexDocumentId,
-        title: optionalString(payload.mainTitle) ?? lookup.title ?? "",
-        ...(lookup.ref === undefined ? {} : { ref: lookup.ref }),
+        ...(standardTitle === undefined ? {} : { standardTitle }),
+        ...(standardKind === undefined ? {} : { standardKind }),
+        title: sectionTitle,
+        ...(ref === undefined ? {} : { ref }),
         ...(level === undefined ? {} : { level }),
         ...(sort === undefined ? {} : { sort }),
       },
@@ -512,7 +565,15 @@ const getSection: GetSectionProvider["getSection"] = async (request) => {
       textFields: ["result.clauses[].fullContent"],
       notes: ["paraContent는 원천 HTML 조각이며 fullContent는 plain text 정규화 결과입니다."],
     }),
-    references: { stdNum: request.stdNum, indexDocumentId: lookup.indexDocumentId, sectionUrl: sourceUrl },
+    references: {
+      stdNum: request.stdNum,
+      indexDocumentId: lookup.indexDocumentId,
+      ...(standardTitle === undefined ? {} : { standardTitle }),
+      ...(standardKind === undefined ? {} : { standardKind }),
+      ...(sectionTitle.length === 0 ? {} : { sectionTitle }),
+      ...(ref === undefined ? {} : { sectionRef: ref }),
+      sectionUrl: sourceUrl,
+    },
     warnings: [
       ...(lookup.ambiguousRef === true
         ? [{ code: "ambiguous_ref_resolved" as const, message: "여러 섹션이 같은 ref를 사용해 가장 구체적인 하위 섹션을 선택했습니다." }]
@@ -523,6 +584,26 @@ const getSection: GetSectionProvider["getSection"] = async (request) => {
         : []),
     ],
   };
+};
+
+const assertSectionExists = async (
+  stdNum: string,
+  indexDocumentId: string,
+  sourceUrl: string,
+): Promise<void> => {
+  const structureUrl = standardIndexesUrl(stdNum);
+  const structure = asRecord(await fetchKasbJson(structureUrl), structureUrl, "standard indexes");
+  const exists = asArray(structure.standardIndexes, structureUrl, "standardIndexes").some((item) =>
+    asSoftRecord(item) && toStringValue(item.documentId) === indexDocumentId,
+  );
+  if (!exists) {
+    throw new ProviderFailure({
+      code: "not_found",
+      message: "요청한 indexDocumentId 또는 ref에 해당하는 섹션을 찾을 수 없습니다. get-standard-structure를 실행해 반환된 indexDocumentId를 사용하세요. 브라우저 경로의 titleDocumentId는 v1에서 허용되지 않습니다.",
+      retryable: false,
+      sourceUrl,
+    });
+  }
 };
 
 const toSectionClause = (
@@ -598,21 +679,35 @@ const getParagraph: GetParagraphProvider["getParagraph"] = async (request) => {
   ) {
     throw sourceChanged(sourceUrl, "문단 응답 식별자가 요청과 일치하지 않습니다.");
   }
+  const sectionEnrichment = await getOptionalSectionEnrichment(paragraph.stdNum, paragraph.indexDocumentId);
+  const enrichedParagraph: Paragraph = {
+    ...paragraph,
+    ...(sectionEnrichment?.standardTitle === undefined ? {} : { standardTitle: sectionEnrichment.standardTitle }),
+    ...(sectionEnrichment?.standardKind === undefined ? {} : { standardKind: sectionEnrichment.standardKind }),
+    ...(sectionEnrichment?.title === undefined ? {} : { sectionTitle: sectionEnrichment.title }),
+    ...(sectionEnrichment?.ref === undefined ? {} : { sectionRef: sectionEnrichment.ref }),
+  };
   return {
-    result: { request, paragraph },
+    result: { request, paragraph: enrichedParagraph },
     metadata: metadata(sourceUrl, "complete", {
       htmlFields: ["result.paragraph.paraContent"],
       textFields: ["result.paragraph.fullContent"],
       notes: ["paraContent는 원천 HTML 조각이며 fullContent는 plain text 정규화 결과입니다."],
     }),
     references: {
-      stdNum: paragraph.stdNum,
-      paraNum: paragraph.paraNum,
-      uniqueKey: paragraph.uniqueKey,
-      indexDocumentId: paragraph.indexDocumentId,
+      stdNum: enrichedParagraph.stdNum,
+      paraNum: enrichedParagraph.paraNum,
+      uniqueKey: enrichedParagraph.uniqueKey,
+      indexDocumentId: enrichedParagraph.indexDocumentId,
+      ...(enrichedParagraph.standardTitle === undefined ? {} : { standardTitle: enrichedParagraph.standardTitle }),
+      ...(enrichedParagraph.standardKind === undefined ? {} : { standardKind: enrichedParagraph.standardKind }),
+      ...(enrichedParagraph.sectionTitle === undefined ? {} : { sectionTitle: enrichedParagraph.sectionTitle }),
+      ...(enrichedParagraph.sectionRef === undefined ? {} : { sectionRef: enrichedParagraph.sectionRef }),
       paragraphUrl: sourceUrl,
     },
-    warnings: [],
+    warnings: sectionEnrichment?.exists === true
+      ? []
+      : [{ code: "paragraph_metadata_incomplete" as const, message: "문단의 상위 기준서/섹션 metadata를 완전히 확인할 수 없습니다." }],
   };
 };
 

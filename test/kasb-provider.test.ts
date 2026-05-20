@@ -236,7 +236,18 @@ describe("KASB provider operations", () => {
       indexDocumentId: "ZB2hJW",
     });
 
-    expect(result.result.section.title).toBe("목적");
+    expect(result.result.section).toMatchObject({
+      title: "목적",
+      ref: "1~2",
+      standardTitle: "기업회계기준서 제1116호 리스",
+      standardKind: "k-ifrs-standard",
+    });
+    expect(result.references).toMatchObject({
+      standardTitle: "기업회계기준서 제1116호 리스",
+      standardKind: "k-ifrs-standard",
+      sectionTitle: "목적",
+      sectionRef: "1~2",
+    });
     expect(result.result.clauses.map((clause) => clause.paraNum)).toEqual(["1", "2"]);
     expect(result.warnings.map((warning) => warning.code)).not.toContain("source_html_preserved");
     expect(result.metadata.content?.htmlFields).toContain("result.clauses[].paraContent");
@@ -269,8 +280,20 @@ describe("KASB provider operations", () => {
   test("fetches an exact paragraph by stdNum and paraNum", async () => {
     const result = await defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" });
 
-    expect(result.result.paragraph.uniqueKey).toBe("1116-23");
-    expect(result.result.paragraph.indexDocumentId).toBe("bdbwhT");
+    expect(result.result.paragraph).toMatchObject({
+      uniqueKey: "1116-23",
+      indexDocumentId: "bdbwhT",
+      standardTitle: "기업회계기준서 제1116호 리스",
+      standardKind: "k-ifrs-standard",
+      sectionTitle: "사용권자산의 최초 측정",
+      sectionRef: "23~25",
+    });
+    expect(result.references).toMatchObject({
+      standardTitle: "기업회계기준서 제1116호 리스",
+      standardKind: "k-ifrs-standard",
+      sectionTitle: "사용권자산의 최초 측정",
+      sectionRef: "23~25",
+    });
     expect(result.result.paragraph.fullContent).toContain("사용권자산을 원가로 측정");
   });
 

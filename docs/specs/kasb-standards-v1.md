@@ -218,7 +218,7 @@ Implementation notes:
 - `inputs`
   `stdNum`, either `indexDocumentId` or `ref`, optional `keyword`
 - `output`
-  Section metadata plus ordered title/paragraph clauses. Title clauses may include source title text. Ref-based lookups return the resolved `indexDocumentId` in references and section metadata.
+  Section metadata plus ordered title/paragraph clauses. Title clauses may include source title text. Ref-based lookups return the resolved `indexDocumentId` in references and section metadata. When the structure index can be checked, section output and references also include best-effort `standardTitle`, `standardKind`, and resolved `ref` context.
 - `warnings`
   `ambiguous_ref_resolved`, `empty_section`, `partial_clause_normalization`
 - `failure cases`
@@ -244,7 +244,7 @@ Implementation notes:
 - `inputs`
   `stdNum`, `paraNum`
 - `output`
-  One paragraph record with `paraNum`, `uniqueKey`, `fullContent`, `paraContent`, and parent `indexDocumentId`.
+  One paragraph record with `paraNum`, `uniqueKey`, `fullContent`, `paraContent`, parent `indexDocumentId`, and best-effort containing-standard/section context (`standardTitle`, `standardKind`, `sectionTitle`, `sectionRef`) when the structure index can be checked.
 - `warnings`
   `paragraph_metadata_incomplete`
 - `failure cases`

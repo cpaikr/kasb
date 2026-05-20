@@ -55,6 +55,22 @@ export const ParagraphSchema = Schema.Struct({
     description: "Parent retrieval-facing section id returned by the source paragraph lookup when available.",
     examples: ["bdbwhT"],
   }),
+  standardTitle: Schema.optional(Schema.String.annotations({
+    description: "Best-effort title of the containing standard when available from the structure index.",
+    examples: ["기업회계기준서 제1116호 리스"],
+  })),
+  standardKind: Schema.optional(Schema.String.annotations({
+    description: "Best-effort standard family or framework label when available from the structure index.",
+    examples: ["k-ifrs-standard"],
+  })),
+  sectionTitle: Schema.optional(Schema.String.annotations({
+    description: "Best-effort parent section title from the structure index when available.",
+    examples: ["최초 측정"],
+  })),
+  sectionRef: Schema.optional(Schema.String.annotations({
+    description: "Best-effort parent section paragraph range or reference label when available.",
+    examples: ["23~28"],
+  })),
   paraContent: Schema.String.annotations({
     description: "Source paragraph HTML fragment preserved for verification.",
   }),
@@ -90,6 +106,22 @@ export const GetParagraphResultSchema = Schema.Struct({
       examples: ["1116-23"],
     }),
     indexDocumentId: IndexDocumentIdSchema,
+    standardTitle: Schema.optional(Schema.String.annotations({
+      description: "Best-effort title of the containing standard when available.",
+      examples: ["기업회계기준서 제1116호 리스"],
+    })),
+    standardKind: Schema.optional(Schema.String.annotations({
+      description: "Best-effort standard family or framework label when available.",
+      examples: ["k-ifrs-standard"],
+    })),
+    sectionTitle: Schema.optional(Schema.String.annotations({
+      description: "Best-effort parent section title when available.",
+      examples: ["최초 측정"],
+    })),
+    sectionRef: Schema.optional(Schema.String.annotations({
+      description: "Best-effort parent section paragraph range or reference label when available.",
+      examples: ["23~28"],
+    })),
     paragraphUrl: SourceUrlSchema,
   }).annotations({ description: "Operation-level citation and source reference for the paragraph." }),
   warnings: Schema.Array(

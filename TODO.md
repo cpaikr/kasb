@@ -12,25 +12,20 @@
   - Evidence from tryouts:
     - Comparing `충당부채` required manually discovering K-IFRS `1037` and general GAAP `14`.
     - Adding framework words such as `KIFRS` or `일반기업회계기준` often made search worse.
-    - `get-section` and `get-paragraph` outputs do not always include `standardTitle` and `standardKind`, so users must remember what `1037` or `14` means.
     - No command retrieves comparable sections across multiple standards.
   - Useful directions:
     - Add `--framework` or `--standard-kind` filter for `search-standards`, e.g. `k-ifrs`, `general-gaap`.
     - Normalize framework synonyms: `KIFRS`, `K-IFRS`, `한국채택국제회계기준`, `일반기업회계기준`.
-    - Include `standardTitle` and `standardKind` in section and paragraph retrieval outputs/references.
     - Consider a later comparison-oriented finder only after the primitive search/filter UX is solid.
 
 - JSON/content issues.
   - Evidence from tryouts:
     - Paragraph `fullContent` often collapses numbered items, e.g. `인식한다.(1)`, reducing readability and downstream summarization quality.
     - Raw `contentHtml` and `relStds` are noisy in default human-facing output, though useful for provenance.
-    - `get-section --index-document-id` and `get-section --ref` can differ in contextual fields such as `section.ref`.
-    - `get-paragraph` returns `indexDocumentId` but not section title/ref, reducing citation context.
     - Structure titles may contain preserved HTML such as `<sup>` without a warning.
   - Useful directions:
     - Improve plain-text normalization around lists, line breaks, and HTML entities.
     - Keep raw HTML available only where contractually useful; consider `--plain`, `--compact`, or `--raw` modes before expanding defaults.
-    - Include section title/ref in paragraph references when source lookup can provide it without extra brittle calls.
     - Make warnings consistent when output preserves or normalizes source HTML.
 
 ## Later
