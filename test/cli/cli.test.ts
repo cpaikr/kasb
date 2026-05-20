@@ -159,6 +159,35 @@ describe("kasb CLI", () => {
     }
   });
 
+  test("documents common structure and ref lookup examples", () => {
+    const structureHelp = runCli(["help", "get-standard-structure"]);
+    const structureStdout = decode(structureHelp.stdout);
+
+    expect(structureHelp.exitCode).toBe(0);
+    expect(decode(structureHelp.stderr)).toBe("");
+    expect(structureStdout).toContain("kasb get-standard-structure --std-num 1116 --keyword 리스 --output summary");
+    expect(structureStdout).toContain("kasb get-standard-structure --std-num 1115 --keyword 수행의무 --output summary");
+    expect(structureStdout).toContain("--keyword는 get-section --ref로 이어질 후보 섹션을 좁힐 때 사용하세요.");
+
+    const sectionHelp = runCli(["help", "get-section"]);
+    const sectionStdout = decode(sectionHelp.stdout);
+
+    expect(sectionHelp.exitCode).toBe(0);
+    expect(decode(sectionHelp.stderr)).toBe("");
+    expect(sectionStdout).toContain("kasb get-section --std-num 1116 --ref 3~4 --output summary");
+    expect(sectionStdout).toContain("kasb get-section --std-num 1116 --ref 9~17 --output summary");
+    expect(sectionStdout).toContain("kasb get-section --std-num 1019 --ref 153~158 --output summary");
+    expect(sectionStdout).toContain("kasb get-section --std-num 1115 --ref 22~30 --output summary");
+
+    const paragraphHelp = runCli(["help", "get-paragraph"]);
+    const paragraphStdout = decode(paragraphHelp.stdout);
+
+    expect(paragraphHelp.exitCode).toBe(0);
+    expect(decode(paragraphHelp.stderr)).toBe("");
+    expect(paragraphStdout).toContain("kasb get-paragraph --std-num 1116 --para-num 9");
+    expect(paragraphStdout).toContain("문단 범위(예: 9~17, 22~30)는 --para-num이 아니라 get-section --ref로 조회하세요.");
+  });
+
   test.each([
     ["search-standards", ["search-standards", "--keyword", "리스", "--limit", "1.5"], "1.5"],
     ["search-qna page", ["search-qna", "--keyword", "리스", "--page", "abc"], "abc"],

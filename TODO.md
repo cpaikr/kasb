@@ -2,17 +2,6 @@
 
 ## Now
 
-- Help needs deeper command-specific examples.
-  - Evidence from tryouts:
-    - `get-standard-structure --keyword` and `get-section --ref` are important but under-explained.
-  - Useful directions:
-    - Add command-specific examples for common tryouts:
-      - `리스` 적용범위: `1116`, ref `3~4`
-      - `리스` 식별/정의: `1116`, ref `9~17`, paragraph `9`
-      - `장기종업원급여`: `1019`, ref `153~158`
-      - `수행의무 식별`: `1115`, ref `22~30`
-    - Keep examples in CLI help rather than README command duplication unless README policy changes.
-
 - Errors need next-step guidance.
   - Evidence from tryouts:
     - `get-section --std-num 1019` says `--index-document-id` or `--ref` is required, but does not suggest running `get-standard-structure` first.

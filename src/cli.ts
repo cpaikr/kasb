@@ -81,8 +81,12 @@ const getStandardStructureCommand = buildOperationCommand<
     { key: "stdNum", flags: "--std-num <text>", description: "[필수] 기준서 번호입니다. 예: 1116" },
     { key: "keyword", flags: "--keyword <text>", description: "[선택] 구조를 검색어로 필터링합니다." },
   ],
-  notes: ["큰 구조 결과는 --output summary로 indexDocumentId, title, ref 중심의 compact JSON을 받을 수 있습니다."],
-  examples: [{ description: "제1116호 리스 기준서 구조를 조회합니다.", argv: ["--std-num", "1116"] }],
+  notes: ["큰 구조 결과는 --output summary로 indexDocumentId, title, ref 중심의 compact JSON을 받을 수 있습니다.", "--keyword는 get-section --ref로 이어질 후보 섹션을 좁힐 때 사용하세요."],
+  examples: [
+    { description: "제1116호 리스 기준서 구조를 조회합니다.", argv: ["--std-num", "1116"] },
+    { description: "리스 검색어로 제1116호 구조에서 적용범위/식별 섹션 후보를 찾습니다.", argv: ["--std-num", "1116", "--keyword", "리스", "--output", "summary"] },
+    { description: "수행의무 검색어로 제1115호 구조에서 수행의무 식별 섹션 후보를 찾습니다.", argv: ["--std-num", "1115", "--keyword", "수행의무", "--output", "summary"] },
+  ],
   outputModes: detailOutputModes,
   summarizeResult: (output) => ({
     request: output.result.request,
@@ -113,10 +117,13 @@ const getSectionCommand = buildOperationCommand<
     { key: "ref", flags: "--ref <text>", description: "[선택] 기준서 구조의 ref입니다. --index-document-id를 모를 때만 사용하세요. 예: 153~158, 21.5~21.5의3" },
     { key: "keyword", flags: "--keyword <text>", description: "[선택] 섹션 문단 하이라이트 검색어입니다." },
   ],
-  notes: ["--index-document-id 또는 --ref 중 하나가 필요합니다.", "브라우저 경로의 titleDocumentId가 아니라 standard-indexes의 indexDocumentId를 사용합니다.", "동일한 ref가 여러 섹션에 있으면 가장 구체적인 하위 섹션을 선택하고 경고를 반환합니다."],
+  notes: ["--index-document-id 또는 --ref 중 하나가 필요합니다.", "브라우저 경로의 titleDocumentId가 아니라 standard-indexes의 indexDocumentId를 사용합니다.", "ref 범위(예: 9~17, 22~30)는 get-section --ref로 조회하고, 단일 문단은 get-paragraph --para-num으로 조회하세요.", "동일한 ref가 여러 섹션에 있으면 가장 구체적인 하위 섹션을 선택하고 경고를 반환합니다."],
   examples: [
-    { description: "제1116호 목적 섹션을 조회합니다.", argv: ["--std-num", "1116", "--index-document-id", "ZB2hJW"] },
-    { description: "제1019호 기타장기종업원급여 섹션을 ref로 조회합니다.", argv: ["--std-num", "1019", "--ref", "153~158"] },
+    { description: "제1116호 목적 섹션을 indexDocumentId로 조회합니다.", argv: ["--std-num", "1116", "--index-document-id", "ZB2hJW", "--output", "summary"] },
+    { description: "리스 적용범위(ref 3~4)를 조회합니다.", argv: ["--std-num", "1116", "--ref", "3~4", "--output", "summary"] },
+    { description: "리스 식별/정의(ref 9~17)를 조회합니다.", argv: ["--std-num", "1116", "--ref", "9~17", "--output", "summary"] },
+    { description: "제1019호 장기종업원급여(ref 153~158)를 조회합니다.", argv: ["--std-num", "1019", "--ref", "153~158", "--output", "summary"] },
+    { description: "제1115호 수행의무 식별(ref 22~30)을 조회합니다.", argv: ["--std-num", "1115", "--ref", "22~30", "--output", "summary"] },
   ],
   outputModes: detailOutputModes,
   summarizeResult: (output) => ({
@@ -146,7 +153,11 @@ const getParagraphCommand = buildOperationCommand<
     { key: "stdNum", flags: "--std-num <text>", description: "[필수] 기준서 번호입니다. 예: 1116" },
     { key: "paraNum", flags: "--para-num <text>", description: "[필수] 문단 번호입니다. 예: 23, 한2.1, B3, BC240A" },
   ],
-  examples: [{ description: "제1116호 문단 23을 조회합니다.", argv: ["--std-num", "1116", "--para-num", "23"] }],
+  notes: ["문단 범위(예: 9~17, 22~30)는 --para-num이 아니라 get-section --ref로 조회하세요."],
+  examples: [
+    { description: "제1116호 문단 23을 조회합니다.", argv: ["--std-num", "1116", "--para-num", "23"] },
+    { description: "리스 식별 관련 제1116호 문단 9를 직접 조회합니다.", argv: ["--std-num", "1116", "--para-num", "9"] },
+  ],
   runOperation: (input) => defaultGetParagraphOperation.execute(input),
   writeStdout,
 });
