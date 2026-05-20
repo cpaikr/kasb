@@ -41,8 +41,9 @@ const searchStandardsCommand = buildOperationCommand<
   options: [
     { key: "keyword", flags: "--keyword <text>", description: "[필수] 검색어입니다." },
     { key: "limit", flags: "--limit <number>", description: "[기본값: 20] 반환할 기준서 수입니다.", integer: true },
+    { key: "sort", flags: "--sort <mode>", description: "[기본값: relevance] 정렬입니다: relevance, match-count, std-num, title." },
   ],
-  notes: ["정확한 용어로 결과가 좁을 때는 suggestedKeywords 또는 더 넓은 표준명 용어로 다시 검색하세요. 예: 장기종업원급여 → 종업원급여"],
+  notes: ["기본 relevance 정렬은 원천 API 순서 대신 기준서 제목 매치와 matchCount를 우선합니다.", "정확한 용어로 결과가 좁을 때는 suggestedKeywords 또는 더 넓은 표준명 용어로 다시 검색하세요. 예: 장기종업원급여 → 종업원급여"],
   examples: [{ description: "리스 관련 기준서를 검색합니다.", argv: ["--keyword", "리스"] }],
   runOperation: (input) => defaultSearchStandardsOperation.execute(input),
   writeStdout,

@@ -180,6 +180,7 @@ Observed response shapes:
 
 - `/api/standard`
   Returns `standards.stdCountObj`, `standards.totalCount`, and `standards.stdCountArr`.
+  Observed on 2026-05-20: `stdCountArr` is not relevance-ranked by `doc_count`. For example, `리스` returned K-IFRS `1116` at source rank 35 despite the highest count, `수익인식` returned `1115` at source rank 15 despite the highest count, and `충당부채` returned `1037`/general GAAP `14` at source ranks 21/41 while they were count ranks 1/2. Treat this as source/API order, not task-oriented ranking.
 - `/api/title/{stdNum}`
   Returns nested `titles[]` with title text, `ref`, sequencing fields, and route-facing `documentId`.
 - `/api/standard-indexes/{stdNum}`

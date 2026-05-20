@@ -11,7 +11,7 @@ const operations = [
   {
     operation: defaultSearchStandardsOperation,
     requiredInput: ["keyword"],
-    inputProperties: ["keyword", "limit"],
+    inputProperties: ["keyword", "limit", "sort"],
     resultProperties: ["result", "metadata", "references", "warnings"],
   },
   {

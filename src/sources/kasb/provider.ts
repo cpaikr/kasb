@@ -9,7 +9,7 @@ import type { StandardSectionNode } from "../../capabilities/get-standard-struct
 import type { SearchQnaProvider } from "../../capabilities/search-qna/provider.ts";
 import type { QnaSearchItem } from "../../capabilities/search-qna/contract.ts";
 import type { SearchStandardsProvider } from "../../capabilities/search-standards/provider.ts";
-import type { SearchStandardItem } from "../../capabilities/search-standards/contract.ts";
+import type { SearchStandardItem, SearchStandardsRequest } from "../../capabilities/search-standards/contract.ts";
 import { ProviderFailure, type ResultMetadata } from "../../capabilities/types.ts";
 import { fetchKasbJson } from "./fetch-json.ts";
 import {
@@ -82,8 +82,10 @@ const searchStandards: SearchStandardsProvider["search"] = async (request) => {
     .map((item) => toSearchStandardItem(item, sourceUrl))
     .filter((item): item is SearchStandardItem => item !== undefined);
   assertAnyNormalized(stdCountArr, items, sourceUrl, "기준서 검색 결과 필드가 변경되었습니다.");
-  const baseLimitedItems = items.slice(0, request.limit);
-  const limitedItems = await addStandardDisplayMetadata(baseLimitedItems);
+  const orderedItems = await orderSearchStandardItems(items, request);
+  const limitedItems = request.sort === "relevance" || request.sort === "title"
+    ? orderedItems.slice(0, request.limit)
+    : await addStandardDisplayMetadata(orderedItems.slice(0, request.limit));
   const incomplete = items.length !== stdCountArr.length;
 
   return {
@@ -123,15 +125,32 @@ const toSearchStandardItem = (
   };
 };
 
+const orderSearchStandardItems = async (
+  items: readonly SearchStandardItem[],
+  request: SearchStandardsRequest,
+): Promise<SearchStandardItem[]> => {
+  if (request.sort === "relevance") {
+    return sortSearchStandardItems(
+      await addStandardDisplayMetadata(items),
+      (left, right) => compareSearchRelevance(request.keyword, left, right),
+    );
+  }
+  if (request.sort === "title") {
+    return sortSearchStandardItems(await addStandardDisplayMetadata(items), compareSearchStandardTitle);
+  }
+  if (request.sort === "std-num") {
+    return sortSearchStandardItems(items, compareSearchStandardNumber);
+  }
+  return sortSearchStandardItems(items, compareSearchStandardMatchCount);
+};
+
 const addStandardDisplayMetadata = async (
   items: readonly SearchStandardItem[],
 ): Promise<SearchStandardItem[]> =>
-  Promise.all(
-    items.map(async (item) => ({
-      ...item,
-      ...(await getStandardDisplayMetadata(item.stdNum)),
-    })),
-  );
+  mapWithConcurrency(items, 8, async (item) => ({
+    ...item,
+    ...(await getStandardDisplayMetadata(item.stdNum)),
+  }));
 
 const getStandardDisplayMetadata = async (
   stdNum: string,
@@ -152,6 +171,91 @@ const getStandardDisplayMetadata = async (
   } catch {
     return {};
   }
+};
+
+const sortSearchStandardItems = (
+  items: readonly SearchStandardItem[],
+  compare: (left: SearchStandardItem, right: SearchStandardItem) => number,
+): SearchStandardItem[] => [...items].sort(compare);
+
+const compareSearchRelevance = (
+  keyword: string,
+  left: SearchStandardItem,
+  right: SearchStandardItem,
+): number =>
+  compareDescending(titleRelevanceScore(keyword, left.standardTitle), titleRelevanceScore(keyword, right.standardTitle)) ||
+  compareSearchStandardMatchCount(left, right) ||
+  compareSearchStandardNumber(left, right) ||
+  compareSearchStandardTitle(left, right);
+
+const compareSearchStandardMatchCount = (left: SearchStandardItem, right: SearchStandardItem): number =>
+  compareDescending(left.matchCount, right.matchCount) || compareSearchStandardNumber(left, right);
+
+const compareSearchStandardNumber = (left: SearchStandardItem, right: SearchStandardItem): number => {
+  const leftNumber = numericStdNum(left.stdNum);
+  const rightNumber = numericStdNum(right.stdNum);
+  if (leftNumber !== undefined && rightNumber !== undefined && leftNumber !== rightNumber) {
+    return leftNumber - rightNumber;
+  }
+  return left.stdNum.localeCompare(right.stdNum, "ko");
+};
+
+const compareSearchStandardTitle = (left: SearchStandardItem, right: SearchStandardItem): number => {
+  if (left.standardTitle === undefined && right.standardTitle === undefined) return compareSearchStandardNumber(left, right);
+  if (left.standardTitle === undefined) return 1;
+  if (right.standardTitle === undefined) return -1;
+  return left.standardTitle.localeCompare(right.standardTitle, "ko") || compareSearchStandardNumber(left, right);
+};
+
+const titleRelevanceScore = (keyword: string, standardTitle: string | undefined): number => {
+  if (standardTitle === undefined) return 0;
+  const normalizedKeyword = normalizeSearchText(keyword);
+  if (normalizedKeyword.length === 0) return 0;
+  const normalizedSubject = normalizeSearchText(stripStandardTitlePrefix(standardTitle));
+  const normalizedTitle = normalizeSearchText(standardTitle);
+  if (normalizedSubject === normalizedKeyword) return 4;
+  if (normalizedSubject.startsWith(normalizedKeyword)) return 3;
+  if (normalizedSubject.includes(normalizedKeyword)) return 2;
+  if (normalizedTitle.includes(normalizedKeyword)) return 1;
+  return 0;
+};
+
+const stripStandardTitlePrefix = (standardTitle: string): string =>
+  stripHtml(standardTitle)
+    .replace(/^기업회계기준(?:해석)?서\s*제?\s*\d+[A-Za-z]?\s*호?\s*/u, "")
+    .replace(/^한국채택국제회계기준\s*제?\s*\d+[A-Za-z]?\s*호?\s*/u, "")
+    .replace(/^일반기업회계기준\s*/u, "")
+    .replace(/^제\s*\d+\s*장\s*/u, "")
+    .trim();
+
+const normalizeSearchText = (value: string): string =>
+  stripHtml(value)
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko")
+    .replace(/[\s\-_,，.()（）「」『』·ㆍ:：]/gu, "");
+
+const numericStdNum = (stdNum: string): number | undefined => /^\d+$/u.test(stdNum) ? Number(stdNum) : undefined;
+
+const compareDescending = (left: number, right: number): number => right - left;
+
+const mapWithConcurrency = async <Input, Output>(
+  values: readonly Input[],
+  concurrency: number,
+  map: (value: Input) => Promise<Output>,
+): Promise<Output[]> => {
+  const results = new Array<Output>(values.length);
+  let nextIndex = 0;
+
+  const workers = Array.from({ length: Math.min(concurrency, values.length) }, async () => {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await map(values[index] as Input);
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
 };
 
 const inferStandardKind = (standardTitle: string): string => {

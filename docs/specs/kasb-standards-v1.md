@@ -110,6 +110,7 @@ Examples:
 | Operation | JSON field | CLI flag |
 |---|---|---|
 | `search-standards` | `keyword` | `--keyword` |
+| `search-standards` | `sort` | `--sort` |
 | `get-standard-structure` | `stdNum` | `--std-num` |
 | `get-section` | `indexDocumentId` | `--index-document-id` |
 | `get-section` | `ref` | `--ref` |
@@ -165,7 +166,7 @@ Every operation output mode still emits a JSON envelope:
 - `purpose`
   Find standards relevant to a keyword before deeper retrieval.
 - `inputs`
-  `keyword`, optional `limit`
+  `keyword`, optional `limit`, optional `sort` (`relevance`, `match-count`, `std-num`, `title`; default `relevance`)
 - `output`
   Matching standards with `stdNum`, match counts, best-effort `standardTitle` / `standardKind`, broader `suggestedKeywords`, and source references.
 - `warnings`
@@ -180,6 +181,7 @@ Implementation notes:
 - Map public `keyword` to source parameter `searchWord`.
 - Use `GET /api/standard?searchWord={keyword}`.
 - Do not hide the source's match-count behavior; expose enough metadata to explain ranking or truncation.
+- Default search UX should use relevance ranking rather than source order because observed `/api/standard` order is not `doc_count` relevance order.
 
 ### `get-standard-structure`
 

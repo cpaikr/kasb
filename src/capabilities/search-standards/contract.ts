@@ -6,9 +6,12 @@ import {
   readOptionalInteger,
   readRequiredString,
 } from "../request-validation.ts";
-import { ResultMetadataSchema, SourceUrlSchema, StdNumSchema } from "../types.ts";
+import { InvalidCapabilityRequest, ResultMetadataSchema, SourceUrlSchema, StdNumSchema } from "../types.ts";
 
-const fields = new Set(["keyword", "limit"]);
+export const searchStandardsSorts = ["relevance", "match-count", "std-num", "title"] as const;
+export type SearchStandardsSort = (typeof searchStandardsSorts)[number];
+
+const fields = new Set(["keyword", "limit", "sort"]);
 
 export const SearchStandardsRequestSchema = Schema.Struct({
   keyword: Schema.String.pipe(Schema.minLength(1)).annotations({
@@ -22,6 +25,10 @@ export const SearchStandardsRequestSchema = Schema.Struct({
     description: "Maximum number of matching standards to return, from 1 to 100.",
     examples: [10, 20],
   }),
+  sort: Schema.optionalWith(Schema.Literal(...searchStandardsSorts), { default: () => "relevance" as const }).annotations({
+    description: "Ordering for returned standards. relevance favors title matches and high match counts; match-count sorts by source hit count; std-num sorts by standard number; title sorts by enriched title.",
+    examples: ["relevance", "match-count"],
+  }),
 });
 export type SearchStandardsRawInput = typeof SearchStandardsRequestSchema.Encoded;
 export type SearchStandardsRequest = typeof SearchStandardsRequestSchema.Type;
@@ -31,10 +38,28 @@ export const resolveSearchStandardsRequest = (
 ): SearchStandardsRequest => {
   assertObjectInput(input);
   assertNoUnknownKeys(input, fields);
+  const sort = readSearchStandardsSort(input.sort);
   return {
     keyword: readRequiredString(input, "keyword"),
     limit: readOptionalInteger(input, "limit", { defaultValue: 20, min: 1, max: 100 }),
+    sort,
   };
+};
+
+const readSearchStandardsSort = (value: unknown): SearchStandardsSort => {
+  if (value === undefined) return "relevance";
+  if (typeof value !== "string") {
+    throw new InvalidCapabilityRequest({
+      parameter: "sort",
+      message: '매개변수 "sort"은(는) 문자열이어야 합니다.',
+    });
+  }
+  const trimmed = value.trim();
+  if (searchStandardsSorts.includes(trimmed as SearchStandardsSort)) return trimmed as SearchStandardsSort;
+  throw new InvalidCapabilityRequest({
+    parameter: "sort",
+    message: `매개변수 "sort"은(는) ${searchStandardsSorts.join(", ")} 중 하나여야 합니다.`,
+  });
 };
 
 export const SearchStandardItemSchema = Schema.Struct({

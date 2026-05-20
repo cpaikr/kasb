@@ -41,6 +41,15 @@ const useFixtureMap = (fixtureByPath: Map<string, unknown>): void => {
   }) as typeof fetch;
 };
 
+const standardSearchPath = (keyword: string): string => {
+  const params = new URLSearchParams({ searchWord: keyword });
+  return `/api/standard?${params.toString()}`;
+};
+
+const standardTitleFixture = (stdNum: string, title: string): unknown => ({
+  standardIndexes: [{ documentId: `${stdNum}-root`, stdNum, title, level: 1, parentDocumentIds: [] }],
+});
+
 beforeEach(() => {
   useFixtureMap(makeFixtureMap());
 });
@@ -50,13 +59,92 @@ afterEach(() => {
 });
 
 describe("KASB provider operations", () => {
-  test("searches standards from the captured standard fixture", async () => {
+  test("searches standards from the captured standard fixture with relevance ranking", async () => {
     const result = await defaultSearchStandardsOperation.execute({ keyword: "리스", limit: 2 });
 
     expect(result.result.totalMatchCount).toBe(1043);
+    expect(result.result.request.sort).toBe("relevance");
     expect(result.result.returnedCount).toBe(2);
-    expect(result.result.standards[0]?.stdNum).toBe("1017");
+    expect(result.result.standards[0]).toMatchObject({ stdNum: "1116", matchCount: 519 });
     expect(result.warnings[0]?.code).toBe("truncated_results");
+  });
+
+  test("can sort standards by match count or standard number", async () => {
+    const byMatchCount = await defaultSearchStandardsOperation.execute({ keyword: "리스", limit: 1, sort: "match-count" });
+    const byStdNum = await defaultSearchStandardsOperation.execute({ keyword: "리스", limit: 2, sort: "std-num" });
+
+    expect(byMatchCount.result.standards[0]).toMatchObject({ stdNum: "1116", matchCount: 519 });
+    expect(byStdNum.result.standards.map((item) => item.stdNum)).toEqual(["3", "4"]);
+  });
+
+  test("sorts standards by enriched title with missing titles last", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(standardSearchPath("정렬"), {
+      standards: { totalCount: 3, stdCountArr: [{ key: "300", doc_count: 99 }, { key: "200", doc_count: 1 }, { key: "100", doc_count: 5 }] },
+    });
+    fixtures.set("/api/standard-indexes/200", standardTitleFixture("200", "나 기준"));
+    fixtures.set("/api/standard-indexes/100", standardTitleFixture("100", "가 기준"));
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchStandardsOperation.execute({ keyword: "정렬", limit: 3, sort: "title" });
+
+    expect(result.result.standards.map((item) => item.stdNum)).toEqual(["100", "200", "300"]);
+    expect(result.result.standards[2]?.standardTitle).toBeUndefined();
+  });
+
+  test("lets normalized title relevance beat higher match counts", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(standardSearchPath("수익 인식"), {
+      standards: { totalCount: 2, stdCountArr: [{ key: "900", doc_count: 1000 }, { key: "1115", doc_count: 1 }] },
+    });
+    fixtures.set("/api/standard-indexes/1115", standardTitleFixture("1115", "기업회계기준서 제1115호 수익-인식"));
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchStandardsOperation.execute({ keyword: "수익 인식", limit: 2 });
+
+    expect(result.result.standards.map((item) => item.stdNum)).toEqual(["1115", "900"]);
+  });
+
+  test.each([
+    {
+      keyword: "리스",
+      rows: [{ key: "1017", doc_count: 97 }, { key: "1116", doc_count: 519 }, { key: "13", doc_count: 120 }],
+      titles: { "1116": "기업회계기준서 제1116호 리스", "13": "제13장 리스" },
+      limit: 1,
+      expected: ["1116"],
+    },
+    {
+      keyword: "수익인식",
+      rows: [{ key: "1011", doc_count: 4 }, { key: "16", doc_count: 21 }, { key: "1115", doc_count: 132 }],
+      titles: { "1115": "기업회계기준서 제1115호 고객과의 계약에서 생기는 수익" },
+      limit: 1,
+      expected: ["1115"],
+    },
+    {
+      keyword: "충당부채",
+      rows: [{ key: "10", doc_count: 9 }, { key: "1037", doc_count: 77 }, { key: "14", doc_count: 34 }, { key: "21", doc_count: 25 }],
+      titles: { "1037": "기업회계기준서 제1037호 충당부채, 우발부채, 우발자산", "14": "제14장 충당부채, 우발부채 및 우발자산" },
+      limit: 2,
+      expected: ["1037", "14"],
+    },
+    {
+      keyword: "종업원급여",
+      rows: [{ key: "1103", doc_count: 14 }, { key: "1019", doc_count: 80 }, { key: "21", doc_count: 12 }],
+      titles: { "1019": "기업회계기준서 제1019호 종업원급여" },
+      limit: 1,
+      expected: ["1019"],
+    },
+  ] as const)("keeps core target standards in the default page for $keyword", async ({ keyword, rows, titles, limit, expected }) => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(standardSearchPath(keyword), { standards: { totalCount: 999, stdCountArr: rows } });
+    for (const [stdNum, title] of Object.entries(titles)) {
+      fixtures.set(`/api/standard-indexes/${stdNum}`, standardTitleFixture(stdNum, title));
+    }
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchStandardsOperation.execute({ keyword, limit });
+
+    expect(result.result.standards.map((item) => item.stdNum)).toEqual([...expected]);
   });
 
   test("enriches standard search rows with available titles", async () => {

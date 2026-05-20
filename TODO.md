@@ -2,17 +2,12 @@
 
 ## Now
 
-- Search ranking is the biggest blocker.
-  - Evidence from tryouts:
-    - `search-standards --keyword 리스 --limit 10` did not surface K-IFRS `1116`; `1116` appeared only with a much larger limit despite the strongest match count.
-    - `search-standards --keyword 수익인식 --limit 10` did not surface `1115`; it appeared around rank 15 with larger limits.
-    - `search-standards --keyword 충당부채` missed core comparison targets in the default page: K-IFRS `1037` and general GAAP `14`.
-    - Some results lack `standardTitle`, making ranking mistakes harder for users to correct.
-  - Useful directions:
-    - Rank exact/current title matches and high `matchCount` before incidental hits.
-    - Consider a `--sort relevance|match-count|std-num|title` option if source order must stay inspectable.
-    - Add tests around representative searches: `리스`, `수익인식`, `충당부채`, `종업원급여`.
-    - Keep source order available only if there is a concrete reason; default UX should favor task completion.
+- Search ranking follow-up.
+  - Default `search-standards` now ranks by relevance, adds `--sort relevance|match-count|std-num|title`, and has representative tests for `리스`, `수익인식`, `충당부채`, and `종업원급여`.
+  - Remaining useful checks:
+    - Monitor live KASB ordering/source drift for ranking regressions.
+    - Revisit whether source order deserves an explicit sort mode only if users need to inspect upstream order.
+    - Continue improving title enrichment where source metadata is unavailable.
 
 - Help lacks end-to-end workflows.
   - Evidence from tryouts:

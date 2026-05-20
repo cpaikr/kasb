@@ -114,9 +114,16 @@ describe("capability request validation", () => {
     });
   });
 
-  test("applies integer defaults", () => {
-    expect(resolveSearchStandardsRequest({ keyword: "리스" }).limit).toBe(20);
+  test("applies request defaults", () => {
+    expect(resolveSearchStandardsRequest({ keyword: "리스" })).toMatchObject({ limit: 20, sort: "relevance" });
     expect(resolveSearchQnaRequest({ keyword: "리스" })).toMatchObject({ page: 1, rows: 10 });
+  });
+
+  test("rejects unsupported search-standards sort modes", () => {
+    expectInvalid(
+      () => resolveSearchStandardsRequest({ keyword: "리스", sort: "source" } as Record<string, unknown>),
+      { parameter: "sort", messageIncludes: "relevance, match-count, std-num, title" },
+    );
   });
 
   test("normalizes source-facing Q&A type CSV", () => {

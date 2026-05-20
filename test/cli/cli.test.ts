@@ -41,6 +41,7 @@ describe("kasb CLI", () => {
     expect(decode(result.stderr)).toBe("");
     expect(stdout).toContain("Usage: kasb search-standards [options]");
     expect(stdout).toContain("--limit <number>");
+    expect(stdout).toContain("--sort <mode>");
   });
 
   test.each([
