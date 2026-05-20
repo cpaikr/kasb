@@ -288,6 +288,27 @@ describe("KASB provider operations", () => {
     expect(result.result.typeLabels["15"]).toBe("K-IFRS · 신속처리질의");
   });
 
+  test("removes repeated source undefined placeholders from Q&A search snippets", async () => {
+    const fixtures = makeFixtureMap();
+    const qnaSearch = clone(readFixture("fixtures/kasb/search-qna-lease.json")) as {
+      facilityQnas: Array<Record<string, unknown>>;
+    };
+    qnaSearch.facilityQnas[0] = {
+      ...qnaSearch.facilityQnas[0],
+      fullContent_snippet: "본문 마지막 문장입니다.<em>undefined</em> <em>undefined</em> undefined",
+    };
+    fixtures.set(
+      "/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=5",
+      qnaSearch,
+    );
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5 });
+
+    expect(result.result.items[0]?.snippet).toBe("본문 마지막 문장입니다.");
+    expect(result.result.items[0]?.snippet).not.toContain("undefined");
+  });
+
   test("derives Q&A pagination totals from requested type buckets", async () => {
     const fixtures = makeFixtureMap();
     fixtures.set(
