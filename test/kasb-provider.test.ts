@@ -331,6 +331,25 @@ describe("KASB provider operations", () => {
     expect(result.result.qna.title).toBe("리스 개시일과 계약일");
   });
 
+  test("removes repeated source undefined placeholders from Q&A fullContent", async () => {
+    const fixtures = makeFixtureMap();
+    const qna = clone(readFixture("fixtures/kasb/qna-SSI-35629.json")) as {
+      facilityQna: Record<string, unknown>;
+    };
+    qna.facilityQna = {
+      ...qna.facilityQna,
+      docNumber: "2024-I-KQA007",
+      fullContent: "본문 마지막 문장입니다.undefined undefined undefined",
+    };
+    fixtures.set("/api/qnas/v2/2024-I-KQA007", qna);
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetQnaOperation.execute({ docNumber: "2024-I-KQA007" });
+
+    expect(result.result.qna.fullContent).toBe("본문 마지막 문장입니다.");
+    expect(result.result.qna.fullContent).not.toContain("undefined");
+  });
+
   test("classifies 200 OK non-JSON source responses as source_changed", async () => {
     globalThis.fetch = (async () => ({
       ok: true,

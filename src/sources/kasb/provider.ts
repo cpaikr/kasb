@@ -789,7 +789,7 @@ const toQna = (value: unknown, sourceUrl: string): Qna => {
     type,
     typeLabel: qnaTypeLabel(type),
     title: stripHtml(arrayText(item.title) || optionalString(item.title) || docNumber),
-    fullContent,
+    fullContent: normalizeQnaFullContent(fullContent),
     tags,
     deprecated: optionalNumber(item.deprecatedYn) === 1,
     ...(id === undefined ? {} : { id }),
@@ -802,6 +802,9 @@ const toQna = (value: unknown, sourceUrl: string): Qna => {
     ...(nextDocNumber === undefined ? {} : { nextDocNumber }),
   };
 };
+
+const normalizeQnaFullContent = (fullContent: string): string =>
+  fullContent.replace(/(?:\bundefined\b\s*){2,}$/u, "").trim();
 
 const assertAnyNormalized = (
   sourceItems: readonly unknown[],
