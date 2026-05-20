@@ -343,6 +343,75 @@ describe("KASB provider operations", () => {
     expect(result.result.paragraph.fullContent).toContain("사용권자산을 원가로 측정");
   });
 
+  test("normalizes paragraph plain text around source list markers and entities", async () => {
+    const fixtures = makeFixtureMap();
+    const paragraph = clone(readFixture("fixtures/kasb/paragraph-1116-23.json")) as {
+      paraContents: Array<Record<string, unknown>>;
+    };
+    paragraph.paraContents[0] = {
+      ...paragraph.paraContents[0],
+      fullContent: "리스이용자는 다음 금액을 인식한다.(1)리스료 &amp; 선급리스료이다.(2)복구원가",
+    };
+    fixtures.set("/api/paragraphs/content/1116/23", paragraph);
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" });
+
+    expect(result.result.paragraph.fullContent).toBe("리스이용자는 다음 금액을 인식한다.\n(1) 리스료 & 선급리스료이다.\n(2) 복구원가");
+  });
+
+  test("does not split parenthetical paragraph references as list markers", async () => {
+    const fixtures = makeFixtureMap();
+    const paragraph = clone(readFixture("fixtures/kasb/paragraph-1116-23.json")) as {
+      paraContents: Array<Record<string, unknown>>;
+    };
+    paragraph.paraContents[0] = {
+      ...paragraph.paraContents[0],
+      fullContent: "문단 (1)의 요구사항과 (2)의 예외",
+    };
+    fixtures.set("/api/paragraphs/content/1116/23", paragraph);
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" });
+
+    expect(result.result.paragraph.fullContent).toBe("문단 (1)의 요구사항과 (2)의 예외");
+  });
+
+  test("normalizes indented line-start list markers", async () => {
+    const fixtures = makeFixtureMap();
+    const paragraph = clone(readFixture("fixtures/kasb/paragraph-1116-23.json")) as {
+      paraContents: Array<Record<string, unknown>>;
+    };
+    paragraph.paraContents[0] = {
+      ...paragraph.paraContents[0],
+      fullContent: "리스 조건은 다음과 같다.\n\t(가)리스료\n  (나)복구원가",
+    };
+    fixtures.set("/api/paragraphs/content/1116/23", paragraph);
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" });
+
+    expect(result.result.paragraph.fullContent).toBe("리스 조건은 다음과 같다.\n(가) 리스료\n(나) 복구원가");
+  });
+
+  test("derives normalized section fullContent from paragraph HTML when source text is absent", async () => {
+    const fixtures = makeFixtureMap();
+    const section = clone(readFixture("fixtures/kasb/section-1116-ZB2hJW.json")) as {
+      clauses: Array<Record<string, unknown>>;
+    };
+    delete section.clauses[0]?.fullContent;
+    section.clauses[0] = {
+      ...section.clauses[0],
+      paraContent: "<div>리스이용자는 다음 금액을 인식한다.<br>(1)&nbsp;리스료 &amp; 선급리스료</div>",
+    };
+    fixtures.set("/api/paragraphs/1116/ZB2hJW", section);
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetSectionOperation.execute({ stdNum: "1116", indexDocumentId: "ZB2hJW" });
+
+    expect(result.result.clauses[0]?.fullContent).toBe("리스이용자는 다음 금액을 인식한다.\n(1) 리스료 & 선급리스료");
+  });
+
   test("searches Q&A documents from the qnas fixture", async () => {
     const result = await defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5 });
 

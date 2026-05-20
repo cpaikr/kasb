@@ -19,6 +19,7 @@ import {
   optionalNumber,
   optionalString,
   sourceChanged,
+  normalizeKasbPlainText,
   stripHtml,
   toStringValue,
 } from "./source-helpers.ts";
@@ -641,7 +642,10 @@ const toSectionClause = (
   const paraNum = toStringValue(value.paraNum);
   const title = optionalString(value.title);
   const paraContent = optionalString(value.paraContent);
-  const fullContent = optionalString(value.fullContent) ?? (paraContent === undefined ? undefined : stripHtml(paraContent));
+  const sourceFullContent = optionalString(value.fullContent);
+  const fullContent = sourceFullContent === undefined
+    ? (paraContent === undefined ? undefined : normalizeKasbPlainText(paraContent))
+    : normalizeKasbPlainText(sourceFullContent);
   const uniqueKey = toStringValue(value.uniqueKey);
   const sort = optionalNumber(value.sort);
   const faqDocNumbers = optionalString(value.faqDocNumbers);
@@ -736,7 +740,8 @@ const toParagraph = (value: unknown, sourceUrl: string): Paragraph => {
   const uniqueKey = toStringValue(item.uniqueKey);
   const indexDocumentId = toStringValue(item.documentId);
   const paraContent = optionalString(item.paraContent);
-  const fullContent = optionalString(item.fullContent);
+  const sourceFullContent = optionalString(item.fullContent);
+  const fullContent = sourceFullContent === undefined ? undefined : normalizeKasbPlainText(sourceFullContent);
   if (
     stdNum === undefined ||
     paraNum === undefined ||

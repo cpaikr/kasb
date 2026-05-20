@@ -20,11 +20,9 @@
 
 - JSON/content issues.
   - Evidence from tryouts:
-    - Paragraph `fullContent` often collapses numbered items, e.g. `인식한다.(1)`, reducing readability and downstream summarization quality.
     - Raw `contentHtml` and `relStds` are noisy in default human-facing output, though useful for provenance.
     - Structure titles may contain preserved HTML such as `<sup>` without a warning.
   - Useful directions:
-    - Improve plain-text normalization around lists, line breaks, and HTML entities.
     - Keep raw HTML available only where contractually useful; consider `--plain`, `--compact`, or `--raw` modes before expanding defaults.
     - Make warnings consistent when output preserves or normalizes source HTML.
 
