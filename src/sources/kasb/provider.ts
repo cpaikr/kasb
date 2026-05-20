@@ -166,6 +166,7 @@ type StandardDisplayMetadata = Pick<SearchStandardItem, "standardTitle" | "stand
 type StandardStructureSnapshot = {
   readonly sourceUrl: string;
   readonly sections: readonly StandardSectionNode[];
+  readonly indexDocumentIds: ReadonlySet<string>;
   readonly incomplete: boolean;
 };
 
@@ -195,10 +196,16 @@ const fetchStandardStructureSnapshot = async (stdNum: string): Promise<StandardS
   const sections = sourceItems
     .map((item) => toSectionNode(item, sourceUrl, stdNum))
     .filter((item): item is StandardSectionNode => item !== undefined);
+  const indexDocumentIds = new Set(
+    sourceItems
+      .map((item) => toRawStructureIndexDocumentId(item, sourceUrl, stdNum))
+      .filter((item): item is string => item !== undefined),
+  );
   assertAnyNormalized(sourceItems, sections, sourceUrl, "기준서 구조 행 필드가 변경되었습니다.");
   return {
     sourceUrl,
     sections,
+    indexDocumentIds,
     incomplete: sections.length !== sourceItems.length,
   };
 };
@@ -214,21 +221,28 @@ const getStandardDisplayMetadataFromSections = (
   };
 };
 
+const getSectionEnrichmentFromSnapshot = (
+  snapshot: StandardStructureSnapshot,
+  indexDocumentId: string,
+): SectionEnrichment => {
+  const section = snapshot.sections.find((item) => item.indexDocumentId === indexDocumentId);
+  return {
+    ...getStandardDisplayMetadataFromSections(snapshot.sections),
+    exists: section !== undefined || snapshot.indexDocumentIds.has(indexDocumentId),
+    ...(section?.title === undefined ? {} : { title: section.title }),
+    ...(section?.ref === undefined ? {} : { ref: section.ref }),
+    ...(section?.level === undefined ? {} : { level: section.level }),
+    ...(section?.sort === undefined ? {} : { sort: section.sort }),
+  };
+};
+
 const getOptionalSectionEnrichment = async (
   stdNum: string,
   indexDocumentId: string,
 ): Promise<SectionEnrichment | undefined> => {
   try {
     const snapshot = await fetchStandardStructureSnapshot(stdNum);
-    const section = snapshot.sections.find((item) => item.indexDocumentId === indexDocumentId);
-    return {
-      ...getStandardDisplayMetadataFromSections(snapshot.sections),
-      exists: section !== undefined,
-      ...(section?.title === undefined ? {} : { title: section.title }),
-      ...(section?.ref === undefined ? {} : { ref: section.ref }),
-      ...(section?.level === undefined ? {} : { level: section.level }),
-      ...(section?.sort === undefined ? {} : { sort: section.sort }),
-    };
+    return getSectionEnrichmentFromSnapshot(snapshot, indexDocumentId);
   } catch {
     return undefined;
   }
@@ -425,21 +439,32 @@ const filterSectionsBySearchMetadata = (
   return sections.filter((section) => matchedIndexDocumentIds.has(section.indexDocumentId));
 };
 
+const toRawStructureIndexDocumentId = (
+  value: unknown,
+  sourceUrl: string,
+  expectedStdNum: string,
+): string | undefined => {
+  if (!asSoftRecord(value)) return undefined;
+  const indexDocumentId = toStringValue(value.documentId);
+  const stdNum = toStringValue(value.stdNum);
+  if (indexDocumentId === undefined || stdNum === undefined) return undefined;
+  if (stdNum !== expectedStdNum) {
+    throw sourceChanged(sourceUrl, "기준서 구조 행의 stdNum이 요청과 일치하지 않습니다.");
+  }
+  return indexDocumentId;
+};
+
 const toSectionNode = (
   value: unknown,
   sourceUrl: string,
   expectedStdNum: string,
 ): StandardSectionNode | undefined => {
   if (!asSoftRecord(value)) return undefined;
-  const indexDocumentId = toStringValue(value.documentId);
-  const stdNum = toStringValue(value.stdNum);
+  const indexDocumentId = toRawStructureIndexDocumentId(value, sourceUrl, expectedStdNum);
   const title = optionalString(value.title);
   const level = optionalNumber(value.level);
-  if (indexDocumentId === undefined || stdNum === undefined || title === undefined || level === undefined) {
+  if (indexDocumentId === undefined || title === undefined || level === undefined) {
     return undefined;
-  }
-  if (stdNum !== expectedStdNum) {
-    throw sourceChanged(sourceUrl, "기준서 구조 행의 stdNum이 요청과 일치하지 않습니다.");
   }
   const parentDocumentIds = Array.isArray(value.parentDocumentIds)
     ? value.parentDocumentIds.map(toStringValue).filter((item): item is string => item !== undefined)
@@ -448,7 +473,7 @@ const toSectionNode = (
   const sort = optionalNumber(value.sort);
   return {
     indexDocumentId,
-    stdNum,
+    stdNum: expectedStdNum,
     title,
     ref: optionalString(value.ref) ?? "",
     level,
@@ -458,12 +483,9 @@ const toSectionNode = (
   };
 };
 
-type ResolvedSectionLookup = StandardDisplayMetadata & {
+type ResolvedSectionLookup = {
   readonly indexDocumentId: string;
-  readonly ref?: string;
-  readonly title?: string;
-  readonly level?: number;
-  readonly sort?: number;
+  readonly sectionEnrichment?: SectionEnrichment;
   readonly ambiguousRef?: boolean;
 };
 
@@ -503,11 +525,7 @@ const resolveSectionLookup = async (request: GetSectionRequest): Promise<Resolve
   }
   return {
     indexDocumentId: selected.indexDocumentId,
-    ref: selected.ref,
-    title: selected.title,
-    level: selected.level,
-    ...(selected.sort === undefined ? {} : { sort: selected.sort }),
-    ...getStandardDisplayMetadataFromSections(sections),
+    sectionEnrichment: getSectionEnrichmentFromSnapshot(snapshot, selected.indexDocumentId),
     ...(matches.length > 1 ? { ambiguousRef: true } : {}),
   };
 };
@@ -524,7 +542,7 @@ const getSection: GetSectionProvider["getSection"] = async (request) => {
     .filter((item): item is SectionClause => item !== undefined);
   assertAnyNormalized(sourceClauses, clauses, sourceUrl, "섹션 문단 행 필드가 변경되었습니다.");
   const incomplete = clauses.length !== sourceClauses.length;
-  const sectionEnrichment = await getOptionalSectionEnrichment(request.stdNum, lookup.indexDocumentId);
+  const sectionEnrichment = lookup.sectionEnrichment ?? (await getOptionalSectionEnrichment(request.stdNum, lookup.indexDocumentId));
 
   if (clauses.length === 0 && sectionEnrichment?.exists !== true) {
     if (sectionEnrichment === undefined) {
@@ -539,12 +557,12 @@ const getSection: GetSectionProvider["getSection"] = async (request) => {
     }
   }
 
-  const standardTitle = lookup.standardTitle ?? sectionEnrichment?.standardTitle;
-  const standardKind = lookup.standardKind ?? sectionEnrichment?.standardKind;
-  const ref = lookup.ref ?? sectionEnrichment?.ref;
-  const sectionTitle = optionalString(payload.mainTitle) ?? lookup.title ?? sectionEnrichment?.title ?? "";
-  const level = optionalNumber(payload.mainTitleLevel) ?? lookup.level ?? sectionEnrichment?.level;
-  const sort = optionalNumber(payload.mainTitleSort) ?? lookup.sort ?? sectionEnrichment?.sort;
+  const standardTitle = sectionEnrichment?.standardTitle;
+  const standardKind = sectionEnrichment?.standardKind;
+  const ref = sectionEnrichment?.ref;
+  const sectionTitle = optionalString(payload.mainTitle) ?? sectionEnrichment?.title ?? "";
+  const level = optionalNumber(payload.mainTitleLevel) ?? sectionEnrichment?.level;
+  const sort = optionalNumber(payload.mainTitleSort) ?? sectionEnrichment?.sort;
   return {
     result: {
       request,
@@ -593,8 +611,8 @@ const assertSectionExists = async (
 ): Promise<void> => {
   const structureUrl = standardIndexesUrl(stdNum);
   const structure = asRecord(await fetchKasbJson(structureUrl), structureUrl, "standard indexes");
-  const exists = asArray(structure.standardIndexes, structureUrl, "standardIndexes").some((item) =>
-    asSoftRecord(item) && toStringValue(item.documentId) === indexDocumentId,
+  const exists = asArray(structure.standardIndexes, structureUrl, "standardIndexes").some(
+    (item) => toRawStructureIndexDocumentId(item, structureUrl, stdNum) === indexDocumentId,
   );
   if (!exists) {
     throw new ProviderFailure({

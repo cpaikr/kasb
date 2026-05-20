@@ -29,16 +29,19 @@ const makeFixtureMap = (): Map<string, unknown> => new Map([
 
 const clone = <T>(value: T): T => structuredClone(value);
 
-const useFixtureMap = (fixtureByPath: Map<string, unknown>): void => {
+const useFixtureMap = (fixtureByPath: Map<string, unknown>): Map<string, number> => {
+  const requestCounts = new Map<string, number>();
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = new URL(String(input));
     const key = `${url.pathname}${url.search}`;
+    requestCounts.set(key, (requestCounts.get(key) ?? 0) + 1);
     const payload = fixtureByPath.get(key);
     if (payload === undefined) {
       return { ok: false, status: 404, json: async () => ({}) } as Response;
     }
     return { ok: true, status: 200, json: async () => payload } as Response;
   }) as typeof fetch;
+  return requestCounts;
 };
 
 const standardSearchPath = (keyword: string): string => {
@@ -254,6 +257,8 @@ describe("KASB provider operations", () => {
   });
 
   test("fetches a section by structure ref", async () => {
+    const requestCounts = useFixtureMap(makeFixtureMap());
+
     const result = await defaultGetSectionOperation.execute({
       stdNum: "1116",
       ref: "1~2",
@@ -266,6 +271,7 @@ describe("KASB provider operations", () => {
     });
     expect(result.references.indexDocumentId).toBe("ZB2hJW");
     expect(result.result.clauses.map((clause) => clause.paraNum)).toEqual(["1", "2"]);
+    expect(requestCounts.get("/api/standard-indexes/1116")).toBe(1);
   });
 
   test("rejects a route-facing titleDocumentId that is not a section id", async () => {
@@ -274,6 +280,46 @@ describe("KASB provider operations", () => {
     ).rejects.toMatchObject({
       code: "not_found",
       message: expect.stringContaining("titleDocumentId"),
+    });
+  });
+
+  test("treats partially malformed structure rows as existing empty sections", async () => {
+    const emptySectionId = "empty-malformed";
+    const fixtures = makeFixtureMap();
+    const structure = clone(readFixture("fixtures/kasb/standard-indexes-1116.json")) as {
+      standardIndexes: unknown[];
+    };
+    structure.standardIndexes = [structure.standardIndexes[0], { documentId: emptySectionId, stdNum: "1116" }];
+    fixtures.set("/api/standard-indexes/1116", structure);
+    fixtures.set(`/api/paragraphs/1116/${emptySectionId}`, { status: 200, clauses: [], mainTitle: null });
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetSectionOperation.execute({ stdNum: "1116", indexDocumentId: emptySectionId });
+
+    expect(result.result.section.indexDocumentId).toBe(emptySectionId);
+    expect(result.result.clauses).toEqual([]);
+    expect(result.warnings.map((warning) => warning.code)).toContain("empty_section");
+  });
+
+  test("rejects mismatched raw structure identity for empty sections", async () => {
+    const wrongStandardSectionId = "wrong-std";
+    const fixtures = makeFixtureMap();
+    const structure = clone(readFixture("fixtures/kasb/standard-indexes-1116.json")) as {
+      standardIndexes: unknown[];
+    };
+    structure.standardIndexes = [
+      structure.standardIndexes[0],
+      { documentId: wrongStandardSectionId, stdNum: "9999" },
+    ];
+    fixtures.set("/api/standard-indexes/1116", structure);
+    fixtures.set(`/api/paragraphs/1116/${wrongStandardSectionId}`, { status: 200, clauses: [], mainTitle: null });
+    useFixtureMap(fixtures);
+
+    await expect(
+      defaultGetSectionOperation.execute({ stdNum: "1116", indexDocumentId: wrongStandardSectionId }),
+    ).rejects.toMatchObject({
+      code: "source_changed",
+      message: "기준서 구조 행의 stdNum이 요청과 일치하지 않습니다.",
     });
   });
 
