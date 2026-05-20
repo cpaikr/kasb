@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
+import { defaultObservedQnaTypeIds } from "../../src/capabilities/qna-types.ts";
+
 const repoRoot = join(import.meta.dir, "..", "..");
 
 const decode = (value: Uint8Array<ArrayBufferLike>) => new TextDecoder().decode(value);
@@ -153,6 +155,7 @@ describe("kasb CLI", () => {
 
     expect(result.exitCode).toBe(0);
     expect(decode(result.stderr)).toBe("");
+    expect(stdout).toContain(`기본값: ${defaultObservedQnaTypeIds.join(",")}`);
     expect(stdout).toContain("Q&A 유형:");
     expect(stdout).toContain("15 K-IFRS 신속처리질의");
     expect(stdout).toContain("24 일반기업회계기준 금융감독원");

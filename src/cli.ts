@@ -12,7 +12,7 @@ import type { GetSectionRawInput, GetSectionResult } from "./capabilities/get-se
 import type { GetStandardStructureRawInput, GetStandardStructureResult } from "./capabilities/get-standard-structure/contract.ts";
 import type { SearchQnaRawInput, SearchQnaResult } from "./capabilities/search-qna/contract.ts";
 import type { SearchStandardItem, SearchStandardsRawInput, SearchStandardsResult } from "./capabilities/search-standards/contract.ts";
-import { observedQnaTypeLabels } from "./capabilities/qna-types.ts";
+import { defaultObservedQnaTypeIds, observedQnaTypeLabels } from "./capabilities/qna-types.ts";
 import { configureCliTransport, renderCliFailureJson, type CliErrorDetails } from "./cli/command-helpers.ts";
 import { buildOperationCommand } from "./cli/commands/shared.ts";
 
@@ -28,6 +28,7 @@ const shouldPrettyPrintJson = (argv: readonly string[]): boolean => argv.include
 
 const detailOutputModes = ["summary", "structured", "raw"] as const;
 
+const qnaDefaultTypesHelpText = defaultObservedQnaTypeIds.join(",");
 const qnaTypeHelpNote = `Q&A 유형: ${Object.entries(observedQnaTypeLabels)
   .map(([type, label]) => `${type} ${label.replace(" · ", " ")}`)
   .join(", ")}.`;
@@ -191,7 +192,7 @@ const searchQnaCommand = buildOperationCommand<
     { key: "page", flags: "--page <number>", description: "[기본값: 1] 결과 페이지입니다.", integer: true },
     { key: "rows", flags: "--rows <number>", description: "[기본값: 10] 반환할 Q&A 수입니다(최대 50).", integer: true },
     { key: "rows", flags: "--limit <number>", description: "[별칭] --rows와 같습니다.", integer: true },
-    { key: "types", flags: "--types <csv>", description: "[선택] 숫자 Q&A 유형 ID CSV입니다. 기본값: 11,12,13,14,15,24,25" },
+    { key: "types", flags: "--types <csv>", description: `[선택] 숫자 Q&A 유형 ID CSV입니다. 기본값: ${qnaDefaultTypesHelpText}` },
   ],
   notes: [qnaTypeHelpNote, "--output summary는 외부 contentLink와 긴 source-adjacent 필드를 제외하고 docNumber 중심으로 보여줍니다."],
   examples: [{ description: "리스 관련 Q&A를 검색합니다.", argv: ["--keyword", "리스", "--limit", "5"] }],
