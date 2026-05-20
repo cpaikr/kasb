@@ -281,8 +281,26 @@ describe("KASB provider operations", () => {
     expect(result.result.totalCount).toBe(149);
     expect(result.result.totalPages).toBe(30);
     expect(result.result.hasNextPage).toBe(true);
+    expect(result.result.paginationStatus).toBe("known");
     expect(result.result.items[0]?.docNumber).toBe("IFRSIC2207E");
     expect(result.result.countByType["15"]).toBe(73);
+  });
+
+  test("derives Q&A pagination totals from requested type buckets", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(
+      "/api/qnas/v2?types=24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=5",
+      readFixture("fixtures/kasb/search-qna-lease.json"),
+    );
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5, types: "24,25" });
+
+    expect(result.result.returnedCount).toBe(5);
+    expect(result.result.totalCount).toBe(33);
+    expect(result.result.totalPages).toBe(7);
+    expect(result.result.hasNextPage).toBe(true);
+    expect(result.result.paginationStatus).toBe("known");
   });
 
   test("marks Q&A pagination metadata partial when source counts are missing", async () => {
@@ -297,6 +315,7 @@ describe("KASB provider operations", () => {
     expect(result.result.totalCount).toBe(5);
     expect(result.result.totalPages).toBe(1);
     expect(result.result.hasNextPage).toBe(false);
+    expect(result.result.paginationStatus).toBe("estimated");
     expect(result.metadata.completeness).toBe("partial");
     expect(result.warnings.map((warning) => warning.code)).toContain("source_metadata_incomplete");
   });

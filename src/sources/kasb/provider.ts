@@ -673,14 +673,15 @@ const searchQna: SearchQnaProvider["search"] = async (request) => {
     : {};
   const countMetadataIncomplete =
     !asSoftRecord(sourceCountData) || Object.keys(countByType).length !== Object.keys(sourceCountData).length;
+  const paginationStatus = countMetadataIncomplete ? "estimated" : "known";
   const totalCount = countMetadataIncomplete
     ? (request.page - 1) * request.rows + items.length
-    : sumRecordValues(countByType);
+    : sumQnaCounts(countByType, request.types);
   const totalPages = totalCount === 0 ? 0 : Math.ceil(totalCount / request.rows);
   const hasNextPage = !countMetadataIncomplete && request.page < totalPages;
 
   return {
-    result: { request, items, returnedCount: items.length, totalCount, totalPages, hasNextPage, countByType },
+    result: { request, items, returnedCount: items.length, totalCount, totalPages, hasNextPage, paginationStatus, countByType },
     metadata: metadata(sourceUrl, incomplete || countMetadataIncomplete ? "partial" : "complete", {
       textFields: ["result.items[].title", "result.items[].snippet"],
       notes: ["검색 하이라이트 HTML은 title과 snippet의 plain text로 정규화합니다."],
@@ -697,8 +698,10 @@ const searchQna: SearchQnaProvider["search"] = async (request) => {
   };
 };
 
-const sumRecordValues = (record: Record<string, number>): number =>
-  Object.values(record).reduce((sum, value) => sum + value, 0);
+const sumQnaCounts = (countByType: Record<string, number>, requestedTypes: string | undefined): number => {
+  const typeIds = requestedTypes?.split(",") ?? Object.keys(countByType);
+  return typeIds.reduce((sum, typeId) => sum + (countByType[typeId] ?? 0), 0);
+};
 
 const toQnaSearchItem = (value: unknown, sourceUrl: string): QnaSearchItem | undefined => {
   if (!asSoftRecord(value)) return undefined;

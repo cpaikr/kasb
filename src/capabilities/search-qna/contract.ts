@@ -127,6 +127,10 @@ export const SearchQnaResultSchema = Schema.Struct({
       description: "Whether another page is available after the requested page.",
       examples: [true],
     }),
+    paginationStatus: Schema.Literal("known", "estimated").annotations({
+      description: "Whether pagination metadata is derived from complete source count data or from a conservative fallback.",
+      examples: ["known"],
+    }),
     countByType: Schema.Record({
       key: Schema.String.annotations({ description: "Source-facing Q&A type id as a string key.", examples: ["24"] }),
       value: Schema.Number.annotations({ description: "Number of matched Q&A records for this type.", examples: [3] }),

@@ -267,7 +267,7 @@ Implementation notes:
 - `inputs`
   `keyword`, optional `page`, optional `rows`, optional source-facing numeric `types` CSV. The CLI also accepts `--limit` as an alias for `rows`.
 - `output`
-  Matching Q&A records with `docNumber`, source type, title, snippet, tags, source links, per-type counts, and pagination metadata (`totalCount`, `totalPages`, `hasNextPage`).
+  Matching Q&A records with `docNumber`, source type, title, snippet, tags, source links, per-type counts, and pagination metadata (`totalCount`, `totalPages`, `hasNextPage`, `paginationStatus`).
 - `warnings`
   `source_metadata_incomplete`
 - `failure cases`
