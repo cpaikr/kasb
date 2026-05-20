@@ -9,10 +9,11 @@ import {
   extractCliOptions,
   parseIntegerCliOption,
   renderCliJson,
-  renderInvalidInputCliErrorMessage,
+  renderInvalidInputCliErrorDetails,
   renderUnknownOptionCliErrorMessage,
   splitCliCommandOptions,
   type CliOptions as SharedCliOptions,
+  type CliErrorDetails,
   type CliOutputMode,
   type ParsedCliCommand,
   type RegisteredOption,
@@ -33,13 +34,14 @@ export type CliCommandSpec<Key extends string, RawInput, Result> = {
   readonly outputModes?: readonly CliOutputMode[];
   readonly summarizeResult?: (result: Result) => unknown;
   readonly projectResult?: (result: Result) => Result;
+  readonly renderFailureNextAction?: (context: { readonly error: unknown; readonly rawOptions: Record<string, unknown> }) => CliErrorDetails["nextAction"];
   readonly runOperation: (input: Partial<RawInput> & Record<string, unknown>) => Promise<Result>;
   readonly writeStdout: (text: string) => void;
 };
 
 export type BuiltCliCommand<Key extends string, RawInput> = {
   readonly command: Command;
-  readonly renderErrorMessage: (error: unknown) => string | undefined;
+  readonly renderErrorDetails: (error: unknown) => CliErrorDetails | undefined;
   readonly parse: (options: SharedCliOptions<Key | "pretty" | "output">) => ParsedCliCommand<RawInput>;
 };
 
@@ -86,9 +88,24 @@ export const buildOperationCommand = <Key extends string, RawInput, Result>(
   return {
     command,
     parse: toCommand,
-    renderErrorMessage: (error) =>
-      renderUnknownOptionCliErrorMessage(error, registeredOptions) ??
-      renderInvalidInputCliErrorMessage(error as { code: string; message: string; parameter?: string }, cliNameByOptionKey),
+    renderErrorDetails: (error) => {
+      const rawOptions = command.opts<Record<string, unknown>>();
+      const invalidInputDetails = renderInvalidInputCliErrorDetails(
+        error as { code: string; message: string; parameter?: string },
+        cliNameByOptionKey,
+        registeredOptions,
+        rawOptions,
+      );
+      const message = renderUnknownOptionCliErrorMessage(error, registeredOptions) ?? invalidInputDetails?.message;
+      const cliOption = invalidInputDetails?.cliOption;
+      const nextAction = spec.renderFailureNextAction?.({ error, rawOptions });
+      if (message === undefined && cliOption === undefined && nextAction === undefined) return undefined;
+      return {
+        ...(message === undefined ? {} : { message }),
+        ...(cliOption === undefined ? {} : { cliOption }),
+        ...(nextAction === undefined ? {} : { nextAction }),
+      };
+    },
   };
 };
 

@@ -36,6 +36,19 @@ export type RegisteredOption<Key extends string> = {
   readonly option: Option;
 };
 
+export type CliFailureNextAction = {
+  readonly operation: string;
+  readonly command?: string;
+  readonly reason: string;
+  readonly input?: Record<string, unknown>;
+};
+
+export type CliErrorDetails = {
+  readonly message?: string;
+  readonly cliOption?: string;
+  readonly nextAction?: CliFailureNextAction;
+};
+
 export type CliOptions<Key extends string> = Partial<Record<Key, CliOptionValue>> &
   Record<string, unknown>;
 
@@ -95,22 +108,43 @@ export const buildCliNameByOptionKey = <Key extends string>(
   ) as Partial<Record<Key, string>>;
 };
 
-export const renderInvalidInputCliErrorMessage = <Key extends string>(
+export const findUsedCliNameForOptionKey = <Key extends string>(
+  key: Key,
+  registeredOptions: readonly RegisteredOption<Key>[],
+  rawOptions: Record<string, unknown>,
+): string | undefined => {
+  for (const option of [...registeredOptions].reverse()) {
+    if (option.key === key && rawOptions[option.attributeName] !== undefined) {
+      return option.cliName;
+    }
+  }
+  return undefined;
+};
+
+export const renderInvalidInputCliErrorDetails = <Key extends string>(
   error: { readonly code: string; readonly parameter?: string; readonly message: string },
   cliNameByOptionKey: Partial<Record<Key, string>>,
-): string | undefined => {
+  registeredOptions: readonly RegisteredOption<Key>[],
+  rawOptions: Record<string, unknown>,
+): CliErrorDetails | undefined => {
   if (error.code !== "invalid_input" || error.parameter === undefined) return undefined;
-  const cliName = cliNameByOptionKey[error.parameter as Key];
+  const parameterKey = error.parameter as Key;
+  const usedCliName = findUsedCliNameForOptionKey(parameterKey, registeredOptions, rawOptions);
+  const cliName = usedCliName ?? cliNameByOptionKey[parameterKey];
   if (cliName === undefined) return undefined;
   let message = error.message
     .replaceAll("필수 매개변수", "필수 옵션")
     .replaceAll("매개변수", "옵션");
   for (const [key, optionCliName] of Object.entries(cliNameByOptionKey)) {
-    if (optionCliName !== undefined) {
-      message = message.replaceAll(`"${key}"`, `"${optionCliName}"`);
+    const replacementCliName = key === error.parameter ? cliName : optionCliName;
+    if (replacementCliName !== undefined) {
+      message = message.replaceAll(`"${key}"`, `"${replacementCliName}"`);
     }
   }
-  return message;
+  return {
+    message,
+    ...(usedCliName === undefined ? {} : { cliOption: usedCliName }),
+  };
 };
 
 export const renderUnknownOptionCliErrorMessage = <Key extends string>(
@@ -171,7 +205,9 @@ export type CliFailureEnvelope = {
     readonly message: string;
     readonly retryable: boolean;
     readonly parameter?: string;
+    readonly cliOption?: string;
     readonly sourceUrl?: string;
+    readonly nextAction?: CliFailureNextAction;
   };
   readonly metadata: { readonly cliTransportVersion: "1"; readonly operation?: string };
   readonly warnings: readonly [];
@@ -187,14 +223,14 @@ const isCliOutputMode = (value: unknown): value is CliOutputMode =>
 
 export const renderCliFailureJson = (
   error: unknown,
-  options: Partial<CliJsonOptions> & { readonly message?: string; readonly operation?: string } = {},
+  options: Partial<CliJsonOptions> & CliErrorDetails & { readonly operation?: string } = {},
 ): string => renderCliJson(toCliFailureEnvelope(error, options), options);
 
 const toCliFailureEnvelope = (
   error: unknown,
-  options: { readonly message?: string; readonly operation?: string },
+  options: CliErrorDetails & { readonly operation?: string },
 ): CliFailureEnvelope => ({
-  failure: toCliFailureError(error, options.message),
+  failure: toCliFailureError(error, options),
   metadata: {
     cliTransportVersion: "1",
     ...(options.operation === undefined ? {} : { operation: options.operation }),
@@ -202,8 +238,12 @@ const toCliFailureEnvelope = (
   warnings: [],
 });
 
-const toCliFailureError = (error: unknown, messageOverride: string | undefined): CliFailureEnvelope["failure"] => {
-  const message = messageOverride ?? toErrorMessage(error);
+const toCliFailureError = (error: unknown, options: CliErrorDetails): CliFailureEnvelope["failure"] => {
+  const message = options.message ?? toErrorMessage(error);
+  const transportFields = {
+    ...(options.cliOption === undefined ? {} : { cliOption: options.cliOption }),
+    ...(options.nextAction === undefined ? {} : { nextAction: options.nextAction }),
+  };
   if (isTypedCliFailure(error)) {
     return {
       code: error.code,
@@ -211,12 +251,13 @@ const toCliFailureError = (error: unknown, messageOverride: string | undefined):
       retryable: error.retryable,
       ...(error.parameter === undefined ? {} : { parameter: error.parameter }),
       ...(error.sourceUrl === undefined ? {} : { sourceUrl: error.sourceUrl }),
+      ...transportFields,
     };
   }
   if (isCommanderError(error)) {
-    return { code: "invalid_input", message, retryable: false };
+    return { code: "invalid_input", message, retryable: false, ...transportFields };
   }
-  return { code: "internal_failure", message, retryable: false };
+  return { code: "internal_failure", message, retryable: false, ...transportFields };
 };
 
 const toErrorMessage = (error: unknown): string =>

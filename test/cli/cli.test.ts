@@ -188,6 +188,56 @@ describe("kasb CLI", () => {
     expect(paragraphStdout).toContain("문단 범위(예: 9~17, 22~30)는 --para-num이 아니라 get-section --ref로 조회하세요.");
   });
 
+  test("adds a structure lookup next action when get-section lacks a locator", () => {
+    const result = runCli(["get-section", "--std-num", "1019"]);
+    const envelope = JSON.parse(decode(result.stderr)) as {
+      readonly failure: {
+        readonly code: string;
+        readonly parameter?: string;
+        readonly message: string;
+        readonly nextAction?: { readonly operation: string; readonly command: string; readonly reason: string; readonly input: { readonly stdNum: string } };
+      };
+    };
+
+    expect(result.exitCode).toBe(1);
+    expect(decode(result.stdout)).toBe("");
+    expect(envelope.failure.code).toBe("invalid_input");
+    expect(envelope.failure.parameter).toBe("indexDocumentId");
+    expect(envelope.failure.message).toContain("--index-document-id");
+    expect(envelope.failure.nextAction).toEqual({
+      operation: "get-standard-structure",
+      input: { stdNum: "1019" },
+      command: "kasb get-standard-structure --std-num 1019 --output summary",
+      reason: expect.stringContaining("get-standard-structure"),
+    });
+  });
+
+  test("preserves the used --limit alias on search-qna row validation failures", () => {
+    const result = runCli(["search-qna", "--keyword", "리스", "--limit", "999"]);
+    const envelope = JSON.parse(decode(result.stderr)) as {
+      readonly failure: {
+        readonly code: string;
+        readonly parameter?: string;
+        readonly cliOption?: string;
+        readonly message: string;
+        readonly nextAction?: { readonly operation: string; readonly command: string; readonly reason: string; readonly input: { readonly keyword: string; readonly rows: number } };
+      };
+    };
+
+    expect(result.exitCode).toBe(1);
+    expect(decode(result.stdout)).toBe("");
+    expect(envelope.failure.code).toBe("invalid_input");
+    expect(envelope.failure.parameter).toBe("rows");
+    expect(envelope.failure.cliOption).toBe("--limit");
+    expect(envelope.failure.message).toContain('옵션 "--limit"');
+    expect(envelope.failure.nextAction).toEqual({
+      operation: "search-qna",
+      input: { keyword: "리스", rows: 50 },
+      command: "kasb search-qna --keyword '리스' --limit 50 --output summary",
+      reason: expect.stringContaining("1~50"),
+    });
+  });
+
   test.each([
     ["search-standards", ["search-standards", "--keyword", "리스", "--limit", "1.5"], "1.5"],
     ["search-qna page", ["search-qna", "--keyword", "리스", "--page", "abc"], "abc"],

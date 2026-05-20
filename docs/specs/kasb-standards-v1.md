@@ -140,6 +140,11 @@ Failures are separate typed values or thrown capability failures. A public failu
 - `parameter` when one input caused the failure
 - `sourceUrl` when the source was contacted
 
+CLI failure envelopes may also include transport-local recovery fields:
+
+- `cliOption` when validation can identify the exact CLI flag used, including aliases such as `--limit`
+- `nextAction` when a safe, concrete follow-up command can help the caller recover
+
 Allowed public failure codes:
 
 - `invalid_input`
@@ -332,13 +337,19 @@ Failure envelope shape:
 ```json
 {
   "failure": {
-    "code": "not_found",
-    "message": "No section found for indexDocumentId.",
+    "code": "invalid_input",
+    "message": "필수 옵션 \"--index-document-id\" 또는 \"--ref\" 중 정확히 하나가 필요합니다. \"--index-document-id\"는 get-standard-structure 결과에서 가져오며, 브라우저 경로의 titleDocumentId는 사용할 수 없습니다.",
     "retryable": false,
     "parameter": "indexDocumentId",
-    "sourceUrl": "https://db.kasb.or.kr/api/paragraphs/1116/19970f"
+    "nextAction": {
+      "operation": "get-standard-structure",
+      "input": { "stdNum": "1019" },
+      "command": "kasb get-standard-structure --std-num 1019 --output summary",
+      "reason": "get-section에는 indexDocumentId 또는 ref가 필요합니다. get-standard-structure가 해당 기준서의 후보 섹션과 indexDocumentId/ref를 반환합니다."
+    }
   },
   "metadata": {
+    "cliTransportVersion": "1",
     "operation": "get-section"
   },
   "warnings": []

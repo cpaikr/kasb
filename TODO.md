@@ -2,14 +2,6 @@
 
 ## Now
 
-- Errors need next-step guidance.
-  - Evidence from tryouts:
-    - `get-section --std-num 1019` says `--index-document-id` or `--ref` is required, but does not suggest running `get-standard-structure` first.
-    - `search-qna --limit 999` reports parameter `rows`, even when the user typed `--limit`.
-  - Useful directions:
-    - Add actionable suggestions or `nextAction` hints to failure envelopes where safe.
-    - Preserve or mention the user-facing flag name in validation errors, especially aliases like `--limit`.
-
 - Q&A UX needs stronger search and recency support.
   - Evidence from tryouts:
     - Exact Q&A searches for `장기종업원급여`, `기타장기종업원급여`, and related compound terms returned zero, while broader `종업원급여` returned many rows.

@@ -12,7 +12,7 @@ import type { GetSectionRawInput, GetSectionResult } from "./capabilities/get-se
 import type { GetStandardStructureRawInput, GetStandardStructureResult } from "./capabilities/get-standard-structure/contract.ts";
 import type { SearchQnaRawInput, SearchQnaResult } from "./capabilities/search-qna/contract.ts";
 import type { SearchStandardItem, SearchStandardsRawInput, SearchStandardsResult } from "./capabilities/search-standards/contract.ts";
-import { configureCliTransport, renderCliFailureJson } from "./cli/command-helpers.ts";
+import { configureCliTransport, renderCliFailureJson, type CliErrorDetails } from "./cli/command-helpers.ts";
 import { buildOperationCommand } from "./cli/commands/shared.ts";
 
 const writeStdout = (text: string) => {
@@ -117,7 +117,7 @@ const getSectionCommand = buildOperationCommand<
     { key: "ref", flags: "--ref <text>", description: "[선택] 기준서 구조의 ref입니다. --index-document-id를 모를 때만 사용하세요. 예: 153~158, 21.5~21.5의3" },
     { key: "keyword", flags: "--keyword <text>", description: "[선택] 섹션 문단 하이라이트 검색어입니다." },
   ],
-  notes: ["--index-document-id 또는 --ref 중 하나가 필요합니다.", "브라우저 경로의 titleDocumentId가 아니라 standard-indexes의 indexDocumentId를 사용합니다.", "ref 범위(예: 9~17, 22~30)는 get-section --ref로 조회하고, 단일 문단은 get-paragraph --para-num으로 조회하세요.", "동일한 ref가 여러 섹션에 있으면 가장 구체적인 하위 섹션을 선택하고 경고를 반환합니다."],
+  notes: ["--index-document-id 또는 --ref 중 하나가 필요합니다. 둘 다 모를 때는 먼저 get-standard-structure --output summary로 후보를 확인하세요.", "브라우저 경로의 titleDocumentId가 아니라 standard-indexes의 indexDocumentId를 사용합니다.", "ref 범위(예: 9~17, 22~30)는 get-section --ref로 조회하고, 단일 문단은 get-paragraph --para-num으로 조회하세요.", "동일한 ref가 여러 섹션에 있으면 가장 구체적인 하위 섹션을 선택하고 경고를 반환합니다."],
   examples: [
     { description: "제1116호 목적 섹션을 indexDocumentId로 조회합니다.", argv: ["--std-num", "1116", "--index-document-id", "ZB2hJW", "--output", "summary"] },
     { description: "리스 적용범위(ref 3~4)를 조회합니다.", argv: ["--std-num", "1116", "--ref", "3~4", "--output", "summary"] },
@@ -137,6 +137,17 @@ const getSectionCommand = buildOperationCommand<
       ...(clause.fullContent === undefined ? {} : { fullContent: clause.fullContent }),
     })),
   }),
+  renderFailureNextAction: ({ error, rawOptions }) => {
+    if (!isInvalidInputForParameter(error, "indexDocumentId")) return undefined;
+    const stdNum = readRawStringOption(rawOptions, "stdNum");
+    if (stdNum === undefined) return undefined;
+    return {
+      operation: "get-standard-structure",
+      input: { stdNum },
+      command: `kasb get-standard-structure --std-num ${shellQuoteCliArg(stdNum)} --output summary`,
+      reason: "get-section에는 indexDocumentId 또는 ref가 필요합니다. get-standard-structure가 해당 기준서의 후보 섹션과 indexDocumentId/ref를 반환합니다.",
+    };
+  },
   runOperation: (input) => defaultGetSectionOperation.execute(input),
   writeStdout,
 });
@@ -195,6 +206,18 @@ const searchQnaCommand = buildOperationCommand<
       ...(item.prefix === undefined ? {} : { prefix: item.prefix }),
     })),
   }),
+  renderFailureNextAction: ({ error, rawOptions }) => {
+    if (!isInvalidInputForParameter(error, "rows")) return undefined;
+    const keyword = readRawStringOption(rawOptions, "keyword");
+    if (keyword === undefined) return undefined;
+    const rowFlag = rawOptions.limit === undefined ? "--rows" : "--limit";
+    return {
+      operation: "search-qna",
+      input: { keyword, rows: 50 },
+      command: `kasb search-qna --keyword ${shellQuoteCliArg(keyword)} ${rowFlag} 50 --output summary`,
+      reason: "search-qna는 한 페이지에 1~50개만 요청할 수 있습니다. 더 많은 결과는 --page를 올려 이어서 조회하세요.",
+    };
+  },
   runOperation: (input) => defaultSearchQnaOperation.execute(input),
   writeStdout,
 });
@@ -242,9 +265,27 @@ const cliCommands = [
   getQnaCommand,
 ] as const;
 
-const renderCommandErrorMessage = (operationName: string | undefined, error: unknown): string | undefined => {
+const renderCommandErrorDetails = (operationName: string | undefined, error: unknown): CliErrorDetails | undefined => {
   const scopedCommand = cliCommands.find((item) => item.command.name() === operationName);
-  return scopedCommand?.renderErrorMessage(error);
+  return scopedCommand?.renderErrorDetails(error);
+};
+
+const isInvalidInputForParameter = (error: unknown, parameter: string): boolean =>
+  error !== null &&
+  typeof error === "object" &&
+  "code" in error &&
+  "parameter" in error &&
+  (error as { readonly code?: unknown }).code === "invalid_input" &&
+  (error as { readonly parameter?: unknown }).parameter === parameter;
+
+const readRawStringOption = (
+  rawOptions: Record<string, unknown>,
+  key: string,
+): string | undefined => {
+  const value = rawOptions[key];
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
 };
 
 const rootHelpNotes = `
@@ -285,11 +326,11 @@ if (process.argv.length <= 2) {
 } else {
   program.parseAsync(process.argv).catch((error) => {
     const operationName = process.argv[2];
-    const cliMessage = renderCommandErrorMessage(operationName, error);
+    const errorDetails = renderCommandErrorDetails(operationName, error);
 
     writeStderr(
       renderCliFailureJson(error, {
-        ...(cliMessage === undefined ? {} : { message: cliMessage }),
+        ...errorDetails,
         ...(operationName === undefined ? {} : { operation: operationName }),
         pretty: shouldPrettyPrintJson(process.argv),
       }),
