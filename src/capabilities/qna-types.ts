@@ -1,3 +1,10 @@
+/**
+ * Observed public Q&A type metadata from the KASB source.
+ *
+ * Keep this table static for the v1 CLI so Q&A lookups remain fixture-friendly
+ * and do not require an extra live metadata request. Refresh it only when source
+ * drift is observed or the product contract explicitly adds live type metadata.
+ */
 export const observedQnaTypeLabels = {
   "11": "K-IFRS · 회계기준원",
   "12": "일반기업회계기준 · 회계기준원",
