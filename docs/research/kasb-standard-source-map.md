@@ -144,7 +144,7 @@ Observed endpoints:
 - `GET /api/qnas/v2/count`
   Returns Q&A counts by type.
 - `GET /api/qnas/v2?types={csv}&searchWord={term}&page={page}&rows={rows}`
-  Returns Q&A search results with `docNumber`, `type`, highlighted `title`, highlighted `fullContent`, tags, source links, and count metadata.
+  Returns Q&A search results with `docNumber`, `type`, highlighted `title`, highlighted `fullContent`, tags, source links, and count metadata. Observed `facilityQnaCountData` values can be summed for `totalCount`; `totalPages` and `hasNextPage` are derived from `rows` and the requested page.
 - `GET /api/qnas/v2/{docNumber}?searchWord={term?}`
   Returns one Q&A document with `docNumber`, `type`, `title`, `fullContent`, optional `contentHtml`, related standards HTML, tags, adjacent document numbers, and similar Q&A references.
 - `GET /api/qnas/v2/paragraph?faqDocNumbers={csv}`

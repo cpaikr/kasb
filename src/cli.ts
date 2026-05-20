@@ -194,6 +194,9 @@ const searchQnaCommand = buildOperationCommand<
   summarizeResult: (output) => ({
     request: output.result.request,
     returnedCount: output.result.returnedCount,
+    totalCount: output.result.totalCount,
+    totalPages: output.result.totalPages,
+    hasNextPage: output.result.hasNextPage,
     countByType: output.result.countByType,
     items: output.result.items.map((item) => ({
       docNumber: item.docNumber,

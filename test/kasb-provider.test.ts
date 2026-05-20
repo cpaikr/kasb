@@ -278,8 +278,27 @@ describe("KASB provider operations", () => {
     const result = await defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5 });
 
     expect(result.result.returnedCount).toBe(5);
+    expect(result.result.totalCount).toBe(149);
+    expect(result.result.totalPages).toBe(30);
+    expect(result.result.hasNextPage).toBe(true);
     expect(result.result.items[0]?.docNumber).toBe("IFRSIC2207E");
     expect(result.result.countByType["15"]).toBe(73);
+  });
+
+  test("marks Q&A pagination metadata partial when source counts are missing", async () => {
+    const fixtures = makeFixtureMap();
+    const qnaSearch = clone(readFixture("fixtures/kasb/search-qna-lease.json")) as Record<string, unknown>;
+    delete qnaSearch.facilityQnaCountData;
+    fixtures.set("/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=5", qnaSearch);
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5 });
+
+    expect(result.result.totalCount).toBe(5);
+    expect(result.result.totalPages).toBe(1);
+    expect(result.result.hasNextPage).toBe(false);
+    expect(result.metadata.completeness).toBe("partial");
+    expect(result.warnings.map((warning) => warning.code)).toContain("source_metadata_incomplete");
   });
 
   test("fetches a Q&A document by docNumber", async () => {

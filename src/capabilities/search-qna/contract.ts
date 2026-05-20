@@ -115,6 +115,18 @@ export const SearchQnaResultSchema = Schema.Struct({
       description: "Number of Q&A items included in this response.",
       examples: [10],
     }),
+    totalCount: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)).annotations({
+      description: "Total matched Q&A records derived from source count metadata for the requested keyword and type filter.",
+      examples: [149],
+    }),
+    totalPages: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)).annotations({
+      description: "Total source result pages for the requested rows value, derived from totalCount.",
+      examples: [30],
+    }),
+    hasNextPage: Schema.Boolean.annotations({
+      description: "Whether another page is available after the requested page.",
+      examples: [true],
+    }),
     countByType: Schema.Record({
       key: Schema.String.annotations({ description: "Source-facing Q&A type id as a string key.", examples: ["24"] }),
       value: Schema.Number.annotations({ description: "Number of matched Q&A records for this type.", examples: [3] }),

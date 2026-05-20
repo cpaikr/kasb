@@ -12,7 +12,6 @@
   - Useful directions:
     - Add `suggestedKeywords` or fallback hints for zero-result Q&A searches.
     - Add recency controls if source data supports it: `--sort-date desc`, `--from`, `--to`.
-    - Add pagination metadata: `totalCount`, `totalPages`, `hasNextPage`.
     - Document Q&A type ids in help or expose labels in output.
     - Consider compact result projection for search output: `docNumber`, type label, title, date, tags, short snippet.
 

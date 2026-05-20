@@ -663,17 +663,25 @@ const searchQna: SearchQnaProvider["search"] = async (request) => {
     .filter((item): item is QnaSearchItem => item !== undefined);
   assertAnyNormalized(sourceItems, items, sourceUrl, "Q&A 검색 결과 필드가 변경되었습니다.");
   const incomplete = items.length !== sourceItems.length;
-  const countByType = asSoftRecord(payload.facilityQnaCountData)
+  const sourceCountData = payload.facilityQnaCountData;
+  const countByType = asSoftRecord(sourceCountData)
     ? Object.fromEntries(
-        Object.entries(payload.facilityQnaCountData).filter((entry): entry is [string, number] =>
+        Object.entries(sourceCountData).filter((entry): entry is [string, number] =>
           typeof entry[1] === "number",
         ),
       )
     : {};
+  const countMetadataIncomplete =
+    !asSoftRecord(sourceCountData) || Object.keys(countByType).length !== Object.keys(sourceCountData).length;
+  const totalCount = countMetadataIncomplete
+    ? (request.page - 1) * request.rows + items.length
+    : sumRecordValues(countByType);
+  const totalPages = totalCount === 0 ? 0 : Math.ceil(totalCount / request.rows);
+  const hasNextPage = !countMetadataIncomplete && request.page < totalPages;
 
   return {
-    result: { request, items, returnedCount: items.length, countByType },
-    metadata: metadata(sourceUrl, incomplete ? "partial" : "complete", {
+    result: { request, items, returnedCount: items.length, totalCount, totalPages, hasNextPage, countByType },
+    metadata: metadata(sourceUrl, incomplete || countMetadataIncomplete ? "partial" : "complete", {
       textFields: ["result.items[].title", "result.items[].snippet"],
       notes: ["검색 하이라이트 HTML은 title과 snippet의 plain text로 정규화합니다."],
     }),
@@ -682,9 +690,15 @@ const searchQna: SearchQnaProvider["search"] = async (request) => {
       ...(incomplete
         ? [{ code: "source_metadata_incomplete" as const, message: "일부 Q&A 검색 행을 정규화할 수 없어 제외했습니다." }]
         : []),
+      ...(countMetadataIncomplete
+        ? [{ code: "source_metadata_incomplete" as const, message: "Q&A 검색 count metadata를 완전히 정규화할 수 없어 pagination metadata가 보수적으로 계산되었습니다." }]
+        : []),
     ],
   };
 };
+
+const sumRecordValues = (record: Record<string, number>): number =>
+  Object.values(record).reduce((sum, value) => sum + value, 0);
 
 const toQnaSearchItem = (value: unknown, sourceUrl: string): QnaSearchItem | undefined => {
   if (!asSoftRecord(value)) return undefined;
