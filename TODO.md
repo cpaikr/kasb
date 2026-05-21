@@ -2,12 +2,6 @@
 
 ## Now
 
-- Q&A UX needs stronger search and recency support.
-  - Evidence from tryouts:
-    - `리스` Q&A results are relevant but not recent-first; newer issues were buried around items 24, 25, and 48.
-  - Useful directions:
-    - Add recency controls if source data supports it: `--sort-date desc`, `--from`, `--to`.
-
 - Comparison workflows need metadata/filtering.
   - Evidence from tryouts:
     - Comparing `충당부채` required manually discovering K-IFRS `1037` and general GAAP `14`.

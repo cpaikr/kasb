@@ -7,7 +7,7 @@ import type { GetSectionRequest, SectionClause } from "../../capabilities/get-se
 import type { GetStandardStructureProvider } from "../../capabilities/get-standard-structure/provider.ts";
 import type { StandardSectionNode } from "../../capabilities/get-standard-structure/contract.ts";
 import type { SearchQnaProvider } from "../../capabilities/search-qna/provider.ts";
-import type { QnaSearchItem } from "../../capabilities/search-qna/contract.ts";
+import type { QnaSearchItem, SearchQnaRequest } from "../../capabilities/search-qna/contract.ts";
 import type { SearchStandardsProvider } from "../../capabilities/search-standards/provider.ts";
 import type { SearchStandardItem, SearchStandardsRequest } from "../../capabilities/search-standards/contract.ts";
 import { defaultObservedQnaTypeIds, qnaTypeLabel, qnaTypeLabelsFor } from "../../capabilities/qna-types.ts";
@@ -769,19 +769,148 @@ const toParagraph = (value: unknown, sourceUrl: string): Paragraph => {
 };
 
 const searchQna: SearchQnaProvider["search"] = async (request) => {
+  if (hasQnaRecencyControls(request)) {
+    return searchQnaWithRecencyControls(request);
+  }
+
   const sourceUrl = qnasSearchUrl({
     searchWord: request.keyword,
     page: request.page,
     rows: request.rows,
     types: request.types,
   });
+  const page = await fetchQnaSearchPage(sourceUrl);
+  const paginationStatus = page.countMetadataIncomplete ? "estimated" : "known";
+  const totalCount = page.countMetadataIncomplete
+    ? (request.page - 1) * request.rows + page.items.length
+    : sumQnaCounts(page.countByType, request.types);
+  const totalPages = totalCount === 0 ? 0 : Math.ceil(totalCount / request.rows);
+  const hasNextPage = !page.countMetadataIncomplete && request.page < totalPages;
+  const requestedTypeIds = request.types?.split(",") ?? defaultObservedQnaTypeIds;
+  const typeLabels = qnaTypeLabelsFor(new Set([
+    ...requestedTypeIds,
+    ...Object.keys(page.countByType),
+    ...page.items.map((item) => String(item.type)),
+  ]));
+
+  return {
+    result: {
+      request,
+      items: page.items,
+      returnedCount: page.items.length,
+      totalCount,
+      totalPages,
+      hasNextPage,
+      paginationStatus,
+      countByType: page.countByType,
+      typeLabels,
+      suggestedKeywords: suggestBroaderQnaKeywords(request.keyword, totalCount),
+    },
+    metadata: metadata(sourceUrl, page.incomplete || page.countMetadataIncomplete ? "partial" : "complete", {
+      textFields: ["result.items[].title", "result.items[].snippet"],
+      notes: ["검색 하이라이트 HTML은 title과 snippet의 plain text로 정규화하고 snippet은 빠른 스캔을 위해 길이를 제한합니다."],
+    }),
+    references: { searchUrl: sourceUrl },
+    warnings: qnaSearchMetadataWarnings(page.incomplete, page.countMetadataIncomplete),
+  };
+};
+
+type QnaSearchPage = {
+  readonly items: readonly QnaSearchItem[];
+  readonly incomplete: boolean;
+  readonly countByType: Record<string, number>;
+  readonly countMetadataIncomplete: boolean;
+};
+
+const qnaRecencyScanRows = 50;
+const qnaRecencyMaxScanRows = 500;
+
+const hasQnaRecencyControls = (request: SearchQnaRequest): boolean =>
+  request.sortDate !== undefined || request.from !== undefined || request.to !== undefined;
+
+const searchQnaWithRecencyControls: SearchQnaProvider["search"] = async (request) => {
+  const firstSourceUrl = qnasSearchUrl({
+    searchWord: request.keyword,
+    page: 1,
+    rows: qnaRecencyScanRows,
+    types: request.types,
+  });
+  const firstPage = await fetchQnaSearchPage(firstSourceUrl);
+  const sourceTotalCount = firstPage.countMetadataIncomplete
+    ? firstPage.items.length
+    : sumQnaCounts(firstPage.countByType, request.types);
+  const sourcePagesToScan = firstPage.countMetadataIncomplete
+    ? 1
+    : Math.min(
+        Math.ceil(sourceTotalCount / qnaRecencyScanRows),
+        Math.ceil(qnaRecencyMaxScanRows / qnaRecencyScanRows),
+      );
+  const additionalPages = await mapWithConcurrency(
+    Array.from({ length: Math.max(0, sourcePagesToScan - 1) }, (_value, index) => index + 2),
+    4,
+    async (page) => fetchQnaSearchPage(qnasSearchUrl({
+      searchWord: request.keyword,
+      page,
+      rows: qnaRecencyScanRows,
+      types: request.types,
+    })),
+  );
+  const scannedPages = [firstPage, ...additionalPages];
+  const scannedSourceRowCapacity = scannedPages.length * qnaRecencyScanRows;
+  const scannedItems = scannedPages.flatMap((page) => [...page.items]);
+  const itemsAfterDateControls = applyQnaDateControls(scannedItems, request);
+  const offset = (request.page - 1) * request.rows;
+  const items = itemsAfterDateControls.slice(offset, offset + request.rows);
+  const scannedAllSourceRows = !firstPage.countMetadataIncomplete && scannedSourceRowCapacity >= sourceTotalCount;
+  const incomplete = scannedPages.some((page) => page.incomplete);
+  const countMetadataIncomplete = firstPage.countMetadataIncomplete || !scannedAllSourceRows;
+  const totalCount = itemsAfterDateControls.length;
+  const totalPages = totalCount === 0 ? 0 : Math.ceil(totalCount / request.rows);
+  const countByType = countQnaItemsByType(itemsAfterDateControls);
+  const requestedTypeIds = request.types?.split(",") ?? defaultObservedQnaTypeIds;
+  const typeLabels = qnaTypeLabelsFor(new Set([
+    ...requestedTypeIds,
+    ...Object.keys(countByType),
+    ...itemsAfterDateControls.map((item) => String(item.type)),
+  ]));
+
+  return {
+    result: {
+      request,
+      items,
+      returnedCount: items.length,
+      totalCount,
+      totalPages,
+      hasNextPage: request.page < totalPages,
+      paginationStatus: countMetadataIncomplete ? "estimated" : "known",
+      countByType,
+      typeLabels,
+      suggestedKeywords: suggestBroaderQnaKeywords(request.keyword, totalCount),
+    },
+    metadata: metadata(firstSourceUrl, incomplete || countMetadataIncomplete ? "partial" : "complete", {
+      textFields: ["result.items[].title", "result.items[].snippet"],
+      notes: [
+        "검색 하이라이트 HTML은 title과 snippet의 plain text로 정규화하고 snippet은 빠른 스캔을 위해 길이를 제한합니다.",
+        `sortDate/from/to는 원천 publishDate를 기준으로 최대 ${qnaRecencyMaxScanRows}개 Q&A 검색 행에 client-side 적용됩니다.`,
+      ],
+    }),
+    references: { searchUrl: firstSourceUrl },
+    warnings: [
+      ...qnaSearchMetadataWarnings(incomplete, firstPage.countMetadataIncomplete),
+      ...(!scannedAllSourceRows
+        ? [{ code: "source_metadata_incomplete" as const, message: `Q&A recency control은 원천 검색 결과 ${sourceTotalCount}개 중 처음 ${scannedSourceRowCapacity}개 행에 적용되었습니다.` }]
+        : []),
+    ],
+  };
+};
+
+const fetchQnaSearchPage = async (sourceUrl: string): Promise<QnaSearchPage> => {
   const payload = asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "qnas search");
   const sourceItems = asArray(payload.facilityQnas, sourceUrl, "facilityQnas");
   const items = sourceItems
     .map((item) => toQnaSearchItem(item, sourceUrl))
     .filter((item): item is QnaSearchItem => item !== undefined);
   assertAnyNormalized(sourceItems, items, sourceUrl, "Q&A 검색 결과 필드가 변경되었습니다.");
-  const incomplete = items.length !== sourceItems.length;
   const sourceCountData = payload.facilityQnaCountData;
   const countByType = asSoftRecord(sourceCountData)
     ? Object.fromEntries(
@@ -792,43 +921,70 @@ const searchQna: SearchQnaProvider["search"] = async (request) => {
     : {};
   const countMetadataIncomplete =
     !asSoftRecord(sourceCountData) || Object.keys(countByType).length !== Object.keys(sourceCountData).length;
-  const paginationStatus = countMetadataIncomplete ? "estimated" : "known";
-  const totalCount = countMetadataIncomplete
-    ? (request.page - 1) * request.rows + items.length
-    : sumQnaCounts(countByType, request.types);
-  const totalPages = totalCount === 0 ? 0 : Math.ceil(totalCount / request.rows);
-  const hasNextPage = !countMetadataIncomplete && request.page < totalPages;
-
-  const requestedTypeIds = request.types?.split(",") ?? defaultObservedQnaTypeIds;
-  const typeLabels = qnaTypeLabelsFor(new Set([...requestedTypeIds, ...Object.keys(countByType), ...items.map((item) => String(item.type))]));
-
   return {
-    result: {
-      request,
-      items,
-      returnedCount: items.length,
-      totalCount,
-      totalPages,
-      hasNextPage,
-      paginationStatus,
-      countByType,
-      typeLabels,
-      suggestedKeywords: suggestBroaderQnaKeywords(request.keyword, totalCount),
-    },
-    metadata: metadata(sourceUrl, incomplete || countMetadataIncomplete ? "partial" : "complete", {
-      textFields: ["result.items[].title", "result.items[].snippet"],
-      notes: ["검색 하이라이트 HTML은 title과 snippet의 plain text로 정규화하고 snippet은 빠른 스캔을 위해 길이를 제한합니다."],
-    }),
-    references: { searchUrl: sourceUrl },
-    warnings: [
-      ...(incomplete
-        ? [{ code: "source_metadata_incomplete" as const, message: "일부 Q&A 검색 행을 정규화할 수 없어 제외했습니다." }]
-        : []),
-      ...(countMetadataIncomplete
-        ? [{ code: "source_metadata_incomplete" as const, message: "Q&A 검색 count metadata를 완전히 정규화할 수 없어 pagination metadata가 보수적으로 계산되었습니다." }]
-        : []),
-    ],
+    items,
+    incomplete: items.length !== sourceItems.length,
+    countByType,
+    countMetadataIncomplete,
   };
+};
+
+const qnaSearchMetadataWarnings = (
+  incomplete: boolean,
+  countMetadataIncomplete: boolean,
+): Array<{ readonly code: "source_metadata_incomplete"; readonly message: string }> => [
+  ...(incomplete
+    ? [{ code: "source_metadata_incomplete" as const, message: "일부 Q&A 검색 행을 정규화할 수 없어 제외했습니다." }]
+    : []),
+  ...(countMetadataIncomplete
+    ? [{ code: "source_metadata_incomplete" as const, message: "Q&A 검색 count metadata를 완전히 정규화할 수 없어 pagination metadata가 보수적으로 계산되었습니다." }]
+    : []),
+];
+
+const applyQnaDateControls = (
+  items: readonly QnaSearchItem[],
+  request: SearchQnaRequest,
+): QnaSearchItem[] => {
+  const fromTime = request.from === undefined ? undefined : Date.parse(`${request.from}T00:00:00.000Z`);
+  const toTime = request.to === undefined ? undefined : Date.parse(`${request.to}T23:59:59.999Z`);
+  const filtered = items.filter((item) => {
+    const publishTime = qnaPublishTime(item);
+    if (fromTime !== undefined && (publishTime === undefined || publishTime < fromTime)) return false;
+    if (toTime !== undefined && (publishTime === undefined || publishTime > toTime)) return false;
+    return true;
+  });
+  const sortDate = request.sortDate;
+  if (sortDate === undefined) return filtered;
+  return [...filtered].sort((left, right) => compareQnaPublishDate(left, right, sortDate));
+};
+
+const compareQnaPublishDate = (
+  left: QnaSearchItem,
+  right: QnaSearchItem,
+  direction: "asc" | "desc",
+): number => {
+  const leftTime = qnaPublishTime(left);
+  const rightTime = qnaPublishTime(right);
+  if (leftTime === undefined && rightTime === undefined) return left.docNumber.localeCompare(right.docNumber);
+  if (leftTime === undefined) return 1;
+  if (rightTime === undefined) return -1;
+  const dateOrder = direction === "desc" ? rightTime - leftTime : leftTime - rightTime;
+  return dateOrder === 0 ? left.docNumber.localeCompare(right.docNumber) : dateOrder;
+};
+
+const qnaPublishTime = (item: QnaSearchItem): number | undefined => {
+  if (item.publishDate === undefined) return undefined;
+  const time = Date.parse(item.publishDate);
+  return Number.isNaN(time) ? undefined : time;
+};
+
+const countQnaItemsByType = (items: readonly QnaSearchItem[]): Record<string, number> => {
+  const countByType: Record<string, number> = {};
+  for (const item of items) {
+    const key = String(item.type);
+    countByType[key] = (countByType[key] ?? 0) + 1;
+  }
+  return countByType;
 };
 
 const sumQnaCounts = (countByType: Record<string, number>, requestedTypes: string | undefined): number => {

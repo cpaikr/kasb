@@ -35,7 +35,7 @@ const operations = [
   {
     operation: defaultSearchQnaOperation,
     requiredInput: ["keyword"],
-    inputProperties: ["keyword", "page", "rows", "types"],
+    inputProperties: ["keyword", "page", "rows", "types", "sortDate", "from", "to"],
     resultProperties: ["result", "metadata", "references", "warnings"],
   },
   {
@@ -133,6 +133,9 @@ describe("capability JSON Schema exports", () => {
     expect(qnaTypes.description).toContain("11,12,13,14,15,24,25");
     expect(qnaTypes.description).toContain("numeric Q&A type id CSV");
     expect(qnaTypes.pattern).toBe("^\\s*(?:\\d+\\s*(?:,\\s*\\d+\\s*)*)?$");
+    expect(propertyAt(searchQnaInput, ["sortDate"]).description).toContain("publishDate");
+    expect(propertyAt(searchQnaInput, ["from"]).pattern).toBe("^\\d{4}-\\d{2}-\\d{2}$");
+    expect(propertyAt(searchQnaInput, ["to"]).pattern).toBe("^\\d{4}-\\d{2}-\\d{2}$");
   });
 
   test("get-section input schema exposes the section-locator XOR rule", () => {

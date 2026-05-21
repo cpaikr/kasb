@@ -111,7 +111,7 @@ export const createKasbAgentTools = (
   createKasbAgentTool({
     name: "kasb_search_qna",
     description:
-      "Search KASB Q&A documents with typed JSON fields keyword, page, rows, and optional numeric types CSV; use keyword, not query, and use rows rather than CLI --limit here.",
+      "Search KASB Q&A documents with typed JSON fields keyword, page, rows, optional numeric types CSV, and optional recency fields sortDate/from/to; use keyword, not query, and use rows rather than CLI --limit here.",
     operation: operations.searchQna,
   }),
   createKasbAgentTool({

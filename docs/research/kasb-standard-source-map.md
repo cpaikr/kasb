@@ -1,6 +1,6 @@
 # KASB Standards Source Map
 
-Captured on 2026-03-31. Q&A endpoint notes refreshed on 2026-05-17.
+Captured on 2026-03-31. Q&A endpoint notes refreshed on 2026-05-21.
 
 Status: observed source evidence, not the public contract or architecture guide. Promote stable contract decisions into [../specs/kasb-standards-v1.md](../specs/kasb-standards-v1.md) and implementation-shape decisions into [../../ARCHITECTURE.md](../../ARCHITECTURE.md).
 
@@ -144,7 +144,7 @@ Observed endpoints:
 - `GET /api/qnas/v2/count`
   Returns Q&A counts by type.
 - `GET /api/qnas/v2?types={csv}&searchWord={term}&page={page}&rows={rows}`
-  Returns Q&A search results with `docNumber`, `type`, highlighted `title`, highlighted `fullContent`, tags, source links, and count metadata. Observed `facilityQnaCountData` values can be summed for `totalCount`; `totalPages` and `hasNextPage` are derived from `rows` and the requested page, with `paginationStatus` indicating whether complete count metadata was available.
+  Returns Q&A search results with `docNumber`, `type`, highlighted `title`, highlighted `fullContent`, tags, source links, source `publishDate`, and count metadata. Observed `facilityQnaCountData` values can be summed for `totalCount`; `totalPages` and `hasNextPage` are derived from `rows` and the requested page, with `paginationStatus` indicating whether complete count metadata was available. Observed on 2026-05-21: extra query parameters tried for source-side date ordering/filtering, including `sortDate`, `sort`, `orderBy`/`order`, `from`, and `to`, were ignored by the endpoint; recency controls must be client-side unless later source evidence changes.
 - `GET /api/qnas/v2/{docNumber}?searchWord={term?}`
   Returns one Q&A document with `docNumber`, `type`, `title`, `fullContent`, optional `contentHtml`, related standards HTML, tags, adjacent document numbers, and similar Q&A references.
 - `GET /api/qnas/v2/paragraph?faqDocNumbers={csv}`
@@ -153,6 +153,7 @@ Observed endpoints:
 Observed:
 
 - Searching `리스` with `types=11,12,13,14,15,24,25&page=1&rows=5` returned `200 OK` and Q&A documents such as `IFRSIC2207E`, `2020-I-KQA002`, and `SSI-35629`.
+- Searching `리스` with client-side `publishDate` ordering over the full observed match count surfaced newer documents such as `2024-G-KQA001`, `SSI-202503009`, `SSI-202412009`, `SSI-202412029`, and `IFRSIC2304A` before older source-ranked hits.
 - `GET /api/qnas/v2/SSI-35629?searchWord=리스` returned a full Q&A document for `리스 개시일과 계약일`.
 - Calling legacy `GET /api/qnas?...` with the same search shape returned `500` during refresh; v1 implementation should use `/api/qnas/v2`.
 
@@ -163,6 +164,7 @@ Implementation implication:
 - expose observed type labels beside source-facing type ids for scanning, without accepting labels as inputs
 - preserve source `contentHtml` and `relStds` as HTML fields when returned, with warnings
 - use `/api/qnas/v2` for read-only Q&A search and detail retrieval
+- apply Q&A `sortDate`/`from`/`to` controls in the provider after fetching a bounded search window because the observed endpoint ignores date control query parameters
 
 ### Non-Read Noise To Ignore In V1
 

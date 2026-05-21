@@ -119,6 +119,14 @@ describe("capability request validation", () => {
     expect(resolveSearchQnaRequest({ keyword: "리스" })).toMatchObject({ page: 1, rows: 10 });
   });
 
+  test("normalizes Q&A recency controls", () => {
+    expect(resolveSearchQnaRequest({ keyword: "리스", sortDate: "desc", from: "2024-01-01", to: "2024-12-31" })).toMatchObject({
+      sortDate: "desc",
+      from: "2024-01-01",
+      to: "2024-12-31",
+    });
+  });
+
   test("rejects unsupported search-standards sort modes", () => {
     expectInvalid(
       () => resolveSearchStandardsRequest({ keyword: "리스", sort: "source" } as Record<string, unknown>),
@@ -135,6 +143,14 @@ describe("capability request validation", () => {
       () => resolveSearchQnaRequest({ keyword: "리스", types: "24,,25" }),
       { parameter: "types", messageIncludes: "숫자 Q&A 유형 ID의 CSV" },
     );
+  });
+
+  test.each([
+    ["sortDate", () => resolveSearchQnaRequest({ keyword: "리스", sortDate: "recent" } as Record<string, unknown>), "sortDate", "asc 또는 desc"],
+    ["from", () => resolveSearchQnaRequest({ keyword: "리스", from: "2024-99-01" }), "from", "YYYY-MM-DD"],
+    ["to before from", () => resolveSearchQnaRequest({ keyword: "리스", from: "2024-12-31", to: "2024-01-01" }), "to", "from"],
+  ] as const)("rejects invalid Q&A recency control %s", (_name, run, parameter, messageIncludes) => {
+    expectInvalid(run, { parameter, messageIncludes });
   });
 
   test("rejects paragraph ranges with a get-section recovery hint", () => {

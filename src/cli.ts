@@ -193,9 +193,15 @@ const searchQnaCommand = buildOperationCommand<
     { key: "rows", flags: "--rows <number>", description: "[기본값: 10] 반환할 Q&A 수입니다(최대 50).", integer: true },
     { key: "rows", flags: "--limit <number>", description: "[별칭] --rows와 같습니다.", integer: true },
     { key: "types", flags: "--types <csv>", description: `[선택] 숫자 Q&A 유형 ID CSV입니다. 기본값: ${qnaDefaultTypesHelpText}` },
+    { key: "sortDate", flags: "--sort-date <direction>", description: "[선택] publishDate client-side 정렬입니다: desc, asc." },
+    { key: "from", flags: "--from <yyyy-mm-dd>", description: "[선택] publishDate 시작일(포함)입니다. 예: 2024-01-01" },
+    { key: "to", flags: "--to <yyyy-mm-dd>", description: "[선택] publishDate 종료일(포함)입니다. 예: 2024-12-31" },
   ],
-  notes: [qnaTypeHelpNote, "결과가 0건이면 suggestedKeywords로 더 넓은 검색어 또는 띄어쓰기 변형을 제안합니다.", "--output summary는 외부 contentLink와 긴 source-adjacent 필드를 제외하고 docNumber 중심으로 보여줍니다."],
-  examples: [{ description: "리스 관련 Q&A를 검색합니다.", argv: ["--keyword", "리스", "--limit", "5"] }],
+  notes: [qnaTypeHelpNote, "--sort-date/--from/--to는 KASB 검색 결과의 publishDate를 최대 500개 행까지 가져와 client-side로 적용합니다.", "결과가 0건이면 suggestedKeywords로 더 넓은 검색어 또는 띄어쓰기 변형을 제안합니다.", "--output summary는 외부 contentLink와 긴 source-adjacent 필드를 제외하고 docNumber 중심으로 보여줍니다."],
+  examples: [
+    { description: "리스 관련 Q&A를 검색합니다.", argv: ["--keyword", "리스", "--limit", "5"] },
+    { description: "리스 관련 Q&A를 최근 publishDate 순으로 검색합니다.", argv: ["--keyword", "리스", "--sort-date", "desc", "--limit", "10", "--output", "summary"] },
+  ],
   outputModes: detailOutputModes,
   summarizeResult: (output) => ({
     request: output.result.request,

@@ -49,6 +49,11 @@ const standardSearchPath = (keyword: string): string => {
   return `/api/standard?${params.toString()}`;
 };
 
+const qnaSearchPath = (keyword: string, page: number, rows: number, types = "11,12,13,14,15,24,25"): string => {
+  const params = new URLSearchParams({ types, searchWord: keyword, page: String(page), rows: String(rows) });
+  return `/api/qnas/v2?${params.toString()}`;
+};
+
 const standardTitleFixture = (stdNum: string, title: string): unknown => ({
   standardIndexes: [{ documentId: `${stdNum}-root`, stdNum, title, level: 1, parentDocumentIds: [] }],
 });
@@ -425,6 +430,49 @@ describe("KASB provider operations", () => {
     expect(result.result.countByType["15"]).toBe(73);
     expect(result.result.typeLabels["15"]).toBe("K-IFRS · 신속처리질의");
     expect(result.result.suggestedKeywords).toEqual([]);
+  });
+
+  test("sorts and filters Q&A search results by source publishDate", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(qnaSearchPath("정렬", 1, 50), {
+      facilityQnas: [
+        { docNumber: "OLD", type: 15, title: "old", fullContent_snippet: "old", publishDate: "2019-01-01T15:00:00.000Z", deprecatedYn: 0 },
+        { docNumber: "NEW", type: 15, title: "new", fullContent_snippet: "new", publishDate: "2024-05-01T15:00:00.000Z", deprecatedYn: 0 },
+        { docNumber: "MID", type: 24, title: "mid", fullContent_snippet: "mid", publishDate: "2023-03-01T15:00:00.000Z", deprecatedYn: 0 },
+        { docNumber: "NODATE", type: 15, title: "nodate", fullContent_snippet: "nodate", deprecatedYn: 0 },
+      ],
+      facilityQnaCountData: { "15": 3, "24": 1 },
+    });
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchQnaOperation.execute({ keyword: "정렬", rows: 2, sortDate: "desc", from: "2023-03-01", to: "2024-05-01" });
+
+    expect(result.result.items.map((item) => item.docNumber)).toEqual(["NEW", "MID"]);
+    expect(result.result.totalCount).toBe(2);
+    expect(result.result.totalPages).toBe(1);
+    expect(result.result.countByType).toEqual({ "15": 1, "24": 1 });
+    expect(result.result.paginationStatus).toBe("known");
+    expect(result.references.searchUrl).toContain("rows=50");
+    expect(result.metadata.content?.notes?.join(" ")).toContain("client-side");
+  });
+
+  test("warns when Q&A recency controls scan a bounded source window", async () => {
+    const fixtures = makeFixtureMap();
+    for (let page = 1; page <= 10; page += 1) {
+      fixtures.set(qnaSearchPath("대량", page, 50), {
+        facilityQnas: page === 1
+          ? [{ docNumber: "FIRST", type: 15, title: "first", fullContent_snippet: "first", publishDate: "2024-01-01T15:00:00.000Z", deprecatedYn: 0 }]
+          : [],
+        facilityQnaCountData: { "15": 501 },
+      });
+    }
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchQnaOperation.execute({ keyword: "대량", sortDate: "desc" });
+
+    expect(result.result.paginationStatus).toBe("estimated");
+    expect(result.metadata.completeness).toBe("partial");
+    expect(result.warnings.map((warning) => warning.message).join("\n")).toContain("처음 500개");
   });
 
   test("suggests broader Q&A keywords when an exact search has no results", async () => {

@@ -117,6 +117,8 @@ Examples:
 | `get-paragraph` | `paraNum` | `--para-num` |
 | `search-qna` | `keyword` | `--keyword` |
 | `search-qna` | `rows` | `--rows`, `--limit` alias |
+| `search-qna` | `sortDate` | `--sort-date` |
+| `search-qna` | `from`, `to` | `--from`, `--to` |
 | `get-qna` | `docNumber` | `--doc-number` |
 
 ### Success Envelope
@@ -265,9 +267,9 @@ Implementation notes:
 - `purpose`
   Find KASB Q&A and interpretation material relevant to a keyword.
 - `inputs`
-  `keyword`, optional `page`, optional `rows`, optional source-facing numeric `types` CSV. The CLI also accepts `--limit` as an alias for `rows`.
+  `keyword`, optional `page`, optional `rows`, optional source-facing numeric `types` CSV, optional `sortDate` (`asc` or `desc`), optional inclusive `from`/`to` publish-date bounds in `YYYY-MM-DD` form. The CLI also accepts `--limit` as an alias for `rows`.
 - `output`
-  Matching Q&A records with `docNumber`, source type, observed type label, title, compact snippet, tags, source links, per-type counts, type-label lookup metadata, pagination metadata (`totalCount`, `totalPages`, `hasNextPage`, `paginationStatus`), and zero-result `suggestedKeywords` for broader or spacing-normalized follow-up searches.
+  Matching Q&A records with `docNumber`, source type, observed type label, title, compact snippet, tags, source links, source `publishDate` when available, per-type counts, type-label lookup metadata, pagination metadata (`totalCount`, `totalPages`, `hasNextPage`, `paginationStatus`), and zero-result `suggestedKeywords` for broader or spacing-normalized follow-up searches.
 - `warnings`
   `source_metadata_incomplete`
 - `failure cases`
@@ -279,6 +281,7 @@ Implementation notes:
 
 - Use `GET /api/qnas/v2?types={csv}&searchWord={keyword}&page={page}&rows={rows}`.
 - Default observed public `types` to `11,12,13,14,15,24,25`.
+- The observed source endpoint does not accept date sort/filter parameters; `sortDate`, `from`, and `to` are applied client-side to source `publishDate` across a bounded Q&A search window. When the bounded scan cannot cover all matching source rows, return partial metadata and a warning.
 - Treat `types` as an explicit v1 exception to the usual semantic-field rule; keep type numbers source-facing until a later spec promotes semantic type names.
 - Return observed labels for known public type ids to make source-facing numbers scannable; labels are descriptive metadata, not accepted semantic inputs.
 - Reject malformed non-numeric `types` CSV values as `invalid_input`; normalize spaces around comma-separated numeric ids.

@@ -159,6 +159,9 @@ describe("kasb CLI", () => {
     expect(stdout).toContain("Q&A 유형:");
     expect(stdout).toContain("15 K-IFRS 신속처리질의");
     expect(stdout).toContain("24 일반기업회계기준 금융감독원");
+    expect(stdout).toContain("--sort-date <direction>");
+    expect(stdout).toContain("--from <yyyy-mm-dd>");
+    expect(stdout).toContain("publishDate");
   });
 
   test("documents output detail modes for high-volume commands", () => {
