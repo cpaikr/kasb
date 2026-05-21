@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.4](https://github.com/sjunepark/kasb/compare/v0.0.3...v0.0.4) (2026-05-21)
+
+
+### Bug Fixes
+
+* include proprietary license ([c87d27f](https://github.com/sjunepark/kasb/commit/c87d27fb034800dd43636e221a6e8fca6600907c))
+
 ## [0.0.3](https://github.com/sjunepark/kasb/compare/v0.0.2...v0.0.3) (2026-05-21)
 
 
