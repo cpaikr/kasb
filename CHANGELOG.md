@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/sjunepark/kasb/compare/v0.1.0...v0.1.1) (2026-05-22)
+
+
+### Bug Fixes
+
+* publish Elastic license metadata ([8bc0ee7](https://github.com/sjunepark/kasb/commit/8bc0ee7dcf82335339cc35501f5c90f7c70f7361))
+
 ## [0.1.0](https://github.com/sjunepark/kasb/compare/v0.0.4...v0.1.0) (2026-05-22)
 
 
