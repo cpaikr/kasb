@@ -45,7 +45,7 @@ describe("CLI entrypoints", () => {
     if (result.exitCode !== 0) {
       throw new Error(`Failed to build CLI smoke-test bundle.\nstdout:\n${decode(result.stdout)}\nstderr:\n${decode(result.stderr)}`);
     }
-  });
+  }, 30_000);
 
   afterAll(() => {
     rmSync(buildDir, { force: true, recursive: true });
