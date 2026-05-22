@@ -7,3 +7,7 @@ KASB 기준서와 Q&A 자료를 검색하고 조회하는 read-only tool package
 Command success emits one JSON envelope to stdout. Command failure emits one JSON failure envelope to stdout with a nonzero exit code. Help output remains human-readable. The neutral toolset owns operation discovery, schemas, validation, execution, and error serialization; the Pi adapter wraps that same toolset as one action-oriented host tool.
 
 KASB 공개 웹 동작을 읽기 전용으로 사용하므로 KASB 변경의 영향을 받을 수 있습니다.
+
+## License
+
+Elastic License 2.0. See [LICENSE.md](./LICENSE.md).

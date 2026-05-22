@@ -1,47 +1,55 @@
-# KASB Proprietary License Agreement
+Elastic License 2.0
 
-Copyright (c) 2026 Sejun Park. All rights reserved.
+URL: https://www.elastic.co/licensing/elastic-license
 
-This KASB Proprietary License Agreement (the "Agreement") governs your access to and use of the KASB software, including the CLI, package APIs, bundled files, documentation, updates, and related materials (the "Software").
+Acceptance
 
-## 1. License Grant
+By using the software, you agree to all of the terms and conditions below.
 
-Subject to this Agreement and the accompanying Terms, Sejun Park grants you a limited, revocable, non-exclusive, non-transferable, non-sublicensable license to install and use the Software for personal use or internal business use.
+Copyright License
 
-No ownership rights are transferred. All rights not expressly granted are reserved.
+The licensor grants you a non-exclusive, royalty-free, worldwide, non-sublicensable, non-transferable license to use, copy, distribute, make available, and prepare derivative works of the software, in each case subject to the limitations and conditions below.
 
-## 2. Restrictions
+Limitations
 
-You must not, and must not permit others to:
+You may not provide the software to third parties as a hosted or managed service, where the service provides users with access to any substantial set of the features or functionality of the software.
 
-- copy, redistribute, publish, sublicense, rent, lease, sell, resell, or otherwise transfer the Software;
-- host, expose, wrap, or provide the Software as a service, API, managed service, or hosted tool for third parties;
-- modify, adapt, translate, create derivative works from, or publish modified versions of the Software;
-- reverse engineer, decompile, disassemble, deobfuscate, or otherwise attempt to derive source code, algorithms, or internal implementation details, except to the extent applicable law expressly permits despite this restriction;
-- remove, alter, bypass, or interfere with license notices, access controls, usage controls, authentication, telemetry, rate limits, or other protection mechanisms;
-- use the Software to build, train, benchmark, support, or operate a competing product or service;
-- use the Software for automated abuse, excessive traffic generation, scraping abuse, service disruption, security testing without authorization, or any unlawful purpose.
+You may not move, change, disable, or circumvent the license key functionality in the software, and you may not remove or obscure any functionality in the software that is protected by the license key.
 
-## 3. Commercial Use
+You may not alter, remove, or obscure any licensing, copyright, or other notices of the licensor in the software. Any use of the licensor's trademarks is subject to applicable law.
 
-Internal business use is permitted under this Agreement. External commercial exploitation, including resale, paid hosting, managed access, bundling in a commercial product, or use in a competing offering, requires prior written permission.
+Patents
 
-## 4. Third-Party Services and Data
+The licensor grants you a license, under any patent claims the licensor can license, or becomes able to license, to make, have made, use, sell, offer for sale, import and have imported the software, in each case subject to the limitations and conditions in this license. This license does not cover any patent claims that you cause to be infringed by modifications or additions to the software. If you or your company make any written claim that the software infringes or contributes to infringement of any patent, your patent license for the software granted under these terms ends immediately. If your company makes such a claim, your patent license ends immediately for work on behalf of your company.
 
-The Software may access public KASB web pages and third-party services. You are responsible for complying with applicable laws, third-party terms, rate limits, and acceptable-use rules. This Agreement does not grant rights to third-party data, websites, APIs, or services.
+Notices
 
-## 5. Termination
+You must ensure that anyone who gets a copy of any part of the software from you also gets a copy of these terms.
 
-This license terminates automatically if you violate this Agreement or the accompanying Terms. Upon termination, you must stop using the Software and delete all copies under your control.
+If you modify the software, you must include in any modified copies of the software prominent notices stating that you have modified the software.
 
-## 6. No Warranty
+No Other Rights
 
-The Software is provided "as is" and "as available," without warranties of any kind, whether express, implied, statutory, or otherwise, including warranties of merchantability, fitness for a particular purpose, title, non-infringement, accuracy, availability, or uninterrupted operation.
+These terms do not imply any licenses other than those expressly granted under these terms.
 
-## 7. Limitation of Liability
+Termination
 
-To the maximum extent permitted by law, Sejun Park will not be liable for any indirect, incidental, special, consequential, exemplary, or punitive damages, or for lost profits, lost revenue, lost data, business interruption, or procurement of substitute services, arising from or related to the Software or this Agreement.
+If you use the software in violation of these terms, such use is not licensed, and your licenses will automatically terminate. If the licensor provides you with a notice of your violation, and you cease all violation of this license no later than 30 days after you receive that notice, your licenses will be reinstated retroactively. However, if you violate these terms after such reinstatement, any additional violation of these terms will cause your licenses to terminate automatically and permanently.
 
-## 8. Changes
+No Liability
 
-This Agreement may be updated from time to time. Continued use of the Software after an updated Agreement is published means you accept the updated Agreement.
+As far as the law allows, the software comes as is, without any warranty or condition, and the licensor will not be liable to you for any damages arising out of these terms or the use or nature of the software, under any kind of legal claim.
+
+Definitions
+
+The licensor is the entity offering these terms, and the software is the software the licensor makes available under these terms, including any portion of it.
+
+you refers to the individual or entity agreeing to these terms.
+
+your company is any legal entity, sole proprietorship, or other kind of organization that you work for, plus all organizations that have control over, are under the control of, or are under common control with that organization. control means ownership of substantially all the assets of an entity, or the power to direct its management and policies by vote, contract, or otherwise. Control can be direct or indirect.
+
+your licenses are all the licenses granted to you for the software under these terms.
+
+use means anything you do with the software requiring one of your licenses.
+
+trademark means trademarks, service marks, and similar rights.
