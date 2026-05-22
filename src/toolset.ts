@@ -164,7 +164,7 @@ type AppOperation = {
   readonly name: KasbOperationName;
   readonly inputJsonSchema: unknown;
   readonly resultJsonSchema: unknown;
-  readonly execute: (input: Record<string, unknown>) => Promise<unknown>;
+  readonly execute: (input: Record<string, unknown>, context?: KasbToolRunContext) => Promise<unknown>;
 };
 
 export type KasbOperationDefinition = KasbOperationSummary & {
@@ -761,7 +761,7 @@ export const createKasbToolset = (options: CreateKasbToolsetOptions = {}): KasbT
       const definition = operationByName.get(name as KasbOperationName);
       if (definition === undefined) throw createKasbUnknownOperationError(name);
       if (isAbortSignalAborted(context?.signal)) throw createAbortError(name);
-      return raceWithAbort(definition.operation.execute(input), context?.signal, name);
+      return raceWithAbort(definition.operation.execute(input, context), context?.signal, name);
     },
   };
 };

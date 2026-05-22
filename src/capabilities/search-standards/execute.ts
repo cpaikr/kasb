@@ -1,4 +1,4 @@
-import { toKasbFailure } from "../types.ts";
+import { toKasbFailure, type KasbExecutionContext } from "../types.ts";
 import {
   resolveSearchStandardsRequest,
   type SearchStandardsRawInput,
@@ -9,9 +9,10 @@ import type { SearchStandardsProvider } from "./provider.ts";
 export const executeSearchStandards = async (
   input: Partial<SearchStandardsRawInput> & Record<string, unknown>,
   provider: SearchStandardsProvider,
+  context?: KasbExecutionContext,
 ): Promise<SearchStandardsResult> => {
   try {
-    return await provider.search(resolveSearchStandardsRequest(input));
+    return await provider.search(resolveSearchStandardsRequest(input), context);
   } catch (error) {
     throw toKasbFailure(error, "KASB 기준서 검색 중 예상하지 못한 오류가 발생했습니다.");
   }

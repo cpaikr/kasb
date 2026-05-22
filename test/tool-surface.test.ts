@@ -147,6 +147,28 @@ describe("neutral KASB toolset surface", () => {
       sourceUrl: "https://db.kasb.or.kr/api/example",
     });
   });
+
+  test("passes execution context to operations", async () => {
+    const fakeOperation = createFakeOperation();
+    let receivedSignal: AbortSignal | undefined;
+    const toolset = createKasbToolset({
+      operations: [{
+        ...fakeOperation,
+        operation: {
+          ...fakeOperation.operation,
+          execute: async (input, context) => {
+            receivedSignal = context?.signal;
+            return fakeOperation.operation.execute(input, context);
+          },
+        },
+      }],
+    });
+    const controller = new AbortController();
+
+    await toolset.execute("search-standards", { keyword: "리스" }, { signal: controller.signal });
+
+    expect(receivedSignal).toBe(controller.signal);
+  });
 });
 
 describe("Pi KASB adapter surface", () => {

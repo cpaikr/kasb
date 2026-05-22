@@ -110,6 +110,10 @@ export class InvalidCapabilityRequest extends Schema.TaggedError<InvalidCapabili
   },
 ) {}
 
+export type KasbExecutionContext = {
+  readonly signal?: AbortSignal;
+};
+
 export type ProviderFailureCode =
   | "not_found"
   | "source_unavailable"

@@ -1,10 +1,20 @@
-import { ProviderFailure } from "../../capabilities/types.ts";
+import { ProviderFailure, type KasbExecutionContext } from "../../capabilities/types.ts";
 
 const requestTimeoutMs = 15_000;
 
-export const fetchKasbJson = async (sourceUrl: string): Promise<unknown> => {
+export const fetchKasbJson = async (
+  sourceUrl: string,
+  context: KasbExecutionContext = {},
+): Promise<unknown> => {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs);
+  const abort = () => controller.abort();
+  const timeout = setTimeout(abort, requestTimeoutMs);
+
+  if (context.signal?.aborted === true) {
+    abort();
+  } else {
+    context.signal?.addEventListener("abort", abort, { once: true });
+  }
 
   try {
     const response = await fetch(sourceUrl, {
@@ -50,5 +60,6 @@ export const fetchKasbJson = async (sourceUrl: string): Promise<unknown> => {
     });
   } finally {
     clearTimeout(timeout);
+    context.signal?.removeEventListener("abort", abort);
   }
 };

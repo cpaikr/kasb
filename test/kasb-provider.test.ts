@@ -610,6 +610,143 @@ describe("KASB provider operations", () => {
     } satisfies Partial<KasbFailure>);
   });
 
+  test("passes execution AbortSignal into source fetch", async () => {
+    let fetchSignal: AbortSignal | undefined;
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      fetchSignal = init?.signal ?? undefined;
+      return await new Promise<Response>((_resolve, reject) => {
+        fetchSignal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
+    }) as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    const promise = defaultSearchStandardsOperation.execute({ keyword: "리스" }, { signal: controller.signal });
+    await Promise.resolve();
+
+    expect(fetchSignal).toBeDefined();
+    expect(fetchSignal?.aborted).toBe(false);
+    controller.abort();
+
+    expect(fetchSignal?.aborted).toBe(true);
+    await expect(promise).rejects.toMatchObject({
+      code: "source_unavailable",
+      retryable: true,
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("passes execution AbortSignal into default Q&A search fetch", async () => {
+    let fetchSignal: AbortSignal | undefined;
+    let rejectFetch!: (reason?: unknown) => void;
+    let resolveSearchStarted!: () => void;
+    const searchStarted = new Promise<void>((resolve) => {
+      resolveSearchStarted = resolve;
+    });
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      fetchSignal = init?.signal ?? undefined;
+      resolveSearchStarted();
+      return await new Promise<Response>((_resolve, reject) => {
+        rejectFetch = reject;
+        fetchSignal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
+    }) as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    const promise = defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5 }, { signal: controller.signal });
+    await searchStarted;
+
+    expect(fetchSignal).toBeDefined();
+    expect(fetchSignal?.aborted).toBe(false);
+    controller.abort();
+    if (fetchSignal?.aborted !== true) rejectFetch(new Error("cleanup"));
+
+    expect(fetchSignal?.aborted).toBe(true);
+    await expect(promise).rejects.toMatchObject({
+      code: "source_unavailable",
+      retryable: true,
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("does not swallow cancellation during standard title enrichment", async () => {
+    let enrichmentSignal: AbortSignal | undefined;
+    let resolveEnrichmentStarted!: () => void;
+    const enrichmentStarted = new Promise<void>((resolve) => {
+      resolveEnrichmentStarted = resolve;
+    });
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      const key = `${url.pathname}${url.search}`;
+      if (key === standardSearchPath("정렬")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ standards: { totalCount: 1, stdCountArr: [{ key: "1116", doc_count: 1 }] } }),
+        } as Response;
+      }
+      if (key === "/api/standard-indexes/1116") {
+        enrichmentSignal = init?.signal ?? undefined;
+        resolveEnrichmentStarted();
+        return await new Promise<Response>((_resolve, reject) => {
+          enrichmentSignal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+        });
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    }) as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    const promise = defaultSearchStandardsOperation.execute(
+      { keyword: "정렬", limit: 1, sort: "title" },
+      { signal: controller.signal },
+    );
+    await enrichmentStarted;
+
+    expect(enrichmentSignal).toBeDefined();
+    expect(enrichmentSignal?.aborted).toBe(false);
+    controller.abort();
+
+    expect(enrichmentSignal?.aborted).toBe(true);
+    await expect(promise).rejects.toMatchObject({
+      code: "source_unavailable",
+      retryable: true,
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("does not swallow cancellation during paragraph section enrichment", async () => {
+    let enrichmentSignal: AbortSignal | undefined;
+    let resolveEnrichmentStarted!: () => void;
+    const enrichmentStarted = new Promise<void>((resolve) => {
+      resolveEnrichmentStarted = resolve;
+    });
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      const key = `${url.pathname}${url.search}`;
+      if (key === "/api/paragraphs/content/1116/23") {
+        return { ok: true, status: 200, json: async () => readFixture("fixtures/kasb/paragraph-1116-23.json") } as Response;
+      }
+      if (key === "/api/standard-indexes/1116") {
+        enrichmentSignal = init?.signal ?? undefined;
+        resolveEnrichmentStarted();
+        return await new Promise<Response>((_resolve, reject) => {
+          enrichmentSignal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+        });
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    }) as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    const promise = defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" }, { signal: controller.signal });
+    await enrichmentStarted;
+
+    expect(enrichmentSignal).toBeDefined();
+    expect(enrichmentSignal?.aborted).toBe(false);
+    controller.abort();
+
+    expect(enrichmentSignal?.aborted).toBe(true);
+    await expect(promise).rejects.toMatchObject({
+      code: "source_unavailable",
+      retryable: true,
+    } satisfies Partial<KasbFailure>);
+  });
+
   test("rejects all-malformed standards search rows as source_changed", async () => {
     const fixtures = makeFixtureMap();
     fixtures.set("/api/standard?searchWord=%EB%A6%AC%EC%8A%A4", {

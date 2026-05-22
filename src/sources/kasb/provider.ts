@@ -7,11 +7,11 @@ import type { GetSectionRequest, SectionClause } from "../../capabilities/get-se
 import type { GetStandardStructureProvider } from "../../capabilities/get-standard-structure/provider.ts";
 import type { StandardSectionNode } from "../../capabilities/get-standard-structure/contract.ts";
 import type { SearchQnaProvider } from "../../capabilities/search-qna/provider.ts";
-import type { QnaSearchItem, SearchQnaRequest } from "../../capabilities/search-qna/contract.ts";
+import type { QnaSearchItem, SearchQnaRequest, SearchQnaResult } from "../../capabilities/search-qna/contract.ts";
 import type { SearchStandardsProvider } from "../../capabilities/search-standards/provider.ts";
 import type { SearchStandardItem, SearchStandardsRequest } from "../../capabilities/search-standards/contract.ts";
 import { defaultObservedQnaTypeIds, qnaTypeLabel, qnaTypeLabelsFor } from "../../capabilities/qna-types.ts";
-import { ProviderFailure, type ResultMetadata } from "../../capabilities/types.ts";
+import { ProviderFailure, type KasbExecutionContext, type ResultMetadata } from "../../capabilities/types.ts";
 import { fetchKasbJson } from "./fetch-json.ts";
 import {
   asArray,
@@ -50,32 +50,32 @@ const metadata = (
 });
 
 export const kasbSearchStandardsProvider: SearchStandardsProvider = {
-  search: (request) => searchStandards(request),
+  search: (request, context) => searchStandards(request, context),
 };
 
 export const kasbStandardStructureProvider: GetStandardStructureProvider = {
-  getStructure: (request) => getStandardStructure(request),
+  getStructure: (request, context) => getStandardStructure(request, context),
 };
 
 export const kasbSectionProvider: GetSectionProvider = {
-  getSection: (request) => getSection(request),
+  getSection: (request, context) => getSection(request, context),
 };
 
 export const kasbParagraphProvider: GetParagraphProvider = {
-  getParagraph: (request) => getParagraph(request),
+  getParagraph: (request, context) => getParagraph(request, context),
 };
 
 export const kasbSearchQnaProvider: SearchQnaProvider = {
-  search: (request) => searchQna(request),
+  search: (request, context) => searchQna(request, context),
 };
 
 export const kasbQnaProvider: GetQnaProvider = {
-  getQna: (request) => getQna(request),
+  getQna: (request, context) => getQna(request, context),
 };
 
-const searchStandards: SearchStandardsProvider["search"] = async (request) => {
+const searchStandards: SearchStandardsProvider["search"] = async (request, context) => {
   const sourceUrl = standardsSearchUrl(request.keyword);
-  const payload = asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "standard search");
+  const payload = asRecord(await fetchKasbJson(sourceUrl, context), sourceUrl, "standard search");
   const standards = asRecord(payload.standards, sourceUrl, "standards");
   const stdCountArr = asArray(standards.stdCountArr, sourceUrl, "stdCountArr");
   const totalMatchCount = optionalNumber(standards.totalCount) ?? 0;
@@ -84,10 +84,10 @@ const searchStandards: SearchStandardsProvider["search"] = async (request) => {
     .map((item) => toSearchStandardItem(item, sourceUrl))
     .filter((item): item is SearchStandardItem => item !== undefined);
   assertAnyNormalized(stdCountArr, items, sourceUrl, "기준서 검색 결과 필드가 변경되었습니다.");
-  const orderedItems = await orderSearchStandardItems(items, request);
+  const orderedItems = await orderSearchStandardItems(items, request, context);
   const limitedItems = request.sort === "relevance" || request.sort === "title"
     ? orderedItems.slice(0, request.limit)
-    : await addStandardDisplayMetadata(orderedItems.slice(0, request.limit));
+    : await addStandardDisplayMetadata(orderedItems.slice(0, request.limit), context);
   const incomplete = items.length !== stdCountArr.length;
 
   return {
@@ -138,15 +138,16 @@ const buildSearchStandardNextActions = (stdNum: string): SearchStandardItem["nex
 const orderSearchStandardItems = async (
   items: readonly SearchStandardItem[],
   request: SearchStandardsRequest,
+  context: KasbExecutionContext | undefined,
 ): Promise<SearchStandardItem[]> => {
   if (request.sort === "relevance") {
     return sortSearchStandardItems(
-      await addStandardDisplayMetadata(items),
+      await addStandardDisplayMetadata(items, context),
       (left, right) => compareSearchRelevance(request.keyword, left, right),
     );
   }
   if (request.sort === "title") {
-    return sortSearchStandardItems(await addStandardDisplayMetadata(items), compareSearchStandardTitle);
+    return sortSearchStandardItems(await addStandardDisplayMetadata(items, context), compareSearchStandardTitle);
   }
   if (request.sort === "std-num") {
     return sortSearchStandardItems(items, compareSearchStandardNumber);
@@ -156,10 +157,11 @@ const orderSearchStandardItems = async (
 
 const addStandardDisplayMetadata = async (
   items: readonly SearchStandardItem[],
+  context: KasbExecutionContext | undefined,
 ): Promise<SearchStandardItem[]> =>
   mapWithConcurrency(items, 8, async (item) => ({
     ...item,
-    ...(await getStandardDisplayMetadata(item.stdNum)),
+    ...(await getStandardDisplayMetadata(item.stdNum, context)),
   }));
 
 type StandardDisplayMetadata = Pick<SearchStandardItem, "standardTitle" | "standardKind">;
@@ -181,18 +183,25 @@ type SectionEnrichment = StandardDisplayMetadata & {
 
 const getStandardDisplayMetadata = async (
   stdNum: string,
+  context: KasbExecutionContext | undefined,
 ): Promise<StandardDisplayMetadata> => {
   try {
-    const snapshot = await fetchStandardStructureSnapshot(stdNum);
+    const snapshot = await fetchStandardStructureSnapshot(stdNum, context);
     return getStandardDisplayMetadataFromSections(snapshot.sections);
-  } catch {
+  } catch (error) {
+    if (context?.signal?.aborted === true) {
+      throw error;
+    }
     return {};
   }
 };
 
-const fetchStandardStructureSnapshot = async (stdNum: string): Promise<StandardStructureSnapshot> => {
+const fetchStandardStructureSnapshot = async (
+  stdNum: string,
+  context: KasbExecutionContext | undefined,
+): Promise<StandardStructureSnapshot> => {
   const sourceUrl = standardIndexesUrl(stdNum);
-  const payload = asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "standard indexes");
+  const payload = asRecord(await fetchKasbJson(sourceUrl, context), sourceUrl, "standard indexes");
   const sourceItems = asArray(payload.standardIndexes, sourceUrl, "standardIndexes");
   const sections = sourceItems
     .map((item) => toSectionNode(item, sourceUrl, stdNum))
@@ -240,11 +249,15 @@ const getSectionEnrichmentFromSnapshot = (
 const getOptionalSectionEnrichment = async (
   stdNum: string,
   indexDocumentId: string,
+  context: KasbExecutionContext | undefined,
 ): Promise<SectionEnrichment | undefined> => {
   try {
-    const snapshot = await fetchStandardStructureSnapshot(stdNum);
+    const snapshot = await fetchStandardStructureSnapshot(stdNum, context);
     return getSectionEnrichmentFromSnapshot(snapshot, indexDocumentId);
-  } catch {
+  } catch (error) {
+    if (context?.signal?.aborted === true) {
+      throw error;
+    }
     return undefined;
   }
 };
@@ -364,8 +377,8 @@ const suggestBroaderStandardKeywords = (keyword: string): string[] => {
   return [...suggestions];
 };
 
-const getStandardStructure: GetStandardStructureProvider["getStructure"] = async (request) => {
-  const baseSnapshot = await fetchStandardStructureSnapshot(request.stdNum);
+const getStandardStructure: GetStandardStructureProvider["getStructure"] = async (request, context) => {
+  const baseSnapshot = await fetchStandardStructureSnapshot(request.stdNum, context);
   const baseSourceUrl = baseSnapshot.sourceUrl;
   const sourceUrl = request.keyword === undefined ? baseSourceUrl : standardIndexesUrl(request.stdNum, request.keyword);
   const baseSections = baseSnapshot.sections;
@@ -384,7 +397,7 @@ const getStandardStructure: GetStandardStructureProvider["getStructure"] = async
     ? baseSections
     : filterSectionsBySearchMetadata(
         baseSections,
-        asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "standard index search"),
+        asRecord(await fetchKasbJson(sourceUrl, context), sourceUrl, "standard index search"),
         sourceUrl,
       );
 
@@ -490,7 +503,10 @@ type ResolvedSectionLookup = {
   readonly ambiguousRef?: boolean;
 };
 
-const resolveSectionLookup = async (request: GetSectionRequest): Promise<ResolvedSectionLookup> => {
+const resolveSectionLookup = async (
+  request: GetSectionRequest,
+  context: KasbExecutionContext | undefined,
+): Promise<ResolvedSectionLookup> => {
   if (request.indexDocumentId !== undefined) {
     return { indexDocumentId: request.indexDocumentId };
   }
@@ -504,7 +520,7 @@ const resolveSectionLookup = async (request: GetSectionRequest): Promise<Resolve
     });
   }
 
-  const snapshot = await fetchStandardStructureSnapshot(request.stdNum);
+  const snapshot = await fetchStandardStructureSnapshot(request.stdNum, context);
   const sourceUrl = snapshot.sourceUrl;
   const sections = snapshot.sections;
 
@@ -533,21 +549,21 @@ const resolveSectionLookup = async (request: GetSectionRequest): Promise<Resolve
 
 const normalizeRef = (ref: string): string => ref.replaceAll(/\s+/gu, "");
 
-const getSection: GetSectionProvider["getSection"] = async (request) => {
-  const lookup = await resolveSectionLookup(request);
+const getSection: GetSectionProvider["getSection"] = async (request, context) => {
+  const lookup = await resolveSectionLookup(request, context);
   const sourceUrl = paragraphsUrl(request.stdNum, lookup.indexDocumentId, request.keyword);
-  const payload = asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "paragraphs");
+  const payload = asRecord(await fetchKasbJson(sourceUrl, context), sourceUrl, "paragraphs");
   const sourceClauses = asArray(payload.clauses, sourceUrl, "clauses");
   const clauses = sourceClauses
     .map((item) => toSectionClause(item, sourceUrl, request.stdNum, lookup.indexDocumentId))
     .filter((item): item is SectionClause => item !== undefined);
   assertAnyNormalized(sourceClauses, clauses, sourceUrl, "섹션 문단 행 필드가 변경되었습니다.");
   const incomplete = clauses.length !== sourceClauses.length;
-  const sectionEnrichment = lookup.sectionEnrichment ?? (await getOptionalSectionEnrichment(request.stdNum, lookup.indexDocumentId));
+  const sectionEnrichment = lookup.sectionEnrichment ?? (await getOptionalSectionEnrichment(request.stdNum, lookup.indexDocumentId, context));
 
   if (clauses.length === 0 && sectionEnrichment?.exists !== true) {
     if (sectionEnrichment === undefined) {
-      await assertSectionExists(request.stdNum, lookup.indexDocumentId, sourceUrl);
+      await assertSectionExists(request.stdNum, lookup.indexDocumentId, sourceUrl, context);
     } else {
       throw new ProviderFailure({
         code: "not_found",
@@ -609,9 +625,10 @@ const assertSectionExists = async (
   stdNum: string,
   indexDocumentId: string,
   sourceUrl: string,
+  context: KasbExecutionContext | undefined,
 ): Promise<void> => {
   const structureUrl = standardIndexesUrl(stdNum);
-  const structure = asRecord(await fetchKasbJson(structureUrl), structureUrl, "standard indexes");
+  const structure = asRecord(await fetchKasbJson(structureUrl, context), structureUrl, "standard indexes");
   const exists = asArray(structure.standardIndexes, structureUrl, "standardIndexes").some(
     (item) => toRawStructureIndexDocumentId(item, structureUrl, stdNum) === indexDocumentId,
   );
@@ -680,9 +697,9 @@ const toSectionClause = (
   };
 };
 
-const getParagraph: GetParagraphProvider["getParagraph"] = async (request) => {
+const getParagraph: GetParagraphProvider["getParagraph"] = async (request, context) => {
   const sourceUrl = paragraphContentUrl(request.stdNum, request.paraNum);
-  const payload = asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "paragraph content");
+  const payload = asRecord(await fetchKasbJson(sourceUrl, context), sourceUrl, "paragraph content");
   const paragraphs = asArray(payload.paraContents, sourceUrl, "paraContents");
   const first = paragraphs[0];
   if (first === undefined) {
@@ -701,7 +718,7 @@ const getParagraph: GetParagraphProvider["getParagraph"] = async (request) => {
   ) {
     throw sourceChanged(sourceUrl, "문단 응답 식별자가 요청과 일치하지 않습니다.");
   }
-  const sectionEnrichment = await getOptionalSectionEnrichment(paragraph.stdNum, paragraph.indexDocumentId);
+  const sectionEnrichment = await getOptionalSectionEnrichment(paragraph.stdNum, paragraph.indexDocumentId, context);
   const enrichedParagraph: Paragraph = {
     ...paragraph,
     ...(sectionEnrichment?.standardTitle === undefined ? {} : { standardTitle: sectionEnrichment.standardTitle }),
@@ -768,9 +785,9 @@ const toParagraph = (value: unknown, sourceUrl: string): Paragraph => {
   };
 };
 
-const searchQna: SearchQnaProvider["search"] = async (request) => {
+const searchQna: SearchQnaProvider["search"] = async (request, context) => {
   if (hasQnaRecencyControls(request)) {
-    return searchQnaWithRecencyControls(request);
+    return searchQnaWithRecencyControls(request, context);
   }
 
   const sourceUrl = qnasSearchUrl({
@@ -779,7 +796,7 @@ const searchQna: SearchQnaProvider["search"] = async (request) => {
     rows: request.rows,
     types: request.types,
   });
-  const page = await fetchQnaSearchPage(sourceUrl);
+  const page = await fetchQnaSearchPage(sourceUrl, context);
   const paginationStatus = page.countMetadataIncomplete ? "estimated" : "known";
   const totalCount = page.countMetadataIncomplete
     ? (request.page - 1) * request.rows + page.items.length
@@ -828,14 +845,17 @@ const qnaRecencyMaxScanRows = 500;
 const hasQnaRecencyControls = (request: SearchQnaRequest): boolean =>
   request.sortDate !== undefined || request.from !== undefined || request.to !== undefined;
 
-const searchQnaWithRecencyControls: SearchQnaProvider["search"] = async (request) => {
+const searchQnaWithRecencyControls = async (
+  request: SearchQnaRequest,
+  context: KasbExecutionContext | undefined,
+): Promise<SearchQnaResult> => {
   const firstSourceUrl = qnasSearchUrl({
     searchWord: request.keyword,
     page: 1,
     rows: qnaRecencyScanRows,
     types: request.types,
   });
-  const firstPage = await fetchQnaSearchPage(firstSourceUrl);
+  const firstPage = await fetchQnaSearchPage(firstSourceUrl, context);
   const sourceTotalCount = firstPage.countMetadataIncomplete
     ? firstPage.items.length
     : sumQnaCounts(firstPage.countByType, request.types);
@@ -853,7 +873,7 @@ const searchQnaWithRecencyControls: SearchQnaProvider["search"] = async (request
       page,
       rows: qnaRecencyScanRows,
       types: request.types,
-    })),
+    }), context),
   );
   const scannedPages = [firstPage, ...additionalPages];
   const scannedSourceRowCapacity = scannedPages.length * qnaRecencyScanRows;
@@ -904,8 +924,11 @@ const searchQnaWithRecencyControls: SearchQnaProvider["search"] = async (request
   };
 };
 
-const fetchQnaSearchPage = async (sourceUrl: string): Promise<QnaSearchPage> => {
-  const payload = asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "qnas search");
+const fetchQnaSearchPage = async (
+  sourceUrl: string,
+  context: KasbExecutionContext | undefined,
+): Promise<QnaSearchPage> => {
+  const payload = asRecord(await fetchKasbJson(sourceUrl, context), sourceUrl, "qnas search");
   const sourceItems = asArray(payload.facilityQnas, sourceUrl, "facilityQnas");
   const items = sourceItems
     .map((item) => toQnaSearchItem(item, sourceUrl))
@@ -1020,9 +1043,9 @@ const toQnaSearchItem = (value: unknown, sourceUrl: string): QnaSearchItem | und
   };
 };
 
-const getQna: GetQnaProvider["getQna"] = async (request) => {
+const getQna: GetQnaProvider["getQna"] = async (request, context) => {
   const sourceUrl = qnaContentUrl(request.docNumber, request.keyword);
-  const payload = asRecord(await fetchKasbJson(sourceUrl), sourceUrl, "qna detail");
+  const payload = asRecord(await fetchKasbJson(sourceUrl, context), sourceUrl, "qna detail");
   const sourceQna = payload.facilityQna;
   if (sourceQna === undefined || sourceQna === null) {
     throw new ProviderFailure({
