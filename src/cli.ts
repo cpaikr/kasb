@@ -20,10 +20,6 @@ const writeStdout = (text: string) => {
   console.log(text);
 };
 
-const writeStderr = (text: string) => {
-  console.error(text);
-};
-
 const shouldPrettyPrintJson = (argv: readonly string[]): boolean => argv.includes("--pretty");
 
 const detailOutputModes = ["summary", "structured", "raw"] as const;
@@ -348,7 +344,7 @@ if (process.argv.length <= 2) {
     const operationName = process.argv[2];
     const errorDetails = renderCommandErrorDetails(operationName, error);
 
-    writeStderr(
+    writeStdout(
       renderCliFailureJson(error, {
         ...errorDetails,
         ...(operationName === undefined ? {} : { operation: operationName }),

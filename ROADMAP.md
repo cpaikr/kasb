@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap records the path from docs-only planning to the first Darty-shaped CLI implementation. It is historical context plus broad release direction; use [TODO.md](TODO.md) for active work.
+This roadmap records the path from docs-only planning to the first Darty-shaped tool package implementation. It is historical context plus broad release direction; use [TODO.md](TODO.md) for active work.
 
 ## Completed
 
@@ -48,18 +48,28 @@ Delivered:
 - Commander root CLI
 - commands for the six v1 operations
 - JSON success envelope on `stdout`
-- JSON failure envelope on `stderr` with nonzero exit code and empty `stdout`
+- JSON failure envelope on `stdout` with nonzero exit code
 - `--pretty` output without breaking parseable JSON
 - subprocess CLI smoke tests
+
+### Phase 5: Tool Package Surfaces
+
+Delivered:
+
+- `./toolset` export with operation discovery, command help, validation, execution dispatch, and error serialization
+- `./pi` export and Pi extension entrypoint wrapping the neutral toolset as one action-oriented tool
+- package metadata for CLI, toolset, Pi exports, and Pi extension registration
+- build output for ESM library modules and declaration files
+- tool-surface tests for neutral and Pi action envelopes
 
 ## Current Phase: Hardening And Release Readiness
 
 Focus:
 
-- broaden contract, validation, source-drift, and CLI entrypoint coverage
+- broaden contract, validation, source-drift, CLI entrypoint, toolset, and Pi coverage
 - keep opt-in live checks gated by `LIVE_KASB_TESTS=1`
 - add CLI examples after command behavior settles
-- review packaging before publishing the CLI
+- review packaging before publishing the CLI/tool package
 
 ## Later
 
@@ -69,7 +79,7 @@ Focus:
 
 ## Intentional Deferrals
 
-- MCP, Pi-native tools, or SDK packages
+- MCP or additional host adapters beyond Pi
 - database persistence or background ingestion
 - broad multi-source abstraction
 - mutation, login, or account flows

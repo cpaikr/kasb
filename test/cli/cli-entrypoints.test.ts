@@ -82,27 +82,27 @@ describe("CLI entrypoints", () => {
     expect(decode(result.stdout)).toContain("Usage: kasb [options] [command]");
   });
 
-  test("bundled CLI renders unknown commands as JSON failures on stderr", () => {
+  test("bundled CLI renders unknown commands as JSON failures on stdout", () => {
     const result = runEntrypoint(nodeRuntime, builtEntrypoint, ["missing-command"]);
-    const envelope = JSON.parse(decode(result.stderr)) as {
+    const envelope = JSON.parse(decode(result.stdout)) as {
       readonly failure: { readonly code: string; readonly message: string };
     };
 
     expect(result.exitCode).toBe(1);
-    expect(decode(result.stdout)).toBe("");
+    expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.message).toContain("unknown command 'missing-command'");
   });
 
   test("bundled CLI validates command input through Node", () => {
     const result = runEntrypoint(nodeRuntime, builtEntrypoint, ["get-section", "--std-num", "1116"]);
-    const envelope = JSON.parse(decode(result.stderr)) as {
+    const envelope = JSON.parse(decode(result.stdout)) as {
       readonly failure: { readonly code: string; readonly parameter?: string; readonly message: string };
       readonly metadata: { readonly operation: string };
     };
 
     expect(result.exitCode).toBe(1);
-    expect(decode(result.stdout)).toBe("");
+    expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.parameter).toBe("indexDocumentId");
     expect(envelope.failure.message).toContain('필수 옵션 "--index-document-id"');

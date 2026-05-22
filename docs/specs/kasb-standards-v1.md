@@ -21,7 +21,7 @@ Generic browsing is insufficient because:
 
 ## 3. Capability Boundary
 
-This tool provides read-only CLI access to public KASB standards content through the current `https://db.kasb.or.kr/api/` surface.
+This tool package provides read-only CLI, neutral TypeScript toolset, and Pi access to public KASB standards content through the current `https://db.kasb.or.kr/api/` surface.
 
 In scope:
 
@@ -34,6 +34,8 @@ In scope:
 - stable references and source metadata
 - JSON Schemas exported from the same contracts used at runtime
 - Commander CLI commands for the v1 operations
+- runtime-neutral TypeScript toolset export for operation discovery, validation, execution, and error serialization
+- Pi adapter export and extension entrypoint wrapping the neutral toolset as one action-oriented host tool
 
 Out of scope:
 
@@ -43,7 +45,7 @@ Out of scope:
 - route-id support via `titleDocumentId`
 - broad multi-source abstraction
 - database persistence or background ingestion
-- MCP, SDK, or Pi-native adapters
+- MCP or additional host adapters beyond Pi
 
 ## 4. Domain Model
 
@@ -142,6 +144,8 @@ Failures are separate typed values or thrown capability failures. A public failu
 - `parameter` when one input caused the failure
 - `sourceUrl` when the source was contacted
 
+Neutral toolset validation failures use recoverable `missing_parameter`, `invalid_parameter`, `unknown_parameter`, or `invalid_request` codes and include command-help recovery metadata when possible. Execution errors are serialized with `name`, `message`, and known structured failure fields.
+
 CLI failure envelopes may also include transport-local recovery fields:
 
 - `cliOption` when validation can identify the exact CLI flag used, including aliases such as `--limit`
@@ -158,9 +162,9 @@ Allowed public failure codes:
 
 ### Output Modes
 
-The first implementation supports structured output by default. High-volume CLI commands (`get-standard-structure`, `get-section`, `search-qna`, and `get-qna`) also accept `--output summary|structured|raw` without changing the shared capability contracts or the JSON CLI operation-output rule.
+The first implementation supports structured CLI output by default. High-volume CLI commands (`get-standard-structure`, `get-section`, `search-qna`, and `get-qna`) also accept `--output summary|structured|raw` without changing the shared capability contracts or the JSON CLI operation-output rule.
 
-Every operation output mode still emits a JSON envelope:
+Every CLI operation output mode still emits a JSON envelope:
 
 - `structured`: schema-first `result` payload for downstream use
 - `summary`: concise JSON `result` projection over the structured result; operation-level `metadata`, `references`, and `warnings` are preserved
@@ -312,7 +316,7 @@ Implementation notes:
 
 ## 7. CLI Transport
 
-The only planned public interface is the Commander CLI.
+The Commander CLI is the human/debuggable package surface. The neutral toolset and Pi adapter expose the same operation ids without CLI flags.
 
 The CLI should:
 
@@ -320,7 +324,7 @@ The CLI should:
 - accept kebab-case flags
 - emit JSON for operation success and failure output; Commander help may remain human-readable
 - write success envelopes to `stdout` with exit code `0`
-- write failure envelopes to `stderr` with a nonzero exit code and empty `stdout`
+- write failure envelopes to `stdout` with a nonzero exit code
 - do not mix human-readable diagnostics into operation output; any diagnostic mode must stay parseable, such as JSON lines on `stderr` or a separate diagnostic file
 - keep help text, examples, and output presentation outside capability contracts
 - make `kasb help <command>` and `<command> --help` both exit successfully without JSON failure envelopes

@@ -2,9 +2,9 @@
 
 ## Scope
 
-- This repo is for a read-only KASB standards CLI, not a generic Markdown guide.
-- The app design should follow `../darty`: a behavior-first capability core, thin CLI transport, explicit source adapters, and typed contract/error boundaries.
-- The first CLI implementation now exists. Treat broad docs as product and architecture guidance, while `TODO.md` tracks active hardening work.
+- This repo is for a read-only KASB standards tool package, not a generic Markdown guide.
+- The app design should follow `../darty`: a behavior-first capability core, neutral toolset, thin CLI/Pi transports, explicit source adapters, and typed contract/error boundaries.
+- The first CLI/toolset/Pi implementation now exists. Treat broad docs as product and architecture guidance, while `TODO.md` tracks active hardening work.
 
 ## Read First
 
@@ -19,7 +19,7 @@
 - Install deps: `bun install`
 - Typecheck: `bun run typecheck`
 - Test: `bun test`
-- Build npm CLI: `bun run build`
+- Build npm CLI and package exports: `bun run build`
 - Live checks: `bun run test:live`
 
 Do not add placeholder build, lint, format, or test commands to docs. Document only commands that exist in `package.json`.
@@ -28,7 +28,7 @@ Do not add placeholder build, lint, format, or test commands to docs. Document o
 
 - Agents may run the local CLI from the repo root to inspect behavior and validate changes.
 - Treat the CLI help output as the guide: start with `bun src/cli.ts --help`, then use `bun src/cli.ts help <command>` for command-specific usage.
-- After `bun run build`, use `node dist/cli.js --help` to check the packaged entrypoint.
+- After `bun run build`, use `node dist/cli.js --help` to check the packaged entrypoint and import `dist/toolset.js`/`dist/pi.js` when package exports change.
 
 Expected implementation stack, matching `../darty` unless a later decision changes it:
 
@@ -50,9 +50,9 @@ Expected implementation stack, matching `../darty` unless a later decision chang
 ## Working Rules
 
 - Keep each idea in one canonical document and link to it instead of repeating it.
-- Preserve Darty's layer split: CLI transport -> app composition -> capability -> source adapter.
+- Preserve Darty's layer split: CLI/Pi transports -> neutral toolset/app composition -> capability -> source adapter.
 - Public JSON contracts use camelCase fields; CLI flags should use kebab-case.
 - Keep raw KASB source identifiers and response shapes internal unless the spec explicitly promotes them.
 - Mark source claims as observed, inferred, or unverified when that distinction matters.
-- Keep the implementation read-only, CLI-only, and citation-first unless the product docs change that contract.
-- Do not add MCP, SDK, browser-automation, database, or background ingestion goals without first changing the product docs.
+- Keep the implementation read-only and citation-first with CLI, neutral toolset, and Pi as the public surfaces unless the product docs change that contract.
+- Do not add MCP, browser-automation, database, or background ingestion goals without first changing the product docs.

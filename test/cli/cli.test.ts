@@ -60,17 +60,17 @@ describe("kasb CLI", () => {
     expect(stdout).toContain(expectedOption);
   });
 
-  test("writes JSON failures to stderr and leaves stdout empty", () => {
+  test("writes JSON failures to stdout and leaves stderr empty", () => {
     const result = runCli(["get-paragraph", "--std-num", "1116"]);
     const stdout = decode(result.stdout);
     const stderr = decode(result.stderr);
-    const envelope = JSON.parse(stderr) as {
+    const envelope = JSON.parse(stdout) as {
       readonly failure: { readonly code: string; readonly parameter?: string; readonly message: string };
       readonly metadata: { readonly cliTransportVersion: string; readonly operation: string };
     };
 
     expect(result.exitCode).toBe(1);
-    expect(stdout).toBe("");
+    expect(stderr).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.parameter).toBe("paraNum");
     expect(envelope.failure.message).toContain('필수 옵션 "--para-num"');
@@ -80,12 +80,12 @@ describe("kasb CLI", () => {
 
   test.each(["--query", "--search-word"] as const)("suggests command-local alternative for %s", (option) => {
     const result = runCli(["search-qna", option, "리스"]);
-    const envelope = JSON.parse(decode(result.stderr)) as {
+    const envelope = JSON.parse(decode(result.stdout)) as {
       readonly failure: { readonly code: string; readonly message: string };
     };
 
     expect(result.exitCode).toBe(1);
-    expect(decode(result.stdout)).toBe("");
+    expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.message).toContain(`unknown option '${option}'`);
     expect(envelope.failure.message).toContain("--keyword");
@@ -93,12 +93,12 @@ describe("kasb CLI", () => {
 
   test("does not suggest options from a different command", () => {
     const result = runCli(["get-paragraph", "--query", "리스"]);
-    const envelope = JSON.parse(decode(result.stderr)) as {
+    const envelope = JSON.parse(decode(result.stdout)) as {
       readonly failure: { readonly code: string; readonly message: string };
     };
 
     expect(result.exitCode).toBe(1);
-    expect(decode(result.stdout)).toBe("");
+    expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.message).toContain("unknown option '--query'");
     expect(envelope.failure.message).not.toContain("--keyword");
@@ -106,25 +106,25 @@ describe("kasb CLI", () => {
 
   test("does not suggest command-local options for root-level unknown options", () => {
     const result = runCli(["--query", "리스"]);
-    const envelope = JSON.parse(decode(result.stderr)) as {
+    const envelope = JSON.parse(decode(result.stdout)) as {
       readonly failure: { readonly code: string; readonly message: string };
     };
 
     expect(result.exitCode).toBe(1);
-    expect(decode(result.stdout)).toBe("");
+    expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.message).toContain("unknown option '--query'");
     expect(envelope.failure.message).not.toContain("--keyword");
   });
 
-  test("renders unknown commands as JSON failures on stderr", () => {
+  test("renders unknown commands as JSON failures on stdout", () => {
     const result = runCli(["missing-command"]);
-    const envelope = JSON.parse(decode(result.stderr)) as {
+    const envelope = JSON.parse(decode(result.stdout)) as {
       readonly failure: { readonly code: string; readonly message: string };
     };
 
     expect(result.exitCode).toBe(1);
-    expect(decode(result.stdout)).toBe("");
+    expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.message).toContain("unknown command 'missing-command'");
   });
@@ -138,12 +138,12 @@ describe("kasb CLI", () => {
     ["get-qna", ["get-qna", "--keyword", "리스"], "docNumber", "--doc-number"],
   ] as const)("maps %s required-option failures to CLI flags", (_command, argv, parameter, flag) => {
     const result = runCli(argv);
-    const envelope = JSON.parse(decode(result.stderr)) as {
+    const envelope = JSON.parse(decode(result.stdout)) as {
       readonly failure: { readonly code: string; readonly parameter?: string; readonly message: string };
     };
 
     expect(result.exitCode).toBe(1);
-    expect(decode(result.stdout)).toBe("");
+    expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.parameter).toBe(parameter);
     expect(envelope.failure.message).toContain(flag);
@@ -207,7 +207,7 @@ describe("kasb CLI", () => {
 
   test("adds a structure lookup next action when get-section lacks a locator", () => {
     const result = runCli(["get-section", "--std-num", "1019"]);
-    const envelope = JSON.parse(decode(result.stderr)) as {
+    const envelope = JSON.parse(decode(result.stdout)) as {
       readonly failure: {
         readonly code: string;
         readonly parameter?: string;
@@ -217,7 +217,7 @@ describe("kasb CLI", () => {
     };
 
     expect(result.exitCode).toBe(1);
-    expect(decode(result.stdout)).toBe("");
+    expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.parameter).toBe("indexDocumentId");
     expect(envelope.failure.message).toContain("--index-document-id");
@@ -231,7 +231,7 @@ describe("kasb CLI", () => {
 
   test("preserves the used --limit alias on search-qna row validation failures", () => {
     const result = runCli(["search-qna", "--keyword", "리스", "--limit", "999"]);
-    const envelope = JSON.parse(decode(result.stderr)) as {
+    const envelope = JSON.parse(decode(result.stdout)) as {
       readonly failure: {
         readonly code: string;
         readonly parameter?: string;
@@ -242,7 +242,7 @@ describe("kasb CLI", () => {
     };
 
     expect(result.exitCode).toBe(1);
-    expect(decode(result.stdout)).toBe("");
+    expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.parameter).toBe("rows");
     expect(envelope.failure.cliOption).toBe("--limit");
@@ -261,12 +261,12 @@ describe("kasb CLI", () => {
     ["search-qna rows", ["search-qna", "--keyword", "리스", "--rows", "-1"], "-1"],
   ] as const)("rejects non-integer CLI flags for %s", (_label, argv, value) => {
     const result = runCli(argv);
-    const envelope = JSON.parse(decode(result.stderr)) as {
+    const envelope = JSON.parse(decode(result.stdout)) as {
       readonly failure: { readonly code: string; readonly message: string };
     };
 
     expect(result.exitCode).toBe(1);
-    expect(decode(result.stdout)).toBe("");
+    expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.message).toContain(value);
   });

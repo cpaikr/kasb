@@ -2,18 +2,18 @@
 
 This repo tracks `../darty`'s app design while applying it to KASB standards access.
 
-The system is a CLI-first, read-only TypeScript app:
+The system is a read-only TypeScript tool package:
 
-- `src/`: reusable capability core, source adapters, CLI transport, and app composition
+- `src/`: reusable capability core, source adapters, neutral toolset, Pi adapter, CLI transport, and app composition
 - `fixtures/`: captured KASB API responses for deterministic tests
 - `test/`: CLI, fixture-backed, contract, and opt-in live checks
 - `evals/`: later scenario evals after CLI behavior stabilizes
 
-The first CLI implementation exists. This document defines implemented boundaries and ongoing direction; exact files should follow the proven code shape rather than precommitting unused modules.
+The first CLI/toolset/Pi implementation exists. This document defines implemented boundaries and ongoing direction; exact files should follow the proven code shape rather than precommitting unused modules.
 
 ## Big Picture
 
-The CLI is not the real app. The capability layer is: a semantic request contract, a provider interface, and an execution path that validates inputs, calls KASB source adapters, normalizes source results, and shapes typed success envelopes or typed failures.
+The CLI and Pi adapter are not the real app. The capability layer and neutral toolset are: a semantic request contract, operation discovery/help, validation, a provider-backed execution path, and typed success envelopes or typed failures.
 
 The first public capabilities are:
 
@@ -24,14 +24,19 @@ The first public capabilities are:
 - `search-qna`
 - `get-qna`
 
-The CLI is the only planned public interface. MCP, SDK, Pi-native tools, database persistence, and background ingestion are not implementation goals for this repo.
+The planned public interfaces are the CLI, `./toolset`, and `./pi`. MCP, database persistence, and background ingestion are not implementation goals for this repo.
 
 ## Layering
 
 ```mermaid
 graph TD
-    subgraph CLI["CLI Transport · src/cli/"]
-        CMD["Commander commands · flags · help · presentation"]
+    subgraph Host["Public surfaces"]
+        CMD["CLI transport · Commander flags · presentation"]
+        PI["Pi adapter · single-tool action envelope"]
+    end
+
+    subgraph Toolset["Neutral Toolset · src/toolset.ts"]
+        TOOL["Operation discovery · help · validation · execution · error serialization"]
     end
 
     subgraph App["App Composition · src/app/"]
@@ -46,7 +51,9 @@ graph TD
         SRC["KASB API request builders · fetchers · source models · normalizers"]
     end
 
-    CMD --> APP
+    CMD --> TOOL
+    PI --> TOOL
+    TOOL --> APP
     APP --> CAP
     CAP --> SRC
     SRC --> KASB[("db.kasb.or.kr/api")]
@@ -55,12 +62,16 @@ graph TD
 | Layer | Path | Owns |
 |---|---|---|
 | CLI transport | `src/cli.ts`, `src/cli/` | Parse CLI input, own help/examples/output flags, call shared operations, serialize JSON |
-| App composition | `src/app/` | Operation names, JSON Schemas, and default provider wiring for the CLI |
+| Neutral toolset | `src/toolset.ts` | Public operation discovery, command help, examples, validation, execution dispatch, reusable agent guidance, and error serialization |
+| Pi adapter | `src/pi.ts`, `src/pi-extension.ts` | One host tool with `help`, `command_help`, `validate`, and `run` actions over the neutral toolset |
+| App composition | `src/app/` | Operation names, JSON Schemas, and default provider wiring for public surfaces |
 | Capability | `src/capabilities/` | Public semantic request/result schemas, request resolution, typed failures, execution |
 | Source | `src/sources/kasb/` | KASB API URLs, source response schemas, fetchers, normalization, source error mapping |
 
 ## Implementation Roots
 
+- `src/toolset.ts` for neutral operation discovery, validation, execution dispatch, and error serialization
+- `src/pi.ts` and `src/pi-extension.ts` for the Pi host adapter
 - `src/app/` for operation composition and default wiring
 - `src/capabilities/` for public contracts and execution
 - `src/cli/` for Commander commands, flags, help, and JSON serialization
@@ -71,7 +82,7 @@ The first implementation established the current per-capability file shape. Cont
 
 ## Behavior-First Core
 
-The shared layer owns semantic behavior. The CLI owns presentation and protocol details.
+The shared layer owns semantic behavior. The neutral toolset owns reusable operation metadata and validation. CLI and Pi own presentation and protocol details.
 
 ```mermaid
 graph LR
@@ -81,6 +92,9 @@ graph LR
     SPEC --> APP["operation wiring"]
     APP --> CLI_META["CLI command names"]
     CONTRACT --> RESULT["success result envelope"]
+    APP --> TOOLSET["neutral toolset"]
+    TOOLSET --> CLI["CLI"]
+    TOOLSET --> PI["Pi adapter"]
 ```
 
 One source of truth should provide:
@@ -88,18 +102,25 @@ One source of truth should provide:
 - runtime validation shape
 - TypeScript request/result types
 - success result schema
-- JSON Schema for CLI-facing specs and internal agent-eval tool definitions
-- typed failure mapping
+- JSON Schema for CLI-facing specs, the neutral toolset, Pi parameters, and internal agent-eval tool definitions
+- operation examples, limitations, result summaries, and reusable agent guidance
+- typed failure mapping and error serialization
 
 `src/app/agent-tools.ts` exposes internal `kasb_*` tool definitions over the same app operations for eval/tool-use experiments.
-This is not a new public transport; CLI commands and operation ids remain the stable public surface.
+This is not a separate public host transport; CLI commands, neutral toolset operations, and Pi action commands share the stable operation ids.
 
 What stays CLI-local:
 
 - CLI flags
-- help text and examples
+- help text and examples that are specifically terminal-oriented
 - pretty/verbose output controls
 - terminal presentation
+
+What stays Pi-local:
+
+- host action parameter schema
+- `content[]` text blocks and host result wrapping
+- extension registration
 
 ## Runtime Flow
 
@@ -107,6 +128,14 @@ Runtime CLI flow:
 
 ```text
 argv -> CLI transport -> app operation -> capability execution -> KASB source adapter -> https://db.kasb.or.kr/api/...
+```
+
+The CLI and neutral toolset both dispatch to the same app operations; the CLI keeps terminal-specific flags and output projections local.
+
+Runtime Pi flow:
+
+```text
+Pi tool params -> Pi adapter -> neutral toolset -> app operation -> capability execution -> KASB source adapter
 ```
 
 ## Public Contract vs Source Contract
@@ -157,13 +186,13 @@ Keep two schema families separate:
 - CLI commands import app/capability surfaces, not `sources/kasb/*` internals.
 - CLI help, examples, and presentation options stay CLI-local.
 - Internal agent-eval tool names use the `kasb_*` namespace while preserving existing operation ids and CLI command names.
-- CLI success output is JSON on `stdout`; CLI failure output is JSON on `stderr` with nonzero exit code and empty `stdout`.
-- MCP, SDK, Pi-native tools, database persistence, and background ingestion are not current implementation targets.
+- CLI success output is JSON on `stdout`; CLI failure output is JSON on `stdout` with a nonzero exit code.
+- MCP, database persistence, and background ingestion are not current implementation targets.
 - Mark source observations as observed, inferred, or unverified when they affect contracts.
 
 ## Current Status
 
-The repo currently has docs, source evidence, a v1 spec, and a Darty-shaped Bun/TypeScript CLI implementation.
+The repo currently has docs, source evidence, a v1 spec, and a Darty-shaped Bun/TypeScript tool package implementation.
 
 Implemented roots:
 
@@ -172,5 +201,6 @@ Implemented roots:
 - `fixtures/`
 - `test/`
 - `scripts/build-cli.ts`
+- `tsconfig.build.json`
 
-The current milestone is to keep hardening the implementation with broader contract tests, source-drift coverage, CLI entrypoint coverage, and docs/examples after command behavior settles.
+The current milestone is to keep hardening the implementation with broader contract tests, source-drift coverage, CLI/toolset/Pi entrypoint coverage, and docs/examples after command behavior settles.
