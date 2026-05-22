@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.0](https://github.com/sjunepark/kasb/compare/v0.0.4...v0.1.0) (2026-05-22)
+
+
+### Features
+
+* expose KASB tool package surfaces ([6ac09c3](https://github.com/sjunepark/kasb/commit/6ac09c3b20b878cacbf38459611697bfade32164))
+
+
+### Bug Fixes
+
+* propagate caller cancellation through KASB source paths ([b52490a](https://github.com/sjunepark/kasb/commit/b52490aaa7d503893e5b3e7e59f96c50c363820f))
+
 ## [0.0.4](https://github.com/sjunepark/kasb/compare/v0.0.3...v0.0.4) (2026-05-21)
 
 
