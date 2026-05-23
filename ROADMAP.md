@@ -61,6 +61,7 @@ Delivered:
 - package metadata for CLI, toolset, Pi exports, and Pi extension registration
 - build output for ESM library modules and declaration files
 - tool-surface tests for neutral and Pi action envelopes
+- Korean user-facing copy across neutral toolset, Pi guidance, operation specs, JSON Schema descriptions, and CLI structured failures
 
 ## Current Phase: Hardening And Release Readiness
 

@@ -83,11 +83,11 @@ describe("internal typed eval tools", () => {
     ]);
     expect(new Set(tools.map((tool) => tool.name)).size).toBe(tools.length);
     expect(tools.every((tool) => tool.description.length > 0)).toBe(true);
-    expect(tools.find((tool) => tool.name === "kasb_get_section")?.description).toContain("indexDocumentId");
+    expect(tools.find((tool) => tool.name === "kasb_get_section")?.description).toContain("indexDocumentId/ref 중 정확히 하나");
     expect(tools.find((tool) => tool.name === "kasb_get_section")?.description).toContain("titleDocumentId");
     expect(tools.find((tool) => tool.name === "kasb_search_standards")?.description).toContain("keyword");
-    expect(tools.find((tool) => tool.name === "kasb_search_standards")?.description).toContain("not query");
-    expect(tools.find((tool) => tool.name === "kasb_search_qna")?.description).toContain("rows rather than CLI --limit");
+    expect(tools.find((tool) => tool.name === "kasb_search_standards")?.description).toContain("query");
+    expect(tools.find((tool) => tool.name === "kasb_search_qna")?.description).toContain("CLI --limit 대신 rows");
   });
 
   test("maps definitions directly to app-layer schemas and executors", () => {

@@ -18,37 +18,37 @@ const qnaSortDateValues = ["asc", "desc"] as const;
 
 export const SearchQnaRequestSchema = Schema.Struct({
   keyword: Schema.String.pipe(Schema.minLength(1)).annotations({
-    description: "Keyword used to find KASB Q&A documents; mapped to the source searchWord parameter.",
+    description: "KASB Q&A 문서를 찾을 검색어입니다. 원천 searchWord 매개변수로 매핑됩니다.",
     examples: ["리스", "종업원급여"],
   }),
   page: Schema.optionalWith(
     Schema.Int.pipe(Schema.greaterThanOrEqualTo(1), Schema.lessThanOrEqualTo(1000)),
     { default: () => 1 },
   ).annotations({
-    description: "One-based result page number, from 1 to 1000. Without recency controls this maps to the source page; with sortDate/from/to it pages the client-side filtered result window.",
+    description: "1부터 시작하는 결과 page 번호입니다. 1~1000 사이입니다. recency control이 없으면 원천 page로 매핑되고, sortDate/from/to가 있으면 client-side filtering 결과 창에서 paging합니다.",
     examples: [1, 2],
   }),
   rows: Schema.optionalWith(
     Schema.Int.pipe(Schema.greaterThanOrEqualTo(1), Schema.lessThanOrEqualTo(50)),
     { default: () => 10 },
   ).annotations({
-    description: "Number of Q&A rows to return per page, from 1 to 50. CLI --limit is an alias for this field.",
+    description: "page당 반환할 Q&A row 수입니다. 1~50 사이입니다. CLI --limit는 이 field의 alias입니다.",
     examples: [5, 10],
   }),
   types: Schema.optional(Schema.String.pipe(Schema.pattern(qnaTypesCsvPattern)).annotations({
-    description: "Source-facing numeric Q&A type id CSV. Defaults to observed public types 11,12,13,14,15,24,25 when omitted; override only when you know the KASB source type ids to include.",
+    description: "원천-facing 숫자 Q&A type id CSV입니다. 생략하면 관찰된 공개 type 11,12,13,14,15,24,25가 기본값입니다. 포함할 KASB 원천 type id를 알고 있을 때만 override하세요.",
     examples: [observedDefaultTypes, "24,25"],
   })),
   sortDate: Schema.optional(Schema.Literal(...qnaSortDateValues).annotations({
-    description: "Client-side ordering by source publishDate across the fetched Q&A search window. Use desc for newest first or asc for oldest first.",
+    description: "가져온 Q&A 검색 창에서 원천 publishDate 기준 client-side 정렬을 합니다. 최신순은 desc, 오래된순은 asc를 사용하세요.",
     examples: ["desc"],
   })),
   from: Schema.optional(Schema.String.pipe(Schema.pattern(qnaDatePattern)).annotations({
-    description: "Inclusive publishDate lower bound in YYYY-MM-DD form. Applied client-side because the observed source endpoint does not expose date filter parameters.",
+    description: "YYYY-MM-DD 형식의 publishDate 하한(포함)입니다. 관찰된 원천 endpoint가 date filter parameter를 제공하지 않아 client-side로 적용합니다.",
     examples: ["2024-01-01"],
   })),
   to: Schema.optional(Schema.String.pipe(Schema.pattern(qnaDatePattern)).annotations({
-    description: "Inclusive publishDate upper bound in YYYY-MM-DD form. Applied client-side because the observed source endpoint does not expose date filter parameters.",
+    description: "YYYY-MM-DD 형식의 publishDate 상한(포함)입니다. 관찰된 원천 endpoint가 date filter parameter를 제공하지 않아 client-side로 적용합니다.",
     examples: ["2024-12-31"],
   })),
 });
@@ -121,91 +121,91 @@ const isRealIsoDate = (date: string): boolean => {
 export const QnaSearchItemSchema = Schema.Struct({
   docNumber: DocNumberSchema,
   type: Schema.Number.annotations({
-    description: "Source-facing Q&A type id.",
+    description: "원천-facing Q&A type id입니다.",
     examples: [24],
   }),
   typeLabel: Schema.String.annotations({
-    description: "Observed human-readable Q&A type label derived from the source type metadata.",
+    description: "원천 type metadata에서 파생한 관찰된 human-readable Q&A type label입니다.",
     examples: ["K-IFRS · 신속처리질의"],
   }),
   title: Schema.String.annotations({
-    description: "Q&A title with source highlights normalized to text.",
+    description: "원천 highlight를 text로 정규화한 Q&A 제목입니다.",
     examples: ["리스 개시일과 계약일"],
   }),
   snippet: Schema.String.annotations({
-    description: "Short plain-text content excerpt for scanning search results.",
+    description: "검색 결과 검토를 위한 짧은 plain-text content excerpt입니다.",
   }),
   tags: Schema.Array(Schema.String.annotations({
-    description: "Source tag attached to the Q&A document.",
+    description: "Q&A 문서에 붙은 원천 tag입니다.",
     examples: ["리스"],
-  })).annotations({ description: "Q&A source tags." }),
+  })).annotations({ description: "Q&A 원천 tag입니다." }),
   deprecated: Schema.Boolean.annotations({
-    description: "Whether the source marks this Q&A document as deprecated or superseded.",
+    description: "원천이 이 Q&A 문서를 deprecated 또는 superseded로 표시하는지 여부입니다.",
     examples: [false],
   }),
   contentLink: Schema.optional(Schema.String.annotations({
-    description: "Source-provided content link when available; may point outside the KASB JSON API.",
+    description: "확인 가능한 경우 원천이 제공한 content link입니다. KASB JSON API 밖을 가리킬 수 있습니다.",
     examples: ["https://facility-qnas.s3.ap-northeast-2.amazonaws.com/kasb/quick/kifrs/html/35629.html"],
   })),
   publishDate: Schema.optional(Schema.String.annotations({
-    description: "Source publication date string when available.",
+    description: "확인 가능한 경우 원천 publication date string입니다.",
     examples: ["2020-01-01"],
   })),
   prefix: Schema.optional(Schema.String.annotations({
-    description: "Source prefix/category text when available.",
+    description: "확인 가능한 경우 원천 prefix/category text입니다.",
     examples: ["신속처리질의"],
   })),
   references: Schema.Struct({ qnaUrl: SourceUrlSchema }).annotations({
-    description: "Source API reference for this Q&A search item.",
+    description: "이 Q&A 검색 항목의 원천 API 참조입니다.",
   }),
-}).annotations({ description: "One Q&A search result." });
+}).annotations({ description: "Q&A 검색 결과 하나입니다." });
 export type QnaSearchItem = typeof QnaSearchItemSchema.Type;
 
 export const SearchQnaResultSchema = Schema.Struct({
   result: Schema.Struct({
-    request: SearchQnaRequestSchema.annotations({ description: "Normalized request that produced this result." }),
+    request: SearchQnaRequestSchema.annotations({ description: "이 결과를 만든 정규화된 request입니다." }),
     items: Schema.Array(QnaSearchItemSchema).annotations({
-      description: "Matching Q&A documents; pass a docNumber to get-qna for the full document.",
+      description: "매칭된 Q&A 문서입니다. 전체 문서는 docNumber를 get-qna에 전달해 조회하세요.",
     }),
     returnedCount: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)).annotations({
-      description: "Number of Q&A items included in this response.",
+      description: "이 응답에 포함된 Q&A 항목 수입니다.",
       examples: [10],
     }),
     totalCount: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)).annotations({
-      description: "Total matched Q&A records for the requested controls. Without recency controls this is derived from source count metadata; with sortDate/from/to it is derived from the scanned and filtered result window.",
+      description: "요청한 control에 매칭된 Q&A record 총수입니다. recency control이 없으면 원천 count metadata에서, sortDate/from/to가 있으면 scan/filter 결과 창에서 파생합니다.",
       examples: [149],
     }),
     totalPages: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)).annotations({
-      description: "Total result pages for the requested rows value, derived from totalCount.",
+      description: "요청한 rows 값에 대한 전체 결과 page 수입니다. totalCount에서 파생합니다.",
       examples: [30],
     }),
     hasNextPage: Schema.Boolean.annotations({
-      description: "Whether another page is available after the requested page.",
+      description: "요청한 page 뒤에 다음 page가 있는지 여부입니다.",
       examples: [true],
     }),
     paginationStatus: Schema.Literal("known", "estimated").annotations({
-      description: "Whether pagination metadata is derived from complete source count data or from a conservative fallback.",
+      description: "pagination metadata가 완전한 원천 count data에서 파생되었는지, 보수적 fallback에서 파생되었는지 나타냅니다.",
       examples: ["known"],
     }),
     countByType: Schema.Record({
-      key: Schema.String.annotations({ description: "Source-facing Q&A type id as a string key.", examples: ["24"] }),
-      value: Schema.Number.annotations({ description: "Number of matched Q&A records for this type.", examples: [3] }),
-    }).annotations({ description: "Counts grouped by Q&A type id. Without recency controls these come from source metadata; with sortDate/from/to they are derived from the scanned and filtered result window." }),
+      key: Schema.String.annotations({ description: "string key로 표현한 원천-facing Q&A type id입니다.", examples: ["24"] }),
+      value: Schema.Number.annotations({ description: "이 type에 매칭된 Q&A record 수입니다.", examples: [3] }),
+    }).annotations({ description: "Q&A type id별 count입니다. recency control이 없으면 원천 metadata에서, sortDate/from/to가 있으면 scan/filter 결과 창에서 파생합니다." }),
     typeLabels: Schema.Record({
-      key: Schema.String.annotations({ description: "Source-facing Q&A type id as a string key.", examples: ["15"] }),
-      value: Schema.String.annotations({ description: "Observed human-readable label for the Q&A type id.", examples: ["K-IFRS · 신속처리질의"] }),
-    }).annotations({ description: "Observed labels for public Q&A type ids included in counts or returned items." }),
+      key: Schema.String.annotations({ description: "string key로 표현한 원천-facing Q&A type id입니다.", examples: ["15"] }),
+      value: Schema.String.annotations({ description: "Q&A type id에 대한 관찰된 human-readable label입니다.", examples: ["K-IFRS · 신속처리질의"] }),
+    }).annotations({ description: "count 또는 반환 항목에 포함된 공개 Q&A type id의 관찰된 label입니다." }),
     suggestedKeywords: Schema.Array(Schema.String).annotations({
-      description: "Broader or spacing-normalized Q&A keywords to try when an exact search is empty or too narrow.",
+      description: "정확 검색이 비어 있거나 너무 좁을 때 시도할 더 넓거나 띄어쓰기를 정규화한 Q&A 검색어입니다.",
       examples: [["장기 종업원 급여", "종업원급여"]],
     }),
-  }).annotations({ description: "Q&A search payload." }),
+  }).annotations({ description: "Q&A 검색 payload입니다." }),
   metadata: ResultMetadataSchema,
-  references: Schema.Struct({ searchUrl: SourceUrlSchema }).annotations({ description: "Operation-level source reference for the Q&A search." }),
+  references: Schema.Struct({ searchUrl: SourceUrlSchema }).annotations({ description: "Q&A 검색에 대한 operation-level 원천 참조입니다." }),
   warnings: Schema.Array(
     Schema.Struct({
       code: Schema.Literal("source_metadata_incomplete"),
-      message: Schema.String.annotations({ description: "Human-readable warning detail." }),
+      message: Schema.String.annotations({ description: "사람이 읽을 수 있는 warning 상세입니다." }),
     }),
   ),
 });

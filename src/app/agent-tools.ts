@@ -87,37 +87,37 @@ export const createKasbAgentTools = (
   createKasbAgentTool({
     name: "kasb_search_standards",
     description:
-      "Search KASB standards with typed JSON fields keyword and optional limit; use keyword, not query, CLI flags, or source searchWord.",
+      "KASB 기준서를 검색합니다. typed JSON field는 keyword와 선택 limit/sort이며, query, CLI flag, 원천 searchWord가 아니라 keyword를 사용하세요.",
     operation: operations.searchStandards,
   }),
   createKasbAgentTool({
     name: "kasb_get_standard_structure",
     description:
-      "Retrieve a KASB standard's structure with typed JSON field stdNum and optional keyword; use returned indexDocumentId values for kasb_get_section.",
+      "KASB 기준서 구조를 조회합니다. typed JSON field는 stdNum과 선택 keyword이며, 반환된 indexDocumentId를 kasb_get_section에 전달하세요.",
     operation: operations.getStandardStructure,
   }),
   createKasbAgentTool({
     name: "kasb_get_section",
     description:
-      "Retrieve one KASB standard section with typed JSON field stdNum and exactly one of indexDocumentId or ref; do not use browser titleDocumentId values.",
+      "KASB 기준서 섹션 하나를 조회합니다. typed JSON field는 stdNum과 indexDocumentId/ref 중 정확히 하나이며, 브라우저 titleDocumentId는 사용하지 마세요.",
     operation: operations.getSection,
   }),
   createKasbAgentTool({
     name: "kasb_get_paragraph",
     description:
-      "Retrieve one exact KASB standard paragraph with typed JSON fields stdNum and paraNum; use kasb_get_section with ref for paragraph ranges.",
+      "KASB 기준서 문단 하나를 정확히 조회합니다. typed JSON field는 stdNum과 paraNum이며, 문단 범위는 kasb_get_section의 ref로 조회하세요.",
     operation: operations.getParagraph,
   }),
   createKasbAgentTool({
     name: "kasb_search_qna",
     description:
-      "Search KASB Q&A documents with typed JSON fields keyword, page, rows, optional numeric types CSV, and optional recency fields sortDate/from/to; use keyword, not query, and use rows rather than CLI --limit here.",
+      "KASB Q&A 문서를 검색합니다. typed JSON field는 keyword, page, rows, 선택 numeric types CSV, sortDate/from/to이며, query가 아니라 keyword를 쓰고 CLI --limit 대신 rows를 사용하세요.",
     operation: operations.searchQna,
   }),
   createKasbAgentTool({
     name: "kasb_get_qna",
     description:
-      "Retrieve one KASB Q&A document with typed JSON field docNumber and optional keyword; docNumber comes from kasb_search_qna.",
+      "KASB Q&A 문서 하나를 조회합니다. typed JSON field는 docNumber와 선택 keyword이며, docNumber는 kasb_search_qna 결과에서 가져오세요.",
     operation: operations.getQna,
   }),
 ];

@@ -77,7 +77,7 @@ describe("neutral KASB toolset surface", () => {
     expect(help.id).toBe("kasb");
     expect(help.operations).toHaveLength(kasbOperationNames.length);
     expect(help.limitations.join("\n")).toContain("read-only");
-    expect(help.citationGuidance.join("\n")).toContain("references");
+    expect(help.citationGuidance.join("\n")).toContain("result.references");
 
     for (const operationName of kasbOperationNames) {
       const commandHelp = toolset.getCommandHelp(operationName);
@@ -108,7 +108,7 @@ describe("neutral KASB toolset surface", () => {
         retryable: true,
         recoveryAction: { kind: "inspect_command_help", operationName: "get-paragraph" },
       });
-      expect(invalid.error.recoveryHint).toContain("paragraph");
+      expect(invalid.error.recoveryHint).toContain("문단");
     }
 
     const unknown = toolset.validateInput("missing", {});

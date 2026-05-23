@@ -87,7 +87,7 @@ describe("kasb CLI", () => {
     expect(result.exitCode).toBe(1);
     expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
-    expect(envelope.failure.message).toContain(`unknown option '${option}'`);
+    expect(envelope.failure.message).toContain(`알 수 없는 옵션입니다: "${option}"`);
     expect(envelope.failure.message).toContain("--keyword");
   });
 
@@ -100,7 +100,7 @@ describe("kasb CLI", () => {
     expect(result.exitCode).toBe(1);
     expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
-    expect(envelope.failure.message).toContain("unknown option '--query'");
+    expect(envelope.failure.message).toContain('알 수 없는 옵션입니다: "--query"');
     expect(envelope.failure.message).not.toContain("--keyword");
   });
 
@@ -113,7 +113,7 @@ describe("kasb CLI", () => {
     expect(result.exitCode).toBe(1);
     expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
-    expect(envelope.failure.message).toContain("unknown option '--query'");
+    expect(envelope.failure.message).toContain('알 수 없는 옵션입니다: "--query"');
     expect(envelope.failure.message).not.toContain("--keyword");
   });
 
@@ -126,7 +126,7 @@ describe("kasb CLI", () => {
     expect(result.exitCode).toBe(1);
     expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
-    expect(envelope.failure.message).toContain("unknown command 'missing-command'");
+    expect(envelope.failure.message).toContain('알 수 없는 명령입니다: "missing-command"');
   });
 
   test.each([

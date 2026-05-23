@@ -151,13 +151,13 @@ export const renderUnknownOptionCliErrorMessage = <Key extends string>(
   error: unknown,
   registeredOptions: readonly RegisteredOption<Key>[],
 ): string | undefined => {
-  const message = toErrorMessage(error);
-  const unknownOption = message.match(/unknown option '([^']+)'/u)?.[1];
+  const rawMessage = rawErrorMessage(error);
+  const unknownOption = rawMessage.match(/unknown option '([^']+)'/u)?.[1];
   if (unknownOption === undefined) return undefined;
 
   const suggestedOption = suggestCliOption(unknownOption, registeredOptions);
   if (suggestedOption === undefined) return undefined;
-  return `${message}. 대신 ${suggestedOption} 옵션을 사용하세요.`;
+  return `${localizeCommanderMessage(rawMessage)} 대신 ${suggestedOption} 옵션을 사용하세요.`;
 };
 
 const suggestCliOption = <Key extends string>(
@@ -260,8 +260,20 @@ const toCliFailureError = (error: unknown, options: CliErrorDetails): CliFailure
   return { code: "internal_failure", message, retryable: false, ...transportFields };
 };
 
-const toErrorMessage = (error: unknown): string =>
+const toErrorMessage = (error: unknown): string => localizeCommanderMessage(rawErrorMessage(error));
+
+const rawErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
+
+const localizeCommanderMessage = (message: string): string => {
+  const unknownCommand = message.match(/unknown command '([^']+)'/u)?.[1];
+  if (unknownCommand !== undefined) return `알 수 없는 명령입니다: "${unknownCommand}".`;
+
+  const unknownOption = message.match(/unknown option '([^']+)'/u)?.[1];
+  if (unknownOption !== undefined) return `알 수 없는 옵션입니다: "${unknownOption}".`;
+
+  return message;
+};
 
 const cliFailureCodes = new Set<string>([
   "invalid_input",

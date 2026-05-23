@@ -64,6 +64,18 @@ const hasFunction = (value, key) =>
 const isKebabCaseOperationName = (value) =>
   typeof value === "string" && /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(value);
 
+const descriptionHowToCuePatterns = [
+  /\b(?:action|command)\s*[:=]/i,
+  /\bcommand_help\b/i,
+  /\binputJson\b/i,
+  /\bwith\s+action\b/i,
+  /\b(?:use|call|invoke|execute|run)\s+(?:this\s+)?(?:tool\s+)?(?:with|using)\b/i,
+];
+
+const hasHowToDescriptionCue = (value) =>
+  typeof value === "string" &&
+  descriptionHowToCuePatterns.some((pattern) => pattern.test(value));
+
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 
 const createReporter = () => {
@@ -319,6 +331,12 @@ const validateToolset = async (reporter, toolsetModule, args) => {
     hasString(toolset, "description"),
     "toolset has description string",
   );
+  if (hasString(toolset, "description")) {
+    reporter.check(
+      !hasHowToDescriptionCue(toolset.description),
+      "top-level toolset description is purpose-only, not usage instructions",
+    );
+  }
 
   if (args.id !== undefined && hasString(toolset, "id")) {
     reporter.check(toolset.id === args.id, `toolset id is ${args.id}`);
@@ -459,6 +477,12 @@ const validatePi = async (reporter, piModule, args, toolset) => {
     hasString(piTool, "description"),
     "Pi tool has description string",
   );
+  if (hasString(piTool, "description")) {
+    reporter.check(
+      !hasHowToDescriptionCue(piTool.description),
+      "top-level Pi tool description is purpose-only, not usage instructions",
+    );
+  }
   reporter.check(isRecord(piTool.parameters), "Pi tool has parameters object");
   reporter.check(
     hasFunction(piTool, "execute"),

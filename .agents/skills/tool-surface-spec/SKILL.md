@@ -31,6 +31,7 @@ The core idea is **one capability contract, many adapters**. Compatibility means
    - Keep host-facing compatibility in the outer shells: single-tool action input, `content` text blocks, `details.ok/action/command/error`, validation results, serialized errors, and operation specs.
    - Keep domain variance inside operation definitions and the `result` payload. Do not require greenfield projects to mimic another package's domain fields.
    - Keep CLI and Pi adapters thin. They may own final protocol rendering, argument parsing, transport envelopes, and host-specific parameter shapes, but not domain logic or duplicate domain messages.
+   - Require Korean for user-facing labels, descriptions, help text, validation/error messages, recovery hints, warnings, summaries, and prompt guidance; keep protocol ids and proper names stable when needed.
 
 4. Decide what can be automated.
    - Use automated checks for package shape, imports, function presence, operation metadata, validation error shape, Pi tool shape, and CLI smoke behavior.
@@ -45,7 +46,8 @@ The core idea is **one capability contract, many adapters**. Compatibility means
 ## Guardrails
 
 - Do not duplicate domain logic, operation descriptions, validation copy, recovery hints, result summaries, or reusable single-tool prompt/action copy across adapters.
-- If Pi, web, or another host share the same single-tool action protocol, keep that shared copy and formatting in the neutral toolset and let adapters only wrap it in their host result shape.
+- Keep package/tool-level labels and descriptions written in Korean. Keep top-level package/toolset descriptions and top-level host-tool descriptions purpose-only: especially the single Pi extension tool description, they should not contain call sequences, action names, parameter hints, or other how-to-use instructions. Do not apply this rule to operation specs, command help, JSON Schema descriptions, parameter descriptions, `oneOf` branch descriptions, result-field descriptions, recovery hints, prompt snippets, or internal agent-native function tool descriptions; those places should preserve concrete usage constraints, source provenance, mutually exclusive fields, accepted/rejected identifiers, and cross-command references needed to use the command correctly. Internal tools such as `darty_search_body` or `kasb_get_section` may explicitly explain required identifiers, rejected identifier types, lookup provenance, mutually exclusive fields, and which earlier command returns the needed value.
+- If Pi, web, or another host share the same single-tool action protocol, keep that shared Korean copy and formatting in the neutral toolset and let adapters only wrap it in their host result shape.
 - Do not require agents to infer retry policy from JSON Schema alone; preserve validation/error recovery metadata.
 - Do not force one domain payload shape across all tools. Require compatible outer envelopes and typed errors; put project-specific data under the operation `result` payload and describe it with that operation's result schema.
 - Forward `AbortSignal` through adapters into neutral execution.
