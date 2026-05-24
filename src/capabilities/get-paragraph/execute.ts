@@ -14,6 +14,6 @@ export const executeGetParagraph = async (
   try {
     return await provider.getParagraph(resolveGetParagraphRequest(input), context);
   } catch (error) {
-    throw toKasbFailure(error, "KASB 기준서 문단 조회 중 예상하지 못한 오류가 발생했습니다.");
+    throw toKasbFailure(error, "Unexpected error while retrieving a KASB standard paragraph.");
   }
 };

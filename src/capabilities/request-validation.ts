@@ -6,7 +6,7 @@ export function assertObjectInput(
   if (input === null || typeof input !== "object" || Array.isArray(input)) {
     throw new InvalidCapabilityRequest({
       parameter: "input",
-      message: "입력은 의미 기반 매개변수를 담은 객체여야 합니다.",
+      message: "Input must be an object containing semantic parameters.",
     });
   }
 }
@@ -26,13 +26,13 @@ export const assertNoUnknownKeys = (
 };
 
 const unknownKeyMessage = (key: string, allowedKeys: ReadonlySet<string>): string => {
-  const base = `알 수 없는 매개변수입니다: "${key}".`;
+  const base = `Unknown parameter: "${key}".`;
   const suggestion = suggestAllowedKey(key, allowedKeys);
   if (suggestion !== undefined) {
-    return `${base} 이 typed API는 JSON 필드 "${suggestion}"을(를) 사용합니다.`;
+    return `${base} This typed API uses the JSON field "${suggestion}".`;
   }
   if (key === "titleDocumentId" && allowedKeys.has("indexDocumentId")) {
-    return `${base} titleDocumentId는 브라우저 경로용 ID라서 사용할 수 없습니다. get-standard-structure가 반환한 indexDocumentId를 사용하세요.`;
+    return `${base} titleDocumentId is a browser-route id and cannot be used. Use the indexDocumentId returned by get-standard-structure.`;
   }
   return base;
 };
@@ -66,20 +66,20 @@ export const readRequiredString = (
   if (value === undefined) {
     throw new InvalidCapabilityRequest({
       parameter: key,
-      message: `필수 매개변수 "${key}"이(가) 없습니다.`,
+      message: `Missing required parameter "${key}".`,
     });
   }
   if (typeof value !== "string") {
     throw new InvalidCapabilityRequest({
       parameter: key,
-      message: `매개변수 "${key}"은(는) 문자열이어야 합니다.`,
+      message: `Parameter "${key}" must be a string.`,
     });
   }
   const trimmed = value.trim();
   if (trimmed.length === 0) {
     throw new InvalidCapabilityRequest({
       parameter: key,
-      message: `매개변수 "${key}"은(는) 빈 문자열일 수 없습니다.`,
+      message: `Parameter "${key}" cannot be blank.`,
     });
   }
   return trimmed;
@@ -96,7 +96,7 @@ export const readOptionalString = (
   if (typeof value !== "string") {
     throw new InvalidCapabilityRequest({
       parameter: key,
-      message: `매개변수 "${key}"은(는) 문자열이어야 합니다.`,
+      message: `Parameter "${key}" must be a string.`,
     });
   }
   const trimmed = value.trim();
@@ -112,14 +112,14 @@ export const readOptionalInteger = (
   if (!Number.isInteger(value)) {
     throw new InvalidCapabilityRequest({
       parameter: key,
-      message: `매개변수 "${key}"은(는) 정수여야 합니다.`,
+      message: `Parameter "${key}" must be an integer.`,
     });
   }
   const numericValue = value as number;
   if (numericValue < options.min || numericValue > options.max) {
     throw new InvalidCapabilityRequest({
       parameter: key,
-      message: `매개변수 "${key}"은(는) ${options.min} 이상 ${options.max} 이하여야 합니다.`,
+      message: `Parameter "${key}" must be between ${options.min} and ${options.max}.`,
     });
   }
   return numericValue;

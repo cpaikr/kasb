@@ -13,7 +13,7 @@ const fields = new Set(["docNumber", "keyword"]);
 export const GetQnaRequestSchema = Schema.Struct({
   docNumber: DocNumberSchema,
   keyword: Schema.optional(Schema.String.annotations({
-    description: "원천 측 Q&A highlight에 사용할 선택 검색어입니다. searchWord로 매핑됩니다.",
+    description: "Optional keyword for source-side Q&A highlighting. Maps to searchWord.",
     examples: ["리스"],
   })),
 });
@@ -30,7 +30,7 @@ export const resolveGetQnaRequest = (
   if (/^\d+$/u.test(docNumber)) {
     throw new InvalidCapabilityRequest({
       parameter: "docNumber",
-      message: "매개변수 \"docNumber\"은(는) KASB Q&A의 전체 문서 번호여야 합니다. 숫자만 있는 값은 보통 부족합니다. search-qna로 전체 docNumber(예: SSI-35629)를 확인한 뒤 get-qna에 전달하세요.",
+      message: "Parameter \"docNumber\" must be the full KASB Q&A document number. Numeric-only values are usually insufficient. Use search-qna to find the full docNumber (for example, SSI-35629), then pass it to get-qna.",
     });
   }
   return {
@@ -42,74 +42,74 @@ export const resolveGetQnaRequest = (
 export const QnaSchema = Schema.Struct({
   docNumber: DocNumberSchema,
   id: Schema.optional(Schema.Number.annotations({
-    description: "Q&A API가 제공할 때의 내부 numeric source id입니다. 공개 조회에는 docNumber를 사용하세요.",
+    description: "Internal numeric source id when provided by the Q&A API. Use docNumber for public lookup.",
     examples: [4717],
   })),
   type: Schema.Number.annotations({
-    description: "원천-facing Q&A type id입니다.",
+    description: "Source-facing Q&A type id.",
     examples: [15],
   }),
   typeLabel: Schema.String.annotations({
-    description: "원천 type metadata에서 파생한 관찰된 human-readable Q&A type label입니다.",
+    description: "Observed human-readable Q&A type label derived from source type metadata.",
     examples: ["K-IFRS · 신속처리질의"],
   }),
   title: Schema.String.annotations({
-    description: "원천 highlight를 text로 정규화한 Q&A 문서 제목입니다.",
+    description: "Q&A document title normalized from source highlight text.",
     examples: ["리스 개시일과 계약일"],
   }),
   reference: Schema.optional(Schema.String.annotations({
-    description: "Q&A 문서가 제공하는 경우 원천 reference text입니다.",
+    description: "Source reference text when provided by the Q&A document.",
   })),
   fullContent: Schema.String.annotations({
-    description: "원천에서 정규화한 plain-text Q&A 본문입니다.",
+    description: "Plain-text Q&A body normalized from the source.",
   }),
   contentHtml: Schema.optional(Schema.String.annotations({
-    description: "API가 반환할 때 검증을 위해 보존한 원천 Q&A HTML 본문입니다.",
+    description: "Source Q&A HTML body preserved for verification when returned by the API.",
   })),
   relStds: Schema.optional(Schema.String.annotations({
-    description: "API가 반환할 때 보존한 원천 관련 기준서 HTML fragment입니다.",
+    description: "Source related-standards HTML fragment preserved when returned by the API.",
   })),
   tags: Schema.Array(Schema.String.annotations({
-    description: "Q&A 문서에 붙은 원천 tag입니다.",
+    description: "Source tag attached to the Q&A document.",
     examples: ["리스개시일"],
-  })).annotations({ description: "Q&A 원천 tag입니다." }),
+  })).annotations({ description: "Q&A source tag." }),
   contentLink: Schema.optional(Schema.String.annotations({
-    description: "확인 가능한 경우 원천이 제공한 content link입니다. KASB JSON API 밖을 가리킬 수 있습니다.",
+    description: "Content link provided by the source, when available. It can point outside the KASB JSON API.",
     examples: ["https://facility-qnas.s3.ap-northeast-2.amazonaws.com/kasb/quick/kifrs/html/35629.html"],
   })),
   publishDate: Schema.optional(Schema.String.annotations({
-    description: "확인 가능한 경우 원천 publication date string입니다.",
+    description: "Source publication date string, when available.",
     examples: ["2019-12-23T15:00:00.000Z"],
   })),
   deprecated: Schema.Boolean.annotations({
-    description: "원천이 이 Q&A 문서를 deprecated 또는 superseded로 표시하는지 여부입니다.",
+    description: "Whether the source marks this Q&A document as deprecated or superseded.",
     examples: [false],
   }),
   prevDocNumber: Schema.optional(DocNumberSchema.annotations({
-    description: "확인 가능한 경우 원천이 제공한 이전 인접 Q&A 문서 번호입니다.",
+    description: "Previous adjacent Q&A document number provided by the source, when available.",
     examples: ["SSI-35627"],
   })),
   nextDocNumber: Schema.optional(DocNumberSchema.annotations({
-    description: "확인 가능한 경우 원천이 제공한 다음 인접 Q&A 문서 번호입니다.",
+    description: "Next adjacent Q&A document number provided by the source, when available.",
     examples: ["SSI-35628"],
   })),
-}).annotations({ description: "전체 Q&A 문서 결과입니다." });
+}).annotations({ description: "Full Q&A document result." });
 export type Qna = typeof QnaSchema.Type;
 
 export const GetQnaResultSchema = Schema.Struct({
   result: Schema.Struct({
-    request: GetQnaRequestSchema.annotations({ description: "이 결과를 만든 정규화된 request입니다." }),
+    request: GetQnaRequestSchema.annotations({ description: "Normalized request that produced this result." }),
     qna: QnaSchema,
-  }).annotations({ description: "Q&A 문서 조회 payload입니다." }),
+  }).annotations({ description: "Q&A document retrieval payload." }),
   metadata: ResultMetadataSchema,
   references: Schema.Struct({
     docNumber: DocNumberSchema,
     qnaUrl: SourceUrlSchema,
-  }).annotations({ description: "Q&A 문서에 대한 operation-level 원천 참조입니다." }),
+  }).annotations({ description: "Operation-level source reference for the Q&A document." }),
   warnings: Schema.Array(
     Schema.Struct({
       code: Schema.Literal("source_metadata_incomplete"),
-      message: Schema.String.annotations({ description: "사람이 읽을 수 있는 warning 상세입니다." }),
+      message: Schema.String.annotations({ description: "Human-readable warning detail." }),
     }),
   ),
 });

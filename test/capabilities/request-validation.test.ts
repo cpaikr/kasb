@@ -28,18 +28,18 @@ describe("capability request validation", () => {
   test("rejects non-object input", () => {
     expectInvalid(
       () => resolveSearchStandardsRequest(null as unknown as Record<string, unknown>),
-      { parameter: "input", messageIncludes: "객체" },
+      { parameter: "input", messageIncludes: "object" },
     );
     expectInvalid(
       () => resolveSearchStandardsRequest([] as unknown as Record<string, unknown>),
-      { parameter: "input", messageIncludes: "객체" },
+      { parameter: "input", messageIncludes: "object" },
     );
   });
 
   test("rejects unknown keys", () => {
     expectInvalid(
       () => resolveGetParagraphRequest({ stdNum: "1116", paraNum: "23", extra: true }),
-      { parameter: "extra", messageIncludes: "알 수 없는" },
+      { parameter: "extra", messageIncludes: "Unknown parameter" },
     );
   });
 
@@ -62,7 +62,7 @@ describe("capability request validation", () => {
     );
     expectInvalid(
       () => resolveGetSectionRequest({ stdNum: "1116", titleDocumentId: "19970f" }),
-      { parameter: "titleDocumentId", messageIncludes: "브라우저 경로용 ID" },
+      { parameter: "titleDocumentId", messageIncludes: "browser-route id" },
     );
   });
 
@@ -83,7 +83,7 @@ describe("capability request validation", () => {
     test(`${name} rejects blank required string ${parameter}`, () => {
       expectInvalid(
         () => resolver({ ...base, [parameter]: "   " }),
-        { parameter, messageIncludes: "빈 문자열" },
+        { parameter, messageIncludes: "cannot be blank" },
       );
     });
   }
@@ -95,7 +95,7 @@ describe("capability request validation", () => {
     );
     expectInvalid(
       () => resolveGetSectionRequest({ stdNum: "1116", indexDocumentId: "ZB2hJW", ref: "1~2" }),
-      { parameter: "ref", messageIncludes: "정확히 하나만" },
+      { parameter: "ref", messageIncludes: "exactly one" },
     );
   });
 
@@ -141,12 +141,12 @@ describe("capability request validation", () => {
   test("rejects malformed source-facing Q&A type CSV", () => {
     expectInvalid(
       () => resolveSearchQnaRequest({ keyword: "리스", types: "24,,25" }),
-      { parameter: "types", messageIncludes: "숫자 Q&A 유형 ID의 CSV" },
+      { parameter: "types", messageIncludes: "CSV of numeric Q&A type ids" },
     );
   });
 
   test.each([
-    ["sortDate", () => resolveSearchQnaRequest({ keyword: "리스", sortDate: "recent" } as Record<string, unknown>), "sortDate", "asc 또는 desc"],
+    ["sortDate", () => resolveSearchQnaRequest({ keyword: "리스", sortDate: "recent" } as Record<string, unknown>), "sortDate", "asc or desc"],
     ["from", () => resolveSearchQnaRequest({ keyword: "리스", from: "2024-99-01" }), "from", "YYYY-MM-DD"],
     ["to before from", () => resolveSearchQnaRequest({ keyword: "리스", from: "2024-12-31", to: "2024-01-01" }), "to", "from"],
   ] as const)("rejects invalid Q&A recency control %s", (_name, run, parameter, messageIncludes) => {
@@ -156,7 +156,7 @@ describe("capability request validation", () => {
   test("rejects paragraph ranges with a get-section recovery hint", () => {
     expectInvalid(
       () => resolveGetParagraphRequest({ stdNum: "1116", paraNum: "22~30" }),
-      { parameter: "paraNum", messageIncludes: "get-section --ref" },
+      { parameter: "paraNum", messageIncludes: "get-section ref" },
     );
   });
 
@@ -168,10 +168,10 @@ describe("capability request validation", () => {
   });
 
   test.each([
-    ["search-standards limit", () => resolveSearchStandardsRequest({ keyword: "리스", limit: 1.5 }), "limit", "정수"],
-    ["search-qna page", () => resolveSearchQnaRequest({ keyword: "리스", page: 0 }), "page", "1 이상 1000 이하"],
-    ["search-qna rows", () => resolveSearchQnaRequest({ keyword: "리스", rows: 51 }), "rows", "1 이상 50 이하"],
-    ["search-qna rows type", () => resolveSearchQnaRequest({ keyword: "리스", rows: "5" } as Record<string, unknown>), "rows", "정수"],
+    ["search-standards limit", () => resolveSearchStandardsRequest({ keyword: "리스", limit: 1.5 }), "limit", "integer"],
+    ["search-qna page", () => resolveSearchQnaRequest({ keyword: "리스", page: 0 }), "page", "between 1 and 1000"],
+    ["search-qna rows", () => resolveSearchQnaRequest({ keyword: "리스", rows: 51 }), "rows", "between 1 and 50"],
+    ["search-qna rows type", () => resolveSearchQnaRequest({ keyword: "리스", rows: "5" } as Record<string, unknown>), "rows", "integer"],
   ] as const)("rejects invalid integer %s", (_name, run, parameter, messageIncludes) => {
     expectInvalid(run, { parameter, messageIncludes });
   });

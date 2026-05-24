@@ -155,7 +155,7 @@ export class KasbToolsetError extends Error {
 export const createKasbUnknownOperationError = (operationName: string): KasbToolsetError =>
   new KasbToolsetError({
     code: "unknown_operation",
-    message: `알 수 없는 KASB operation입니다: ${operationName}`,
+    message: `Unknown KASB operation: ${operationName}`,
     retryable: false,
     operationName,
   });
@@ -181,130 +181,130 @@ export type CreateKasbToolsetOptions = {
 };
 
 const sourceLimitations = [
-  "Kasb는 관찰된 공개 db.kasb.or.kr JSON API를 read-only로 읽습니다. 원천 동작은 변경될 수 있습니다.",
-  "반환 content는 구조화된 원천 자료이며 회계, 법률, 투자, 세무 조언이 아닙니다.",
-  "브라우저 경로의 titleDocumentId 값은 공개 섹션 input이 아닙니다. get-standard-structure로 indexDocumentId 값을 확인하세요.",
-  "관찰된 원천 endpoint가 날짜 control을 무시하는 경우 Q&A 날짜 filtering과 ordering은 client-side로 적용됩니다.",
+  "Kasb reads the observed public db.kasb.or.kr JSON API in read-only mode; upstream behavior can change.",
+  "Returned content is structured source material, not accounting, legal, investment, or tax advice.",
+  "Browser-route titleDocumentId values are not public section inputs. Use get-standard-structure to find indexDocumentId values.",
+  "When the observed source endpoint ignores date controls, Q&A date filtering and ordering are applied client-side.",
 ] as const;
 
 const citationGuidance = [
-  "결과를 인용할 때 result.references, metadata, warnings, stdNum/indexDocumentId/paraNum/docNumber, 반환된 원천 API URL을 함께 사용하세요.",
-  "기준서 조사에서는 먼저 검색하고 기준서 구조를 확인한 뒤, 결론을 내리기 전에 섹션이나 정확한 문단을 조회하세요.",
-  "Q&A 조사에서는 search-qna가 반환한 docNumber를 get-qna에 전달해 전체 문서 맥락을 확인하세요.",
+  "When citing results, use result.references, metadata, warnings, stdNum/indexDocumentId/paraNum/docNumber, and the returned source API URL together.",
+  "For standards research, search first, inspect the standard structure, then retrieve the relevant section or exact paragraph before drawing conclusions.",
+  "For Q&A research, pass the docNumber returned by search-qna to get-qna to inspect the full document context.",
 ] as const;
 
 export const kasbSingleToolCopy = {
   description:
-    "KASB 기준서와 Q&A 원천 자료를 read-only로 검색·조회하고 참조, warning, metadata를 함께 반환하는 도구입니다.",
+    "Read-only search and retrieval for KASB standards and Q&A source material with references, warnings, and metadata.",
   promptSnippet:
-    "KASB 기준서 검색, 구조 조회, 섹션/문단 조회, Q&A 조회에는 kasb(action, command?, inputJson?)를 사용하세요.",
+    "Use kasb(action, command?, inputJson?) to search KASB standards, inspect structures, retrieve sections/paragraphs, and read Q&A material.",
   promptGuidelines: [
-    "명령 이름을 추측하지 말고 먼저 action=help로 사용할 수 있는 KASB command를 확인하세요.",
-    "필수 key, 허용값, 예시, 제한사항, result shape가 불명확하면 action=command_help를 사용하세요.",
-    "실제 KASB 접근 없이 command input을 수정하거나 정규화하려면 action=validate를 사용하세요.",
-    "command input을 구성한 뒤에만 action=run을 사용하세요. Kasb는 실행 전에 검증하고 인용에 필요한 원천 참조, warning, metadata를 반환합니다.",
-    "inputJson key에는 stdNum, indexDocumentId, paraNum, docNumber 같은 JSON field를 직접 사용하세요. CLI flag, 원천 searchWord, 브라우저 titleDocumentId를 전달하지 마세요.",
+    "Do not guess command names; call action=help first to inspect available KASB commands.",
+    "Use action=command_help when required keys, allowed values, examples, limitations, or result shapes are unclear.",
+    "Use action=validate to repair or normalize command input without contacting KASB.",
+    "Use action=run only after constructing command input. Kasb validates before execution and returns source references, warnings, and metadata for citation.",
+    "Use JSON fields such as stdNum, indexDocumentId, paraNum, and docNumber directly in inputJson. Do not pass CLI flags, source searchWord, or browser titleDocumentId values.",
   ],
   parameterDescriptions: {
-    action: "Kasb tool action입니다: help, command_help, validate, run 중 하나입니다.",
-    command: "search-standards, get-paragraph 같은 canonical KASB operation name입니다.",
-    inputJson: "선택한 KASB operation의 JSON input contract를 따르는 command input object입니다.",
+    action: "Kasb tool action: one of help, command_help, validate, or run.",
+    command: "Canonical KASB operation name, such as search-standards or get-paragraph.",
+    inputJson: "Command input object matching the selected KASB operation's JSON input contract.",
   },
   actionSummaries: {
-    help: "source-level help와 command menu를 반환합니다.",
-    command_help: "하나의 command schema, 예시, 제한사항, result summary를 반환합니다.",
-    validate: "실제 KASB 접근 없이 하나의 command input을 검증하고 정규화합니다.",
-    run: "검증한 뒤 하나의 command를 실행합니다.",
+    help: "Return source-level help and the command menu.",
+    command_help: "Return one command schema, examples, limitations, and result summary.",
+    validate: "Validate and normalize one command input without contacting KASB.",
+    run: "Validate and execute one command.",
   },
 } as const satisfies KasbSingleToolCopy;
 
 const defaultOperationDefinitions = [
   {
     name: "search-standards",
-    label: "기준서 검색",
-    description: "심층 조회 전에 검색어와 관련된 KASB 기준서를 찾습니다.",
+    label: "Search standards",
+    description: "Find KASB standards relevant to a keyword before deeper retrieval.",
     operation: defaultSearchStandardsOperation,
     prepareInput: (input) => resolveSearchStandardsRequest(input as Record<string, unknown>),
     examples: [{ keyword: "리스", limit: 10 }, { keyword: "수익인식", sort: "match-count" }],
     limitations: [
-      "검색은 관찰된 /api/standard endpoint를 사용하며 원천 ranking 또는 metadata drift가 반영될 수 있습니다.",
-      "섹션을 조회하기 전에 반환된 stdNum을 get-standard-structure에 사용하세요.",
+      "Search uses the observed /api/standard endpoint, so source ranking or metadata drift can affect results.",
+      "Use the returned stdNum with get-standard-structure before retrieving sections.",
     ],
-    resultSummary: "매칭 기준서, 원천 match count, 제안 검색어, 참조, warning, 구조 조회용 nextActions를 반환합니다.",
+    resultSummary: "Returns matching standards, source match counts, suggested keywords, references, warnings, and nextActions for structure lookup.",
   },
   {
     name: "get-standard-structure",
-    label: "기준서 구조 조회",
-    description: "하나의 기준서 섹션 tree를 반환하고 조회용 indexDocumentId 값을 노출합니다.",
+    label: "Get standard structure",
+    description: "Return the section tree for one standard and expose retrieval-facing indexDocumentId values.",
     operation: defaultGetStandardStructureOperation,
     prepareInput: (input) => resolveGetStandardStructureRequest(input as Record<string, unknown>),
     examples: [{ stdNum: "1116" }, { stdNum: "1116", keyword: "리스" }],
     limitations: [
-      "브라우저 title id가 아니라 standard-indexes를 사용합니다. get-section은 titleDocumentId를 받지 않습니다.",
-      "keyword로 필터링한 구조에는 넓거나 noisy한 원천 match가 포함될 수 있습니다.",
+      "Uses standard-indexes, not browser title ids. get-section does not accept titleDocumentId.",
+      "Structures filtered by keyword can include broad or noisy source matches.",
     ],
-    resultSummary: "indexDocumentId, title, ref, level, documentType, parent id, 원천 metadata, warning을 포함한 정규화된 섹션 node를 반환합니다.",
+    resultSummary: "Returns normalized section nodes with indexDocumentId, title, ref, level, documentType, parent ids, source metadata, and warnings.",
   },
   {
     name: "get-section",
-    label: "섹션 조회",
-    description: "indexDocumentId 또는 구조 index에서 resolve한 ref로 기준서 섹션 하나를 조회합니다.",
+    label: "Get section",
+    description: "Retrieve one standard section by indexDocumentId or by a ref resolved through the structure index.",
     operation: defaultGetSectionOperation,
     prepareInput: (input) => resolveGetSectionRequest(input as Record<string, unknown>),
     examples: [{ stdNum: "1116", indexDocumentId: "ZB2hJW" }, { stdNum: "1116", ref: "9~17" }],
     limitations: [
-      "섹션 locator는 indexDocumentId 또는 ref 중 정확히 하나만 필요합니다.",
-      "ref 조회는 현재 원천 구조를 통해 resolve하며, ref가 모호하면 warning을 반환할 수 있습니다.",
-      "보존된 원천 HTML field는 도구가 해석하지 않고 metadata content note로 보고합니다.",
+      "Exactly one section locator is required: indexDocumentId or ref.",
+      "ref lookup resolves through the current source structure and can return a warning when the ref is ambiguous.",
+      "Preserved source HTML fields are reported as metadata content notes; the tool does not interpret them.",
     ],
-    resultSummary: "resolved 섹션 metadata와 순서 있는 title/paragraph clause를 citation, metadata, warning과 함께 반환합니다.",
+    resultSummary: "Returns resolved section metadata and ordered title/paragraph clauses with citations, metadata, and warnings.",
   },
   {
     name: "get-paragraph",
-    label: "문단 조회",
-    description: "안정적인 stdNum + paraNum 참조로 정확한 KASB 문단 하나를 조회합니다.",
+    label: "Get paragraph",
+    description: "Retrieve one exact KASB paragraph by the stable stdNum + paraNum reference.",
     operation: defaultGetParagraphOperation,
     prepareInput: (input) => resolveGetParagraphRequest(input as Record<string, unknown>),
     examples: [{ stdNum: "1116", paraNum: "23" }, { stdNum: "1116", paraNum: "B3" }],
     limitations: [
-      "paraNum은 문단 범위가 아니라 정확한 문단 하나여야 합니다. 범위는 get-section의 ref를 사용하세요.",
-      "구조 index를 확인할 수 있을 때 상위 섹션 metadata는 best-effort로 제공됩니다.",
+      "paraNum must identify one exact paragraph, not a paragraph range. Use get-section with ref for ranges.",
+      "Parent-section metadata is best-effort when the structure index can be checked.",
     ],
-    resultSummary: "uniqueKey, 원천 HTML/plain text, 상위 indexDocumentId, 참조, metadata, warning을 포함한 문단 하나를 반환합니다.",
+    resultSummary: "Returns one paragraph with uniqueKey, source HTML/plain text, parent indexDocumentId, references, metadata, and warnings.",
   },
   {
     name: "search-qna",
-    label: "Q&A 검색",
-    description: "검색어와 선택적인 관찰 원천 type/date control로 KASB Q&A 문서를 검색합니다.",
+    label: "Search Q&A",
+    description: "Search KASB Q&A documents by keyword with optional observed source type/date controls.",
     operation: defaultSearchQnaOperation,
     prepareInput: (input) => resolveSearchQnaRequest(input as Record<string, unknown>),
     examples: [{ keyword: "리스", rows: 5 }, { keyword: "리스", sortDate: "desc", rows: 10 }],
     limitations: [
-      "관찰된 공개 Q&A type id를 사용합니다. label은 검토 편의를 위해 제공되지만 input types는 원천-facing 숫자 CSV 값입니다.",
-      "관찰된 원천 endpoint가 날짜 filter를 무시하므로 sortDate/from/to는 제한된 fetch 결과 창에 대한 client-side control입니다.",
-      "전체 Q&A 문서 맥락은 반환된 docNumber를 get-qna에 사용해 확인하세요.",
+      "Uses observed public Q&A type ids. Labels are returned for scanning, but input types are source-facing numeric CSV values.",
+      "Because the observed source endpoint ignores date filters, sortDate/from/to are client-side controls over a bounded fetch window.",
+      "Use the returned docNumber with get-qna to inspect full Q&A document context.",
     ],
-    resultSummary: "매칭 Q&A 항목, docNumber 식별자, type label, pagination/count metadata, 제안 검색어, 참조, warning을 반환합니다.",
+    resultSummary: "Returns matching Q&A items, docNumber identifiers, type labels, pagination/count metadata, suggested keywords, references, and warnings.",
   },
   {
     name: "get-qna",
-    label: "Q&A 문서 조회",
-    description: "전체 docNumber로 KASB Q&A 문서 하나를 조회합니다.",
+    label: "Get Q&A document",
+    description: "Retrieve one KASB Q&A document by full docNumber.",
     operation: defaultGetQnaOperation,
     prepareInput: (input) => resolveGetQnaRequest(input as Record<string, unknown>),
     examples: [{ docNumber: "SSI-35629" }, { docNumber: "SSI-35629", keyword: "리스" }],
     limitations: [
-      "docNumber는 전체 KASB Q&A 문서 번호여야 합니다. 숫자만 있는 내부 id는 공개 input이 아닙니다.",
-      "원천이 제공하는 경우 검증을 위해 contentHtml과 관련 기준서 HTML을 보존할 수 있습니다.",
+      "docNumber must be the full KASB Q&A document number. Numeric-only internal ids are not public inputs.",
+      "When the source provides it, contentHtml and related-standards HTML can be preserved for verification.",
     ],
-    resultSummary: "전체 Q&A 문서, 원천 참조, content metadata, 원천 warning을 반환합니다.",
+    resultSummary: "Returns the full Q&A document, source references, content metadata, and source warnings.",
   },
 ] as const satisfies readonly KasbOperationDefinition[];
 
 const json = (value: unknown): string => JSON.stringify(value, null, 2);
 
 const bulletList = (items: readonly string[]): string =>
-  items.length === 0 ? "- 없음." : items.map((item) => `- ${item}`).join("\n");
+  items.length === 0 ? "- None." : items.map((item) => `- ${item}`).join("\n");
 
 export const formatKasbToolsetHelp = (help: KasbToolsetHelp): string => {
   const operations = help.operations.map(
@@ -314,19 +314,19 @@ export const formatKasbToolsetHelp = (help: KasbToolsetHelp): string => {
   return [
     `${help.label}: ${help.description}`,
     "",
-    "사용법: kasb(action, command?, inputJson?)",
-    "동작:",
+    "Usage: kasb(action, command?, inputJson?)",
+    "Actions:",
     ...kasbSingleToolActions.map(
       (action) => `- ${action}: ${kasbSingleToolCopy.actionSummaries[action]}`,
     ),
     "",
-    "Command 목록:",
+    "Commands:",
     ...operations,
     "",
-    "제한사항:",
+    "Limitations:",
     bulletList(help.limitations),
     "",
-    "인용 지침:",
+    "Citation guidance:",
     bulletList(help.citationGuidance),
   ].join("\n");
 };
@@ -334,18 +334,18 @@ export const formatKasbToolsetHelp = (help: KasbToolsetHelp): string => {
 export const formatKasbCommandHelp = (commandHelp: KasbCommandHelp): string =>
   [
     `Kasb command ${commandHelp.name}: ${commandHelp.description}`,
-    `필수 input key: ${commandHelp.requiredInputKeys.join(", ") || "없음"}`,
+    `Required input keys: ${commandHelp.requiredInputKeys.join(", ") || "none"}`,
     "",
-    "입력 JSON Schema:",
+    "Input JSON Schema:",
     json(commandHelp.inputJsonSchema),
     "",
-    "예시:",
+    "Examples:",
     json(commandHelp.examples),
     "",
-    "제한사항:",
+    "Limitations:",
     bulletList(commandHelp.limitations),
     "",
-    "결과 요약:",
+    "Result summary:",
     commandHelp.resultSummary,
   ].join("\n");
 
@@ -354,8 +354,8 @@ export const formatKasbValidationSuccess = (
   validation: Extract<KasbValidationResult, { ok: true }>,
 ): string =>
   [
-    `Kasb validation이 성공했습니다: ${command}`,
-    "정규화된 input:",
+    `Kasb validation succeeded: ${command}`,
+    "Normalized input:",
     json(validation.input),
   ].join("\n");
 
@@ -365,32 +365,32 @@ export const formatKasbValidationFailure = (
   error: KasbValidationFailure,
 ): string =>
   [
-    `Kasb ${action} input validation이 실패했습니다: ${command}`,
-    "수정 안내:",
+    `Kasb ${action} input validation failed: ${command}`,
+    "Repair guidance:",
     json(error),
   ].join("\n");
 
 export const formatKasbRunSuccess = (command: string, result: unknown): string =>
   [
-    `Kasb run이 성공했습니다: ${command}`,
-    "인용과 후속 command에는 반환된 references, warnings, metadata, source URL을 사용하세요.",
-    "결과 envelope:",
+    `Kasb run succeeded: ${command}`,
+    "Use the returned references, warnings, metadata, and source URL for citations and follow-up commands.",
+    "Result envelope:",
     json(result),
   ].join("\n");
 
 export const formatKasbRunFailure = (
   command: string,
   error: KasbSerializedError,
-): string => [`Kasb run이 실패했습니다: ${command}`, "오류:", json(error)].join("\n");
+): string => [`Kasb run failed: ${command}`, "Error:", json(error)].join("\n");
 
 export const formatKasbInvalidToolInput = (
   error: KasbValidationFailure,
-): string => `Kasb tool input이 유효하지 않습니다.\n${json(error)}`;
+): string => `Kasb tool input is invalid.\n${json(error)}`;
 
 export const formatKasbUnknownCommand = (
   command: string,
   error: KasbSerializedError,
-): string => `알 수 없는 Kasb command입니다: ${command}\n${json(error)}`;
+): string => `Unknown Kasb command: ${command}\n${json(error)}`;
 
 const isAbortSignalAborted = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
 
@@ -406,8 +406,8 @@ const createAbortError = (operationName?: string): KasbToolsetError =>
   new KasbToolsetError({
     code: "aborted",
     message: operationName
-      ? `KASB operation이 중단되었습니다: ${operationName}`
-      : "KASB operation이 중단되었습니다.",
+      ? `KASB operation was aborted: ${operationName}`
+      : "KASB operation was aborted.",
     retryable: true,
     ...(operationName === undefined ? {} : { operationName }),
   });
@@ -495,12 +495,12 @@ const createSingleToolValidationFailure = (input: {
 export const createKasbSingleToolActionFailure = (actual: unknown): KasbValidationFailure =>
   createSingleToolValidationFailure({
     code: "invalid_parameter",
-    message: "Kasb action은 help, command_help, validate, run 중 하나여야 합니다.",
+    message: "Kasb action must be one of help, command_help, validate, or run.",
     parameter: "action",
     reason: !isRecord(actual) ? "invalid_type" : "invalid_enum",
     expected: kasbSingleToolActions.join(","),
     actual: isRecord(actual) ? actual.action : actual,
-    recoveryHint: "command menu를 보려면 action=help로 kasb를 호출하세요.",
+    recoveryHint: "Call kasb with action=help to inspect the command menu.",
     recoveryAction: inspectToolHelpRecoveryAction,
   });
 
@@ -510,12 +510,12 @@ export const createKasbSingleToolCommandFailure = (
 ): KasbValidationFailure =>
   createSingleToolValidationFailure({
     code: command === undefined ? "missing_parameter" : "invalid_parameter",
-    message: `Kasb action ${action}에는 canonical operation name인 command가 필요합니다.`,
+    message: `Kasb action ${action} requires command to be a canonical operation name.`,
     parameter: "command",
     reason: command === undefined ? "required" : "invalid_type",
     expected: kasbOperationNames.join(","),
     actual: command,
-    recoveryHint: "canonical command name을 보려면 action=help로 kasb를 호출하세요.",
+    recoveryHint: "Call kasb with action=help to inspect canonical command names.",
     recoveryAction: inspectToolHelpRecoveryAction,
   });
 
@@ -526,25 +526,25 @@ export const createKasbSingleToolInputJsonFailure = (
 ): KasbValidationFailure =>
   createSingleToolValidationFailure({
     code: inputJson === undefined ? "missing_parameter" : "invalid_parameter",
-    message: `Kasb action ${action}에는 object 형태의 inputJson이 필요합니다.`,
+    message: `Kasb action ${action} requires inputJson to be an object.`,
     parameter: "inputJson",
     reason: inputJson === undefined ? "required" : "invalid_type",
     expected: "object",
     actual: inputJson,
     command,
-    recoveryHint: "해당 command의 input schema와 예시를 보려면 action=command_help로 kasb를 호출하세요.",
+    recoveryHint: "Call kasb with action=command_help to inspect this command's input schema and examples.",
     recoveryAction: recoveryActionForCommandInput(command),
   });
 
 const createUnknownOperationValidationFailure = (name: string): KasbValidationFailure => ({
   code: "invalid_request",
-  message: `알 수 없는 KASB operation입니다: ${name}`,
+  message: `Unknown KASB operation: ${name}`,
   operationName: name,
   parameter: "name",
   reason: "unknown_operation",
   expected: kasbOperationNames.join(","),
   actual: name,
-  recoveryHint: "canonical KASB operation name을 선택하려면 help() 또는 listOperations()를 사용하세요.",
+  recoveryHint: "Use help() or listOperations() to choose a canonical KASB operation name.",
   retryable: true,
   recoveryAction: inspectToolHelpRecoveryAction,
 });
@@ -555,7 +555,7 @@ const createInvalidInputValidationFailure = (
   exampleInput: Record<string, unknown> | undefined,
 ): KasbValidationFailure => ({
   code: "invalid_parameter",
-  message: "KASB operation input은 object여야 합니다.",
+  message: "KASB operation input must be an object.",
   operationName,
   parameter: "input",
   reason: "invalid_type",
@@ -582,7 +582,7 @@ const toValidationFailure = (
 
     return {
       code,
-      message: hasString(error, "message") ? error.message : "KASB input validation이 실패했습니다.",
+      message: hasString(error, "message") ? error.message : "KASB input validation failed.",
       operationName,
       ...(parameter === undefined ? {} : { parameter }),
       ...(reason === undefined ? {} : { reason }),
@@ -597,7 +597,7 @@ const toValidationFailure = (
 
   return {
     code: "invalid_request",
-    message: "KASB input validation이 실패했습니다.",
+    message: "KASB input validation failed.",
     operationName,
     ...(exampleInput === undefined ? {} : { exampleInput }),
     retryable: true,
@@ -620,8 +620,8 @@ const toValidationFailureCode = (
     }
   }
   const message = hasString(error, "message") ? error.message : "";
-  if (message.includes("필수 매개변수")) return "missing_parameter";
-  if (message.includes("알 수 없는 매개변수")) return "unknown_parameter";
+  if (message.includes("Missing required parameter")) return "missing_parameter";
+  if (message.includes("Unknown parameter")) return "unknown_parameter";
   if (parameter !== undefined) return "invalid_parameter";
   return "invalid_request";
 };
@@ -631,24 +631,24 @@ const inferValidationReason = (
   parameter: string | undefined,
 ): string | undefined => {
   const message = hasString(error, "message") ? error.message : "";
-  if (message.includes("필수 매개변수")) return "required";
-  if (message.includes("알 수 없는 매개변수")) return "unknown_parameter";
-  if (message.includes("문자열이어야")) return "invalid_type";
-  if (message.includes("정수여야")) return "invalid_type";
-  if (message.includes("중 정확히 하나")) return "exclusive_or";
+  if (message.includes("Missing required parameter")) return "required";
+  if (message.includes("Unknown parameter")) return "unknown_parameter";
+  if (message.includes("must be a string")) return "invalid_type";
+  if (message.includes("must be an integer")) return "invalid_type";
+  if (message.includes("exactly one")) return "exclusive_or";
   return parameter === undefined ? undefined : "invalid_value";
 };
 
 const expectedForReason = (reason: string | undefined): string | undefined => {
   switch (reason) {
     case "required":
-      return "필수 매개변수";
+      return "required parameter";
     case "unknown_parameter":
-      return "알려진 의미 기반 input field";
+      return "known semantic input field";
     case "invalid_type":
-      return "operation input schema와 일치하는 값";
+      return "value matching the operation input schema";
     case "exclusive_or":
-      return "허용된 섹션 locator 정확히 하나";
+      return "exactly one accepted section locator";
     default:
       return undefined;
   }
@@ -660,19 +660,19 @@ const recoveryHintForValidation = (
   reason: string | undefined,
 ): string | undefined => {
   if (reason === "unknown_parameter") {
-    return `kasb command_help로 ${operationName}의 문서화된 JSON input field name을 확인해 사용하세요.`;
+    return `Use kasb command_help for ${operationName} to inspect documented JSON input field names.`;
   }
   if (parameter === "indexDocumentId") {
-    return "해당 기준서에 get-standard-structure를 실행해 반환된 indexDocumentId를 전달하거나, get-section에 ref를 사용하세요.";
+    return "Run get-standard-structure for the standard and pass a returned indexDocumentId, or use ref with get-section.";
   }
   if (parameter === "paraNum") {
-    return "정확한 문단 번호 하나를 전달하세요. 범위는 get-section의 ref를 사용하세요.";
+    return "Pass one exact paragraph number. Use get-section ref for ranges.";
   }
   if (parameter === "docNumber") {
-    return "먼저 search-qna를 실행하고 반환된 전체 docNumber를 get-qna에 전달하세요.";
+    return "Run search-qna first and pass the returned full docNumber to get-qna.";
   }
   if (parameter !== undefined) {
-    return `${parameter} 요구사항과 예시를 확인하려면 kasb command_help로 ${operationName}을 확인하세요.`;
+    return `Use kasb command_help for ${operationName} to inspect ${parameter} requirements and examples.`;
   }
   return undefined;
 };
@@ -720,16 +720,16 @@ export const createKasbToolset = (options: CreateKasbToolsetOptions = {}): KasbT
 
   return {
     id: "kasb",
-    label: "회계기준서 및 질의회신 내역 검색",
+    label: "KASB standards and Q&A search",
     description:
-      "KASB 기준서와 Q&A를 read-only로 검색·조회하고 원천 참조, warning, typed capability error를 반환합니다.",
+      "Read-only search and retrieval for KASB standards and Q&A with source references, warnings, and typed capability errors.",
     help: () => ({
       id: "kasb",
-      label: "회계기준서 및 질의회신 내역 검색",
+      label: "KASB standards and Q&A search",
       description:
-        "KASB 기준서와 Q&A를 read-only로 검색·조회하고 원천 참조, warning, typed capability error를 반환합니다.",
+        "Read-only search and retrieval for KASB standards and Q&A with source references, warnings, and typed capability errors.",
       usage:
-        "listOperations()/getCommandHelp(name)로 operation을 확인하고 validateInput(name, input)으로 input을 검증한 뒤 execute(name, input)을 실행하세요.",
+        "Use listOperations()/getCommandHelp(name) to inspect operations, validateInput(name, input) to validate input, then execute(name, input) to run.",
       operations: summaries(),
       limitations: sourceLimitations,
       citationGuidance,

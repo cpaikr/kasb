@@ -124,14 +124,14 @@ describe("capability JSON Schema exports", () => {
     const getQnaInput = defaultGetQnaOperation.inputJsonSchema as JsonObjectSchema;
     const searchQnaInput = defaultSearchQnaOperation.inputJsonSchema as JsonObjectSchema;
 
-    expect(getSectionInput.description).toContain("섹션 locator 하나만");
+    expect(getSectionInput.description).toContain("exactly one section locator");
     expect(propertyAt(getSectionInput, ["indexDocumentId"]).description).toContain("get-standard-structure");
     expect(propertyAt(getSectionInput, ["indexDocumentId"]).description).toContain("titleDocumentId");
     expect(propertyAt(getParagraphInput, ["paraNum"]).examples).toEqual(["23", "한2.1", "B3", "BC240A"]);
     expect(propertyAt(getQnaInput, ["docNumber"]).examples).toEqual(["SSI-35629"]);
     const qnaTypes = propertyAt(searchQnaInput, ["types"]);
     expect(qnaTypes.description).toContain("11,12,13,14,15,24,25");
-    expect(qnaTypes.description).toContain("숫자 Q&A type id CSV");
+    expect(qnaTypes.description).toContain("numeric Q&A type id CSV");
     expect(qnaTypes.pattern).toBe("^\\s*(?:\\d+\\s*(?:,\\s*\\d+\\s*)*)?$");
     expect(propertyAt(searchQnaInput, ["sortDate"]).description).toContain("publishDate");
     expect(propertyAt(searchQnaInput, ["from"]).pattern).toBe("^\\d{4}-\\d{2}-\\d{2}$");
@@ -158,10 +158,10 @@ describe("capability JSON Schema exports", () => {
 
     expect(propertyAt(searchStandardsResult, ["result", "standards"]).description).toContain("get-standard-structure");
     expect(propertyAt(getStructureResult, ["result", "sections"]).description).toContain("indexDocumentId");
-    expect(propertyAt(getSectionResult, ["references", "indexDocumentId"]).description).toContain("조회용 섹션 ID");
+    expect(propertyAt(getSectionResult, ["references", "indexDocumentId"]).description).toContain("Retrieval-facing section id");
     expect(propertyAt(getParagraphResult, ["references", "uniqueKey"]).description).toContain("{stdNum}-{paraNum}");
     expect(propertyAt(searchQnaResult, ["result", "items"]).description).toContain("docNumber");
-    expect(propertyAt(searchQnaResult, ["result", "suggestedKeywords"]).description).toContain("비어 있거나 너무 좁을 때");
+    expect(propertyAt(searchQnaResult, ["result", "suggestedKeywords"]).description).toContain("empty or too narrow");
   });
 
   test("search-standards result items expose the structure follow-up action schema", () => {
@@ -180,12 +180,12 @@ describe("capability JSON Schema exports", () => {
     expect(getStandardStructure.type).toBe("object");
     expect(getStandardStructure.required).toEqual(["operation", "input"]);
     expect(getStandardStructure.additionalProperties).toBe(false);
-    expect(getStandardStructure.description).toContain("transport-neutral");
+    expect(getStandardStructure.description).toContain("Transport-neutral");
     expect(operation.enum).toEqual(["get-standard-structure"]);
     expect(input.type).toBe("object");
     expect(input.required).toEqual(["stdNum"]);
     expect(input.additionalProperties).toBe(false);
-    expect(input.description).toContain("typed input");
+    expect(input.description).toContain("Typed input");
     expect(input.examples).toEqual([{ stdNum: "1116" }]);
     expect(stdNum.examples).toEqual(["1116"]);
   });

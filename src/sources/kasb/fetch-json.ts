@@ -28,7 +28,7 @@ export const fetchKasbJson = async (
     if (!response.ok) {
       throw new ProviderFailure({
         code: response.status === 404 ? "not_found" : "source_unavailable",
-        message: `KASB API 요청이 실패했습니다(status=${response.status}).`,
+        message: `KASB API request failed (status=${response.status}).`,
         retryable: response.status >= 500,
         sourceUrl,
       });
@@ -40,7 +40,7 @@ export const fetchKasbJson = async (
       if (error instanceof SyntaxError) {
         throw new ProviderFailure({
           code: "source_changed",
-          message: "KASB API가 JSON이 아닌 응답을 반환했습니다.",
+          message: "KASB API returned a non-JSON response.",
           retryable: false,
           sourceUrl,
         });
@@ -54,7 +54,7 @@ export const fetchKasbJson = async (
 
     throw new ProviderFailure({
       code: "source_unavailable",
-      message: "KASB API에 연결할 수 없습니다.",
+      message: "Could not connect to the KASB API.",
       retryable: true,
       sourceUrl,
     });

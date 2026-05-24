@@ -91,7 +91,7 @@ describe("CLI entrypoints", () => {
     expect(result.exitCode).toBe(1);
     expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
-    expect(envelope.failure.message).toContain('알 수 없는 명령입니다: "missing-command"');
+    expect(envelope.failure.message).toContain('Unknown command: "missing-command"');
   });
 
   test("bundled CLI validates command input through Node", () => {
@@ -105,7 +105,7 @@ describe("CLI entrypoints", () => {
     expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.parameter).toBe("indexDocumentId");
-    expect(envelope.failure.message).toContain('필수 옵션 "--index-document-id"');
+    expect(envelope.failure.message).toContain('Exactly one of required options "--index-document-id"');
     expect(envelope.metadata.operation).toBe("get-section");
   });
 

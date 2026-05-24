@@ -14,6 +14,6 @@ export const executeGetQna = async (
   try {
     return await provider.getQna(resolveGetQnaRequest(input), context);
   } catch (error) {
-    throw toKasbFailure(error, "KASB Q&A 조회 중 예상하지 못한 오류가 발생했습니다.");
+    throw toKasbFailure(error, "Unexpected error while retrieving KASB Q&A.");
   }
 };

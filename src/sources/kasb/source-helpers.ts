@@ -10,7 +10,7 @@ export const asRecord = (
   context: string,
 ): Record<string, unknown> => {
   if (!isRecord(value)) {
-    throw sourceChanged(sourceUrl, `${context} 응답 객체를 찾을 수 없습니다.`);
+    throw sourceChanged(sourceUrl, `Could not find ${context} response object.`);
   }
   return value;
 };
@@ -21,7 +21,7 @@ export const asArray = (
   context: string,
 ): readonly unknown[] => {
   if (!Array.isArray(value)) {
-    throw sourceChanged(sourceUrl, `${context} 배열을 찾을 수 없습니다.`);
+    throw sourceChanged(sourceUrl, `Could not find ${context} array.`);
   }
   return value;
 };

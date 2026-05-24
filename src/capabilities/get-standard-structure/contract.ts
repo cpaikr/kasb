@@ -17,11 +17,11 @@ const fields = new Set(["stdNum", "keyword"]);
 
 export const GetStandardStructureRequestSchema = Schema.Struct({
   stdNum: StdNumSchema.annotations({
-    description: "조회용 섹션 트리를 반환할 KASB 기준서 번호입니다.",
+    description: "KASB standard number whose retrieval-facing section tree should be returned.",
     examples: ["1116"],
   }),
   keyword: Schema.optional(Schema.String.annotations({
-    description: "원천 측 구조 검색 metadata에 사용할 선택 검색어입니다. searchWord로 매핑됩니다.",
+    description: "Optional keyword for source-side structure search metadata. Maps to searchWord.",
     examples: ["리스"],
   })),
 });
@@ -44,51 +44,51 @@ export const StandardSectionNodeSchema = Schema.Struct({
   indexDocumentId: IndexDocumentIdSchema,
   stdNum: StdNumSchema,
   title: Schema.String.annotations({
-    description: "KASB 기준서 index에서 정규화한 섹션 제목입니다.",
+    description: "Section title normalized from the KASB standard index.",
     examples: ["목적"],
   }),
   ref: Schema.String.annotations({
-    description: "get-section --ref에 사용할 수 있는 섹션 문단 범위 또는 참조 label입니다.",
+    description: "Section paragraph range or reference label usable with get-section ref.",
     examples: ["1~2", "153~158"],
   }),
   level: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)).annotations({
-    description: "기준서 구조 tree 안에서 이 섹션 node의 깊이입니다.",
+    description: "Depth of this section node inside the standard structure tree.",
     examples: [2],
   }),
   documentType: Schema.optional(Schema.String.annotations({
-    description: "제공되는 경우 본문 외 또는 특수 node에 대한 KASB 원천 document type입니다.",
+    description: "KASB source document type for non-body or special nodes, when provided.",
     examples: ["overview"],
   })),
   parentDocumentIds: Schema.Array(IndexDocumentIdSchema).annotations({
-    description: "KASB index tree의 상위 조회용 섹션 ID 목록입니다.",
+    description: "Parent retrieval-facing section ids in the KASB index tree.",
   }),
   sort: Schema.optional(Schema.Number.annotations({
-    description: "제공되는 경우 안정적인 표시 순서에 사용할 원천 ordering 값입니다.",
+    description: "Source ordering value for stable display order, when provided.",
     examples: [1],
   })),
-}).annotations({ description: "get-standard-structure가 반환한 조회용 섹션 node 하나입니다." });
+}).annotations({ description: "One retrieval-facing section node returned by get-standard-structure." });
 export type StandardSectionNode = typeof StandardSectionNodeSchema.Type;
 
 export const GetStandardStructureResultSchema = Schema.Struct({
   result: Schema.Struct({
-    request: GetStandardStructureRequestSchema.annotations({ description: "이 결과를 만든 정규화된 request입니다." }),
+    request: GetStandardStructureRequestSchema.annotations({ description: "Normalized request that produced this result." }),
     sections: Schema.Array(StandardSectionNodeSchema).annotations({
-      description: "indexDocumentId 값을 get-section에 전달할 수 있는 섹션 node입니다.",
+      description: "Section nodes whose indexDocumentId values can be passed to get-section.",
     }),
     returnedCount: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)).annotations({
-      description: "이 응답에 포함된 섹션 node 개수입니다.",
+      description: "Number of section nodes included in this response.",
       examples: [120],
     }),
-  }).annotations({ description: "기준서 구조 payload입니다." }),
+  }).annotations({ description: "Standard structure payload." }),
   metadata: ResultMetadataSchema,
   references: Schema.Struct({
     stdNum: StdNumSchema,
     structureUrl: SourceUrlSchema,
-  }).annotations({ description: "기준서 구조에 대한 operation-level 원천 참조입니다." }),
+  }).annotations({ description: "Operation-level source reference for standard structure." }),
   warnings: Schema.Array(
     Schema.Struct({
       code: Schema.Literal("search_filtered_structure", "source_metadata_incomplete"),
-      message: Schema.String.annotations({ description: "사람이 읽을 수 있는 warning 상세입니다." }),
+      message: Schema.String.annotations({ description: "Human-readable warning detail." }),
     }),
   ),
 });

@@ -48,11 +48,11 @@ const createFakeOperation = (): KasbOperationDefinition => {
     },
     prepareInput: (input) => {
       if (typeof input !== "object" || input === null || Array.isArray(input)) {
-        throw { parameter: "input", message: "입력은 객체여야 합니다." };
+        throw { parameter: "input", message: "Input must be an object." };
       }
       const record = input as Record<string, unknown>;
       if (typeof record.keyword !== "string" || record.keyword.trim().length === 0) {
-        throw { parameter: "keyword", message: '필수 매개변수 "keyword"이(가) 없습니다.' };
+        throw { parameter: "keyword", message: 'Missing required parameter "keyword".' };
       }
       return { keyword: record.keyword.trim() };
     },
@@ -67,7 +67,7 @@ describe("neutral KASB toolset surface", () => {
     const toolset = createKasbToolset();
 
     expect(toolset.id).toBe("kasb");
-    expect(toolset.label).toBe("회계기준서 및 질의회신 내역 검색");
+    expect(toolset.label).toBe("KASB standards and Q&A search");
     expect(toolset.description).toContain("KASB");
     expect(toolset.listOperations().map((operation) => operation.name)).toEqual([
       ...kasbOperationNames,
@@ -108,7 +108,7 @@ describe("neutral KASB toolset surface", () => {
         retryable: true,
         recoveryAction: { kind: "inspect_command_help", operationName: "get-paragraph" },
       });
-      expect(invalid.error.recoveryHint).toContain("문단");
+      expect(invalid.error.recoveryHint).toContain("paragraph");
     }
 
     const unknown = toolset.validateInput("missing", {});

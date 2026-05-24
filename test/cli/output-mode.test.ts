@@ -107,7 +107,7 @@ describe("CLI output modes", () => {
     const runCount = { value: 0 };
     const command = makeCommand(writes, { outputModes: ["summary", "structured"], runCount });
 
-    expect(command.helpInformation()).toContain("출력 상세도를 선택합니다: summary, structured. 기본값은 structured입니다.");
+    expect(command.helpInformation()).toContain("Choose output detail: summary, structured. Default is");
 
     let error: unknown;
     try {

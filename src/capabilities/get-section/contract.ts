@@ -19,16 +19,16 @@ const fields = new Set(["stdNum", "indexDocumentId", "ref", "keyword"]);
 
 export const GetSectionRequestSchema = Schema.Struct({
   stdNum: StdNumSchema.annotations({
-    description: "조회할 섹션이 포함된 KASB 기준서 번호입니다.",
+    description: "KASB standard number containing the section to retrieve.",
     examples: ["1116"],
   }),
   indexDocumentId: Schema.optional(IndexDocumentIdSchema),
   ref: Schema.optional(Schema.String.pipe(Schema.minLength(1)).annotations({
-    description: "indexDocumentId를 모를 때 대체 조회에 사용하는 get-standard-structure의 섹션 ref/range입니다. indexDocumentId와 함께 보내지 마세요.",
+    description: "Section ref/range from get-standard-structure used as an alternate locator when indexDocumentId is unknown. Do not send it together with indexDocumentId.",
     examples: ["1~2", "153~158", "22~30"],
   })),
   keyword: Schema.optional(Schema.String.annotations({
-    description: "원천 측 섹션 highlight에 사용할 선택 검색어입니다. searchWord로 매핑됩니다.",
+    description: "Optional keyword for source-side section highlighting. Maps to searchWord.",
     examples: ["리스"],
   })),
 });
@@ -46,13 +46,13 @@ export const resolveGetSectionRequest = (
   if (indexDocumentId === undefined && ref === undefined) {
     throw new InvalidCapabilityRequest({
       parameter: "indexDocumentId",
-      message: "필수 매개변수 \"indexDocumentId\" 또는 \"ref\" 중 정확히 하나가 필요합니다. \"indexDocumentId\"는 get-standard-structure 결과에서 가져오며, 브라우저 경로의 titleDocumentId는 사용할 수 없습니다.",
+      message: "Exactly one of required parameters \"indexDocumentId\" or \"ref\" is required. \"indexDocumentId\" comes from get-standard-structure results; browser-route titleDocumentId cannot be used.",
     });
   }
   if (indexDocumentId !== undefined && ref !== undefined) {
     throw new InvalidCapabilityRequest({
       parameter: "ref",
-      message: "매개변수 \"indexDocumentId\"와 \"ref\" 중 정확히 하나만 사용할 수 있습니다.",
+      message: "Use exactly one of parameters \"indexDocumentId\" and \"ref\".",
     });
   }
   return {
@@ -65,98 +65,98 @@ export const resolveGetSectionRequest = (
 
 export const SectionClauseSchema = Schema.Struct({
   kind: Schema.Literal("paragraph", "title", "unknown").annotations({
-    description: "정규화된 clause 종류입니다: paragraph content, title row, unknown source row.",
+    description: "Normalized clause kind: paragraph content, title row, or unknown source row.",
     examples: ["paragraph"],
   }),
   title: Schema.optional(Schema.String.annotations({
-    description: "원천이 제공한 경우 title clause의 제목 text입니다.",
+    description: "Title text for a title clause, when provided by the source.",
     examples: ["목적"],
   })),
   uniqueKey: Schema.optional(Schema.String.annotations({
-    description: "확인 가능한 경우 {stdNum}-{paraNum} 형식의 파생 문단 key입니다.",
+    description: "Derived paragraph key in {stdNum}-{paraNum} form, when available.",
     examples: ["1116-23"],
   })),
   stdNum: StdNumSchema,
   paraNum: Schema.optional(ParaNumSchema),
   indexDocumentId: IndexDocumentIdSchema,
   paraContent: Schema.optional(Schema.String.annotations({
-    description: "검증을 위해 보존한 원천 문단 HTML fragment입니다.",
+    description: "Source paragraph HTML fragment preserved for verification.",
   })),
   fullContent: Schema.optional(Schema.String.annotations({
-    description: "원천에서 정규화한 plain-text 문단 content입니다.",
+    description: "Plain-text paragraph content normalized from the source.",
   })),
   sort: Schema.optional(Schema.Number.annotations({
-    description: "제공되는 경우 섹션 안 표시 순서에 사용할 원천 ordering 값입니다.",
+    description: "Source ordering value for display order within the section, when provided.",
     examples: [1],
   })),
   faqDocNumbers: Schema.optional(Schema.String.annotations({
-    description: "제공되는 경우 이 clause와 연결된 원천 FAQ/Q&A document-number 참조입니다.",
+    description: "Source FAQ/Q&A document-number reference linked to this clause, when provided.",
     examples: ["SSI-35629"],
   })),
   faqCount: Schema.optional(Schema.Number.annotations({
-    description: "제공되는 경우 이 clause와 연결된 원천 FAQ/Q&A 참조 개수입니다.",
+    description: "Number of source FAQ/Q&A references linked to this clause, when provided.",
     examples: [1],
   })),
-}).annotations({ description: "섹션에서 반환된 순서 있는 title 또는 paragraph row 하나입니다." });
+}).annotations({ description: "One ordered title or paragraph row returned from a section." });
 export type SectionClause = typeof SectionClauseSchema.Type;
 
 export const GetSectionResultSchema = Schema.Struct({
   result: Schema.Struct({
-    request: GetSectionRequestSchema.annotations({ description: "이 결과를 만든 정규화된 request입니다." }),
+    request: GetSectionRequestSchema.annotations({ description: "Normalized request that produced this result." }),
     section: Schema.Struct({
       stdNum: StdNumSchema,
       indexDocumentId: IndexDocumentIdSchema,
       standardTitle: Schema.optional(Schema.String.annotations({
-        description: "구조 index에서 확인할 수 있을 때 제공하는 best-effort 포함 기준서 제목입니다.",
+        description: "Best-effort containing standard title when it can be checked in the structure index.",
         examples: ["기업회계기준서 제1116호 리스"],
       })),
       standardKind: Schema.optional(Schema.String.annotations({
-        description: "구조 index에서 확인할 수 있을 때 제공하는 best-effort 기준서 계열 또는 framework label입니다.",
+        description: "Best-effort standard family or framework label when it can be checked in the structure index.",
         examples: ["k-ifrs-standard"],
       })),
       title: Schema.String.annotations({
-        description: "확인된 섹션 제목입니다.",
+        description: "Resolved section title.",
         examples: ["목적"],
       }),
       ref: Schema.optional(Schema.String.annotations({
-        description: "확인 가능한 경우 resolved 섹션 문단 범위 또는 참조 label입니다.",
+        description: "Resolved section paragraph range or reference label, when available.",
         examples: ["1~2"],
       })),
       level: Schema.optional(Schema.Number.annotations({
-        description: "확인 가능한 경우 구조 tree 안의 resolved 섹션 깊이입니다.",
+        description: "Resolved section depth in the structure tree, when available.",
         examples: [2],
       })),
       sort: Schema.optional(Schema.Number.annotations({
-        description: "확인 가능한 경우 resolved 섹션의 원천 ordering 값입니다.",
+        description: "Source ordering value for the resolved section, when available.",
         examples: [1],
       })),
-    }).annotations({ description: "확인된 섹션 metadata입니다." }),
+    }).annotations({ description: "Resolved section metadata." }),
     clauses: Schema.Array(SectionClauseSchema).annotations({
-      description: "title clause와 paragraph clause를 포함한 순서 있는 섹션 row입니다.",
+      description: "Ordered section rows including title clauses and paragraph clauses.",
     }),
-  }).annotations({ description: "섹션 조회 payload입니다." }),
+  }).annotations({ description: "Section retrieval payload." }),
   metadata: ResultMetadataSchema,
   references: Schema.Struct({
     stdNum: StdNumSchema,
     indexDocumentId: IndexDocumentIdSchema,
     standardTitle: Schema.optional(Schema.String.annotations({
-      description: "확인 가능한 경우 best-effort 포함 기준서 제목입니다.",
+      description: "Best-effort containing standard title, when available.",
       examples: ["기업회계기준서 제1116호 리스"],
     })),
     standardKind: Schema.optional(Schema.String.annotations({
-      description: "확인 가능한 경우 best-effort 기준서 계열 또는 framework label입니다.",
+      description: "Best-effort standard family or framework label, when available.",
       examples: ["k-ifrs-standard"],
     })),
     sectionTitle: Schema.optional(Schema.String.annotations({
-      description: "확인 가능한 경우 resolved 섹션 제목입니다.",
+      description: "Resolved section title, when available.",
       examples: ["목적"],
     })),
     sectionRef: Schema.optional(Schema.String.annotations({
-      description: "확인 가능한 경우 resolved 섹션 문단 범위 또는 참조 label입니다.",
+      description: "Resolved section paragraph range or reference label, when available.",
       examples: ["1~2"],
     })),
     sectionUrl: SourceUrlSchema,
-  }).annotations({ description: "resolved 섹션에 대한 operation-level 원천 참조입니다." }),
+  }).annotations({ description: "Operation-level source reference for the resolved section." }),
   warnings: Schema.Array(
     Schema.Struct({
       code: Schema.Literal(
@@ -164,7 +164,7 @@ export const GetSectionResultSchema = Schema.Struct({
         "empty_section",
         "partial_clause_normalization",
       ),
-      message: Schema.String.annotations({ description: "사람이 읽을 수 있는 warning 상세입니다." }),
+      message: Schema.String.annotations({ description: "Human-readable warning detail." }),
     }),
   ),
 });

@@ -30,7 +30,7 @@ describe("kasb CLI", () => {
     expect(stdout).toContain("get-paragraph [options]");
     expect(stdout).toContain("search-qna [options]");
     expect(stdout).toContain("get-qna [options]");
-    expect(stdout).toContain("워크플로:");
+    expect(stdout).toContain("Workflows:");
     expect(stdout).toContain("kasb get-standard-structure --std-num 1116 --output summary");
     expect(stdout).toContain("kasb search-qna --keyword 리스 --limit 5 --output summary");
   });
@@ -73,7 +73,7 @@ describe("kasb CLI", () => {
     expect(stderr).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.parameter).toBe("paraNum");
-    expect(envelope.failure.message).toContain('필수 옵션 "--para-num"');
+    expect(envelope.failure.message).toContain('Missing required option "--para-num"');
     expect(envelope.metadata.cliTransportVersion).toBe("1");
     expect(envelope.metadata.operation).toBe("get-paragraph");
   });
@@ -87,7 +87,7 @@ describe("kasb CLI", () => {
     expect(result.exitCode).toBe(1);
     expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
-    expect(envelope.failure.message).toContain(`알 수 없는 옵션입니다: "${option}"`);
+    expect(envelope.failure.message).toContain(`Unknown option: "${option}"`);
     expect(envelope.failure.message).toContain("--keyword");
   });
 
@@ -100,7 +100,7 @@ describe("kasb CLI", () => {
     expect(result.exitCode).toBe(1);
     expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
-    expect(envelope.failure.message).toContain('알 수 없는 옵션입니다: "--query"');
+    expect(envelope.failure.message).toContain('Unknown option: "--query"');
     expect(envelope.failure.message).not.toContain("--keyword");
   });
 
@@ -113,7 +113,7 @@ describe("kasb CLI", () => {
     expect(result.exitCode).toBe(1);
     expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
-    expect(envelope.failure.message).toContain('알 수 없는 옵션입니다: "--query"');
+    expect(envelope.failure.message).toContain('Unknown option: "--query"');
     expect(envelope.failure.message).not.toContain("--keyword");
   });
 
@@ -126,7 +126,7 @@ describe("kasb CLI", () => {
     expect(result.exitCode).toBe(1);
     expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
-    expect(envelope.failure.message).toContain('알 수 없는 명령입니다: "missing-command"');
+    expect(envelope.failure.message).toContain('Unknown command: "missing-command"');
   });
 
   test.each([
@@ -155,8 +155,9 @@ describe("kasb CLI", () => {
 
     expect(result.exitCode).toBe(0);
     expect(decode(result.stderr)).toBe("");
-    expect(stdout).toContain(`기본값: ${defaultObservedQnaTypeIds.join(",")}`);
-    expect(stdout).toContain("Q&A 유형:");
+    expect(stdout).toContain("Default:");
+    expect(stdout).toContain(defaultObservedQnaTypeIds.join(","));
+    expect(stdout).toContain("Q&A types:");
     expect(stdout).toContain("15 K-IFRS 신속처리질의");
     expect(stdout).toContain("24 일반기업회계기준 금융감독원");
     expect(stdout).toContain("--sort-date <direction>");
@@ -184,7 +185,7 @@ describe("kasb CLI", () => {
     expect(decode(structureHelp.stderr)).toBe("");
     expect(structureStdout).toContain("kasb get-standard-structure --std-num 1116 --keyword 리스 --output summary");
     expect(structureStdout).toContain("kasb get-standard-structure --std-num 1115 --keyword 수행의무 --output summary");
-    expect(structureStdout).toContain("--keyword는 get-section --ref로 이어질 후보 섹션을 좁힐 때 사용하세요.");
+    expect(structureStdout).toContain("Use --keyword to narrow candidate sections before get-section --ref.");
 
     const sectionHelp = runCli(["help", "get-section"]);
     const sectionStdout = decode(sectionHelp.stdout);
@@ -202,7 +203,7 @@ describe("kasb CLI", () => {
     expect(paragraphHelp.exitCode).toBe(0);
     expect(decode(paragraphHelp.stderr)).toBe("");
     expect(paragraphStdout).toContain("kasb get-paragraph --std-num 1116 --para-num 9");
-    expect(paragraphStdout).toContain("문단 범위(예: 9~17, 22~30)는 --para-num이 아니라 get-section --ref로 조회하세요.");
+    expect(paragraphStdout).toContain("Retrieve paragraph ranges (for example, 9~17 or 22~30) with get-section --ref, not --para-num.");
   });
 
   test("adds a structure lookup next action when get-section lacks a locator", () => {
@@ -246,12 +247,12 @@ describe("kasb CLI", () => {
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.parameter).toBe("rows");
     expect(envelope.failure.cliOption).toBe("--limit");
-    expect(envelope.failure.message).toContain('옵션 "--limit"');
+    expect(envelope.failure.message).toContain('Option "--limit"');
     expect(envelope.failure.nextAction).toEqual({
       operation: "search-qna",
       input: { keyword: "리스", rows: 50 },
       command: "kasb search-qna --keyword '리스' --limit 50 --output summary",
-      reason: expect.stringContaining("1~50"),
+      reason: expect.stringContaining("1-50"),
     });
   });
 

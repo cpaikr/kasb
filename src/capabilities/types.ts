@@ -12,73 +12,73 @@ export const capabilitySchemaToJsonSchema = <A, I, R>(
 });
 
 export const StdNumSchema = Schema.String.pipe(Schema.minLength(1)).annotations({
-  description: "안정적인 기준서 단위 식별자로 사용하는 KASB 기준서 번호입니다.",
+  description: "KASB standard number used as the stable standard-level identifier.",
   examples: ["1116"],
 });
 
 export const IndexDocumentIdSchema = Schema.String.pipe(Schema.minLength(1)).annotations({
-  description: "get-standard-structure가 반환하고 get-section이 받는 조회용 섹션 ID입니다. 브라우저 경로의 titleDocumentId 값은 허용되지 않습니다.",
+  description: "Retrieval-facing section id returned by get-standard-structure and accepted by get-section. Browser-route titleDocumentId values are not allowed.",
   examples: ["ZB2hJW"],
 });
 
 export const ParaNumSchema = Schema.String.pipe(Schema.minLength(1)).annotations({
-  description: "하나의 기준서 안에서 쓰는 문단 참조입니다. get-paragraph는 숫자, 한글 접두어, 부록, 결론도출근거 형식을 받습니다.",
+  description: "Paragraph reference within one standard. get-paragraph accepts numeric, Korean-prefixed, appendix, and basis-for-conclusions forms.",
   examples: ["23", "한2.1", "B3", "BC240A"],
 });
 
 export const DocNumberSchema = Schema.String.pipe(Schema.minLength(1)).annotations({
-  description: "search-qna와 get-qna에서 사용하는 KASB Q&A 문서 번호입니다.",
+  description: "KASB Q&A document number used by search-qna and get-qna.",
   examples: ["SSI-35629"],
 });
 
 export const SourceUrlSchema = Schema.String.annotations({
-  description: "이 결과를 생성하거나 검증할 때 사용한 KASB API URL입니다.",
+  description: "KASB API URL used to generate or verify this result.",
   examples: ["https://db.kasb.or.kr/api/paragraphs/content/1116/23"],
 });
 
 export const SourceReferenceSchema = Schema.Struct({
   apiUrl: SourceUrlSchema,
-}).annotations({ description: "반환 항목의 원천 API 참조입니다." });
+}).annotations({ description: "Source API reference for a returned item." });
 export type SourceReference = typeof SourceReferenceSchema.Type;
 
 export const ResultMetadataSchema = Schema.Struct({
   fetchedAt: Schema.String.annotations({
-    description: "원천 응답을 가져오거나 정규화한 시점의 ISO timestamp입니다.",
+    description: "ISO timestamp when the source response was fetched or normalized.",
     examples: ["2026-05-18T00:00:00.000Z"],
   }),
   source: Schema.Struct({
-    system: Schema.Literal("kasb").annotations({ description: "원천 시스템 식별자입니다." }),
+    system: Schema.Literal("kasb").annotations({ description: "Source system identifier." }),
     endpoint: Schema.String.annotations({
-      description: "이 작업이 사용한 KASB API endpoint 계열입니다.",
+      description: "KASB API endpoint family used by this operation.",
       examples: ["/api/paragraphs/content/{stdNum}/{paraNum}"],
     }),
-  }).annotations({ description: "원천 endpoint metadata입니다." }),
+  }).annotations({ description: "Source endpoint metadata." }),
   sourceBehavior: Schema.Struct({
     observationStatus: Schema.Literal("observed").annotations({
-      description: "원천 동작이 관찰된 공개 KASB API 동작에 기반함을 나타냅니다.",
+      description: "Indicates that source behavior is based on observed public KASB API behavior.",
     }),
     apiBase: Schema.Literal("https://db.kasb.or.kr/api").annotations({
-      description: "관찰된 KASB JSON API base URL입니다.",
+      description: "Observed KASB JSON API base URL.",
     }),
-  }).annotations({ description: "관찰된 원천 동작 metadata입니다." }),
+  }).annotations({ description: "Observed source-behavior metadata." }),
   completeness: Schema.Literal("complete", "partial").annotations({
-    description: "반환 payload가 완전한지, 일부만 정규화/조회되었는지를 나타냅니다.",
+    description: "Whether the returned payload is complete or only partially normalized/retrieved.",
     examples: ["complete"],
   }),
   content: Schema.optional(Schema.Struct({
     htmlFields: Schema.optional(Schema.Array(Schema.String).annotations({
-      description: "검증을 위해 원천 HTML fragment를 의도적으로 보존한 result field path입니다.",
+      description: "Result field path where a source HTML fragment is intentionally preserved for verification.",
       examples: [["result.paragraph.paraContent"]],
     })),
     textFields: Schema.optional(Schema.Array(Schema.String).annotations({
-      description: "원천 HTML 또는 rich text에서 plain text로 정규화한 result field path입니다.",
+      description: "Result field path normalized to plain text from source HTML or rich text.",
       examples: [["result.paragraph.fullContent"]],
     })),
     notes: Schema.optional(Schema.Array(Schema.String).annotations({
-      description: "조치가 필요한 warning은 아니지만 기록할 일반 content-format note입니다.",
+      description: "Routine content-format note that is recorded but does not require a warning.",
     })),
-  }).annotations({ description: "예상된 HTML 보존 또는 text 정규화에 관한 content formatting metadata입니다." })),
-}).annotations({ description: "원천 접근과 정규화 완전성에 관한 operation metadata입니다." });
+  }).annotations({ description: "Content-format metadata for expected HTML preservation or text normalization." })),
+}).annotations({ description: "Operation metadata for source access and normalization completeness." });
 export type ResultMetadata = typeof ResultMetadataSchema.Type;
 
 export const KasbFailureCodeSchema = Schema.Literal(

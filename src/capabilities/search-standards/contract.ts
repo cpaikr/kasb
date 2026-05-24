@@ -15,18 +15,18 @@ const fields = new Set(["keyword", "limit", "sort"]);
 
 export const SearchStandardsRequestSchema = Schema.Struct({
   keyword: Schema.String.pipe(Schema.minLength(1)).annotations({
-    description: "KASB 기준서를 찾을 검색어입니다. 원천 searchWord 매개변수로 매핑됩니다.",
+    description: "Keyword used to find KASB standards. Maps to the source searchWord parameter.",
     examples: ["리스", "수익인식"],
   }),
   limit: Schema.optionalWith(
     Schema.Int.pipe(Schema.greaterThanOrEqualTo(1), Schema.lessThanOrEqualTo(100)),
     { default: () => 20 },
   ).annotations({
-    description: "반환할 기준서 최대 개수입니다. 1~100 사이입니다.",
+    description: "Maximum number of standards to return. Must be between 1 and 100.",
     examples: [10, 20],
   }),
   sort: Schema.optionalWith(Schema.Literal(...searchStandardsSorts), { default: () => "relevance" as const }).annotations({
-    description: "반환 기준서 정렬 방식입니다. relevance는 제목 매치와 높은 match count를 우선하고, match-count는 원천 hit count, std-num은 기준서 번호, title은 보강된 제목으로 정렬합니다.",
+    description: "Sort mode for returned standards. relevance prefers title matches and high match counts; match-count uses source hit count; std-num uses standard number; title uses enriched title.",
     examples: ["relevance", "match-count"],
   }),
 });
@@ -51,81 +51,81 @@ const readSearchStandardsSort = (value: unknown): SearchStandardsSort => {
   if (typeof value !== "string") {
     throw new InvalidCapabilityRequest({
       parameter: "sort",
-      message: '매개변수 "sort"은(는) 문자열이어야 합니다.',
+      message: 'Parameter "sort" must be a string.',
     });
   }
   const trimmed = value.trim();
   if (searchStandardsSorts.includes(trimmed as SearchStandardsSort)) return trimmed as SearchStandardsSort;
   throw new InvalidCapabilityRequest({
     parameter: "sort",
-    message: `매개변수 "sort"은(는) ${searchStandardsSorts.join(", ")} 중 하나여야 합니다.`,
+    message: `Parameter "sort" must be one of ${searchStandardsSorts.join(", ")}.`,
   });
 };
 
 const SearchStandardNextActionsSchema = Schema.Struct({
   getStandardStructure: Schema.Struct({
     operation: Schema.Literal("get-standard-structure").annotations({
-      description: "이 기준서에 대해 다음에 호출할 capability operation입니다.",
+      description: "Capability operation to call next for this standard.",
     }),
     input: Schema.Struct({
       stdNum: StdNumSchema,
     }).annotations({
-      description: "후속 구조 조회 operation에 전달할 typed input입니다.",
+      description: "Typed input to pass to the follow-up structure lookup operation.",
       examples: [{ stdNum: "1116" }],
     }),
-  }).annotations({ description: "섹션을 조회하기 전에 기준서 구조를 확인하기 위한 transport-neutral follow-up action입니다." }),
-}).annotations({ description: "이 검색 결과에 대해 제안하는 transport-neutral follow-up action입니다." });
+  }).annotations({ description: "Transport-neutral follow-up action for inspecting standard structure before retrieving sections." }),
+}).annotations({ description: "Suggested transport-neutral follow-up action for this search result." });
 
 export const SearchStandardItemSchema = Schema.Struct({
   stdNum: StdNumSchema,
   standardTitle: Schema.optional(Schema.String.annotations({
-    description: "원천 결과에 제목 metadata가 있을 때 제공하는 best-effort KASB 기준서 제목입니다.",
+    description: "Best-effort KASB standard title when title metadata is available from the source.",
     examples: ["리스"],
   })),
   standardKind: Schema.optional(Schema.String.annotations({
-    description: "원천에서 확인할 수 있을 때 제공하는 best-effort 기준서 계열 또는 framework label입니다.",
+    description: "Best-effort standard family or framework label when the source makes it available.",
     examples: ["K-IFRS"],
   })),
   matchCount: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)).annotations({
-    description: "원천이 이 기준서에 대해 보고한 문단 또는 content hit 수입니다.",
+    description: "Paragraph or content hit count reported by the source for this standard.",
     examples: [1043],
   }),
   references: Schema.Struct({ apiUrl: SourceUrlSchema }).annotations({
-    description: "이 기준서 검색 항목의 원천 API 참조입니다.",
+    description: "Source API reference for this standard search item.",
   }),
   nextActions: SearchStandardNextActionsSchema,
-}).annotations({ description: "구조 조회 follow-up action을 포함한 기준서 단위 검색 결과입니다." });
+}).annotations({ description: "Standard-level search result including the structure lookup follow-up action." });
 export type SearchStandardItem = typeof SearchStandardItemSchema.Type;
 
 export const SearchStandardsResultSchema = Schema.Struct({
   result: Schema.Struct({
-    request: SearchStandardsRequestSchema.annotations({ description: "이 결과를 만든 정규화된 request입니다." }),
+    request: SearchStandardsRequestSchema.annotations({ description: "Normalized request that produced this result." }),
     totalMatchCount: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)).annotations({
-      description: "반환된 기준서와 반환되지 않은 기준서를 모두 포함한 원천 hit count 합계입니다.",
+      description: "Total source hit count across returned and non-returned standards.",
       examples: [1043],
     }),
     totalStandardCount: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)).annotations({
-      description: "원천 검색에서 매치된 기준서 총 개수입니다.",
+      description: "Total number of standards matched by the source search.",
       examples: [27],
     }),
     returnedCount: Schema.Int.pipe(Schema.greaterThanOrEqualTo(0)).annotations({
-      description: "limit 적용 후 이 응답에 포함된 기준서 개수입니다.",
+      description: "Number of standards included in this response after applying limit.",
       examples: [20],
     }),
     standards: Schema.Array(SearchStandardItemSchema).annotations({
-      description: "get-standard-structure 또는 get-paragraph를 호출하기 전에 검토할 매칭 기준서입니다.",
+      description: "Matching standards to inspect before calling get-standard-structure or get-paragraph.",
     }),
     suggestedKeywords: Schema.Array(Schema.String.annotations({
-      description: "원천이 제안한 관련 검색어입니다.",
+      description: "Related keywords suggested by the source.",
       examples: ["금융리스"],
-    })).annotations({ description: "원천에서 제공될 때 반환하는 더 넓거나 관련된 검색어입니다." }),
-  }).annotations({ description: "기준서 검색 payload입니다." }),
+    })).annotations({ description: "Broader or related keywords returned when the source provides them." }),
+  }).annotations({ description: "Standards search payload." }),
   metadata: ResultMetadataSchema,
-  references: Schema.Struct({ searchUrl: SourceUrlSchema }).annotations({ description: "operation-level 원천 참조입니다." }),
+  references: Schema.Struct({ searchUrl: SourceUrlSchema }).annotations({ description: "Operation-level source reference." }),
   warnings: Schema.Array(
     Schema.Struct({
       code: Schema.Literal("truncated_results", "source_metadata_incomplete"),
-      message: Schema.String.annotations({ description: "사람이 읽을 수 있는 warning 상세입니다." }),
+      message: Schema.String.annotations({ description: "Human-readable warning detail." }),
     }),
   ),
 });

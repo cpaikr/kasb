@@ -14,6 +14,6 @@ export const executeSearchStandards = async (
   try {
     return await provider.search(resolveSearchStandardsRequest(input), context);
   } catch (error) {
-    throw toKasbFailure(error, "KASB 기준서 검색 중 예상하지 못한 오류가 발생했습니다.");
+    throw toKasbFailure(error, "Unexpected error while searching KASB standards.");
   }
 };

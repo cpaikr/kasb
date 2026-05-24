@@ -324,7 +324,7 @@ describe("KASB provider operations", () => {
       defaultGetSectionOperation.execute({ stdNum: "1116", indexDocumentId: wrongStandardSectionId }),
     ).rejects.toMatchObject({
       code: "source_changed",
-      message: "기준서 구조 행의 stdNum이 요청과 일치하지 않습니다.",
+      message: "Standard structure row stdNum does not match the request.",
     });
   });
 
@@ -472,7 +472,7 @@ describe("KASB provider operations", () => {
 
     expect(result.result.paginationStatus).toBe("estimated");
     expect(result.metadata.completeness).toBe("partial");
-    expect(result.warnings.map((warning) => warning.message).join("\n")).toContain("처음 500개");
+    expect(result.warnings.map((warning) => warning.message).join("\n")).toContain("first 500 rows");
   });
 
   test("suggests broader Q&A keywords when an exact search has no results", async () => {

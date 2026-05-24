@@ -54,7 +54,7 @@ export type CliOptions<Key extends string> = Partial<Record<Key, CliOptionValue>
 
 export const parseIntegerCliOption = (value: string): number => {
   if (!/^\d+$/.test(value)) {
-    throw new InvalidArgumentError(`정수를 입력해야 하지만 "${value}"을(를) 받았습니다.`);
+    throw new InvalidArgumentError(`Expected an integer but received "${value}".`);
   }
   return Number.parseInt(value, 10);
 };
@@ -73,10 +73,10 @@ export const createRegisteredOption = <Key extends string>(
 };
 
 export const createPrettyOption = (): RegisteredOption<"pretty"> =>
-  createRegisteredOption("pretty", "--pretty", "사람이 읽기 쉬운 들여쓰기 JSON으로 출력합니다.");
+  createRegisteredOption("pretty", "--pretty", "Print indented JSON for human reading.");
 
 export const createOutputOption = (outputModes: readonly CliOutputMode[]): RegisteredOption<"output"> =>
-  createRegisteredOption("output", "--output <mode>", `출력 상세도를 선택합니다: ${outputModes.join(", ")}. 기본값은 structured입니다.`, (option) =>
+  createRegisteredOption("output", "--output <mode>", `Choose output detail: ${outputModes.join(", ")}. Default is structured.`, (option) =>
     option.choices([...outputModes]),
   );
 
@@ -133,8 +133,9 @@ export const renderInvalidInputCliErrorDetails = <Key extends string>(
   const cliName = usedCliName ?? cliNameByOptionKey[parameterKey];
   if (cliName === undefined) return undefined;
   let message = error.message
-    .replaceAll("필수 매개변수", "필수 옵션")
-    .replaceAll("매개변수", "옵션");
+    .replaceAll("Missing required parameter", "Missing required option")
+    .replaceAll("Parameter", "Option")
+    .replaceAll("parameter", "option");
   for (const [key, optionCliName] of Object.entries(cliNameByOptionKey)) {
     const replacementCliName = key === error.parameter ? cliName : optionCliName;
     if (replacementCliName !== undefined) {
@@ -157,7 +158,7 @@ export const renderUnknownOptionCliErrorMessage = <Key extends string>(
 
   const suggestedOption = suggestCliOption(unknownOption, registeredOptions);
   if (suggestedOption === undefined) return undefined;
-  return `${localizeCommanderMessage(rawMessage)} 대신 ${suggestedOption} 옵션을 사용하세요.`;
+  return `${localizeCommanderMessage(rawMessage)} Use ${suggestedOption} instead.`;
 };
 
 const suggestCliOption = <Key extends string>(
@@ -267,10 +268,10 @@ const rawErrorMessage = (error: unknown): string =>
 
 const localizeCommanderMessage = (message: string): string => {
   const unknownCommand = message.match(/unknown command '([^']+)'/u)?.[1];
-  if (unknownCommand !== undefined) return `알 수 없는 명령입니다: "${unknownCommand}".`;
+  if (unknownCommand !== undefined) return `Unknown command: "${unknownCommand}".`;
 
   const unknownOption = message.match(/unknown option '([^']+)'/u)?.[1];
-  if (unknownOption !== undefined) return `알 수 없는 옵션입니다: "${unknownOption}".`;
+  if (unknownOption !== undefined) return `Unknown option: "${unknownOption}".`;
 
   return message;
 };

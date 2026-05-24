@@ -57,7 +57,7 @@ export const buildOperationCommand = <Key extends string, RawInput, Result>(
   const command = configureCliTransport(new Command(spec.operationName))
     .summary(spec.summary)
     .description(spec.description)
-    .helpOption("-h, --help", "명령 도움말을 표시합니다.")
+    .helpOption("-h, --help", "Display command help.")
     .addHelpText("after", renderSupplementalHelp(spec));
 
   for (const registeredOption of registeredOptions) {
@@ -157,8 +157,8 @@ const renderSupplementalHelp = <Key extends string, RawInput, Result>(
         `  # ${example.description}\n  kasb ${spec.operationName} ${example.argv.join(" ")}`,
     )
     .join("\n\n");
-  const examplesSection = examples.length > 0 ? `\n예시:\n${examples}` : "";
+  const examplesSection = examples.length > 0 ? `\nExamples:\n${examples}` : "";
   const notes = (spec.notes ?? []).map((note) => `  - ${note}`).join("\n");
-  const notesSection = notes.length > 0 ? `\n\n참고:\n${notes}` : "";
+  const notesSection = notes.length > 0 ? `\n\nNotes:\n${notes}` : "";
   return `${examplesSection}${notesSection}\n`;
 };
