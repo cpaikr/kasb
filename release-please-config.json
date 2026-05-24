@@ -6,7 +6,8 @@
     ".": {
       "release-type": "node",
       "package-name": "@sjunepark/kasb",
-      "changelog-path": "CHANGELOG.md"
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true
     }
   }
 }
