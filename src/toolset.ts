@@ -720,12 +720,12 @@ export const createKasbToolset = (options: CreateKasbToolsetOptions = {}): KasbT
 
   return {
     id: "kasb",
-    label: "Kasb",
+    label: "회계기준서 및 질의회신 내역 검색",
     description:
       "KASB 기준서와 Q&A를 read-only로 검색·조회하고 원천 참조, warning, typed capability error를 반환합니다.",
     help: () => ({
       id: "kasb",
-      label: "Kasb",
+      label: "회계기준서 및 질의회신 내역 검색",
       description:
         "KASB 기준서와 Q&A를 read-only로 검색·조회하고 원천 참조, warning, typed capability error를 반환합니다.",
       usage:

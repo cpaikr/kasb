@@ -74,7 +74,7 @@ People often collapse four different things into "tool":
 - `capability`
   Search standards, fetch sections, and retrieve paragraphs
 - `packaging`
-  npm package, CLI binary, skill text, prompt wrapper, helper agent
+  npm package, CLI entrypoint, skill text, prompt wrapper, helper agent
 - `runtime policy`
   Approval, sandbox, auth, scope, retries, freshness
 

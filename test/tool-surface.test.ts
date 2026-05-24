@@ -67,7 +67,7 @@ describe("neutral KASB toolset surface", () => {
     const toolset = createKasbToolset();
 
     expect(toolset.id).toBe("kasb");
-    expect(toolset.label).toBe("Kasb");
+    expect(toolset.label).toBe("회계기준서 및 질의회신 내역 검색");
     expect(toolset.description).toContain("KASB");
     expect(toolset.listOperations().map((operation) => operation.name)).toEqual([
       ...kasbOperationNames,

@@ -1,6 +1,6 @@
 {
   "name": "@sjunepark/kasb",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "KASB 기준서와 Q&A 자료를 검색하고 조회하는 read-only CLI입니다.",
   "license": "Elastic-2.0",
   "type": "module",
@@ -40,7 +40,6 @@
   },
   "scripts": {
     "build": "bun run scripts/build-cli.ts",
-    "build:binaries": "bun run scripts/build-binaries.ts",
     "prepack": "bun run build",
     "prepublishOnly": "bun run typecheck && bun test",
     "typecheck": "tsc --noEmit",
