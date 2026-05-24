@@ -346,14 +346,14 @@ Failure envelope shape:
 {
   "failure": {
     "code": "invalid_input",
-    "message": "필수 옵션 \"--index-document-id\" 또는 \"--ref\" 중 정확히 하나가 필요합니다. \"--index-document-id\"는 get-standard-structure 결과에서 가져오며, 브라우저 경로의 titleDocumentId는 사용할 수 없습니다.",
+    "message": "Exactly one of required options \"--index-document-id\" or \"--ref\" is required. \"--index-document-id\" comes from get-standard-structure results; browser-route titleDocumentId cannot be used.",
     "retryable": false,
     "parameter": "indexDocumentId",
     "nextAction": {
       "operation": "get-standard-structure",
       "input": { "stdNum": "1019" },
       "command": "kasb get-standard-structure --std-num 1019 --output summary",
-      "reason": "get-section에는 indexDocumentId 또는 ref가 필요합니다. get-standard-structure가 해당 기준서의 후보 섹션과 indexDocumentId/ref를 반환합니다."
+      "reason": "get-section requires indexDocumentId or ref. get-standard-structure returns candidate sections and indexDocumentId/ref values for the standard."
     }
   },
   "metadata": {

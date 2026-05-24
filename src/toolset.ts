@@ -620,8 +620,10 @@ const toValidationFailureCode = (
     }
   }
   const message = hasString(error, "message") ? error.message : "";
-  if (message.includes("Missing required parameter")) return "missing_parameter";
-  if (message.includes("Unknown parameter")) return "unknown_parameter";
+  const normalizedMessage = message.toLowerCase();
+  if (normalizedMessage.includes("missing required parameter")) return "missing_parameter";
+  if (normalizedMessage.includes("exactly one of required parameters")) return "missing_parameter";
+  if (normalizedMessage.includes("unknown parameter")) return "unknown_parameter";
   if (parameter !== undefined) return "invalid_parameter";
   return "invalid_request";
 };
@@ -631,11 +633,12 @@ const inferValidationReason = (
   parameter: string | undefined,
 ): string | undefined => {
   const message = hasString(error, "message") ? error.message : "";
-  if (message.includes("Missing required parameter")) return "required";
-  if (message.includes("Unknown parameter")) return "unknown_parameter";
-  if (message.includes("must be a string")) return "invalid_type";
-  if (message.includes("must be an integer")) return "invalid_type";
-  if (message.includes("exactly one")) return "exclusive_or";
+  const normalizedMessage = message.toLowerCase();
+  if (normalizedMessage.includes("missing required parameter")) return "required";
+  if (normalizedMessage.includes("unknown parameter")) return "unknown_parameter";
+  if (normalizedMessage.includes("must be a string")) return "invalid_type";
+  if (normalizedMessage.includes("must be an integer")) return "invalid_type";
+  if (normalizedMessage.includes("exactly one")) return "exclusive_or";
   return parameter === undefined ? undefined : "invalid_value";
 };
 

@@ -111,6 +111,20 @@ describe("neutral KASB toolset surface", () => {
       expect(invalid.error.recoveryHint).toContain("paragraph");
     }
 
+    const missingSectionLocator = toolset.validateInput("get-section", { stdNum: "1116" });
+    expect(missingSectionLocator.ok).toBe(false);
+    if (!missingSectionLocator.ok) {
+      expect(missingSectionLocator.error).toMatchObject({
+        code: "missing_parameter",
+        operationName: "get-section",
+        parameter: "indexDocumentId",
+        reason: "exclusive_or",
+        expected: "exactly one accepted section locator",
+        retryable: true,
+        recoveryAction: { kind: "inspect_command_help", operationName: "get-section" },
+      });
+    }
+
     const unknown = toolset.validateInput("missing", {});
     expect(unknown.ok).toBe(false);
     if (!unknown.ok) {
