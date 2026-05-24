@@ -1,6 +1,6 @@
 {
   "name": "@sjunepark/kasb",
-  "version": "0.2.0",
+  "version": "0.1.2",
   "description": "KASB 기준서와 Q&A 자료를 검색하고 조회하는 read-only CLI입니다.",
   "license": "Elastic-2.0",
   "type": "module",

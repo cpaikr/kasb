@@ -1,16 +1,5 @@
 # Changelog
 
-## [0.2.0](https://github.com/sjunepark/kasb/compare/v0.1.2...v0.2.0) (2026-05-24)
-
-
-### ⚠ BREAKING CHANGES
-
-* standalone OS-native `kasb` binaries are no longer built or released. Use the npm package CLI instead.
-
-### Features
-
-* remove standalone native CLI releases
-
 ## [0.1.2](https://github.com/sjunepark/kasb/compare/v0.1.1...v0.1.2) (2026-05-23)
 
 
