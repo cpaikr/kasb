@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/sjunepark/kasb/compare/v0.1.1...v0.1.2) (2026-05-23)
+
+
+### Bug Fixes
+
+* harden KASB tool surface copy and skill packaging ([f91eb1f](https://github.com/sjunepark/kasb/commit/f91eb1fc252d817d7479a27f5cbab32995aac42c))
+
 ## [0.1.1](https://github.com/sjunepark/kasb/compare/v0.1.0...v0.1.1) (2026-05-22)
 
 
