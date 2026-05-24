@@ -50,9 +50,9 @@ Naming guidance:
 - Use kebab-case canonical operation names: `search-company`, `view-report`, `list-items`.
 - Prefix host-specific function names only when the host requires it. Keep canonical operation names host-neutral.
 
-## User-facing language
+## Language policy
 
-All user-facing messages should be written in Korean. This includes:
+Reusable agent-tool packages should be **English-native for the agent/control plane**. The package-owned contract is what models, scripts, host adapters, and maintainers use to understand the tool precisely, so keep these surfaces in English:
 
 - toolset, operation, and host-tool labels,
 - top-level toolset and host-tool descriptions,
@@ -62,7 +62,11 @@ All user-facing messages should be written in Korean. This includes:
 - Pi `content` text, `promptGuidelines`, parameter descriptions, and presentation text,
 - validation failure messages, recovery hints, warnings, execution error messages, result summaries, limitations, and citation guidance.
 
-Keep protocol identifiers stable even when adjacent user-facing text is Korean: package ids, export names, action enum values, JSON keys, schema property names, canonical operation names, and CLI flag names may remain code-like English when they are part of the machine contract. Proper nouns and product names may remain untranslated; add Korean descriptors when they improve clarity, for example `darty`/`Darty` as the package or product name but `DART 검색기` as a user-facing label.
+Do not maintain three parallel variants such as Korean, English, and agent-facing copy. The reusable package provides one English model-facing contract. Product hosts such as Creo own Korean UI display copy in their presentation layer when they need localized labels, descriptions, toasts, panels, or dialogs.
+
+Preserve source-native Korean domain terms when they are official identifiers or the terms users and source systems actually use. Do not force awkward translations for terms such as `사업보고서`, `감사보고서`, `반기보고서`, `분기보고서`, `표준지 공시지가`, `개별공시지가`, `법정동`, `공시지가`, and source-specific report or section titles. When a Korean term may be unfamiliar to the model, add a short English gloss on first mention, for example `사업보고서 (annual business report)` or `개별공시지가 (individual publicly announced land price)`.
+
+Keep protocol identifiers stable: package ids, export names, action enum values, JSON keys, schema property names, canonical operation names, and CLI flag names stay code-like English when they are part of the machine contract. Proper nouns and product names may remain untranslated.
 
 ## Layering model
 
@@ -74,7 +78,7 @@ source/domain adapters -> capability contracts -> neutral toolset -> host adapte
                                                         |-> future MCP/HTTP/etc.
 ```
 
-The neutral toolset is the public contract. Adapters parse, render, and translate, but should not own domain behavior, domain validation copy, reusable agent guidance, or source-specific recovery guidance.
+The neutral toolset is the public contract. Adapters parse inputs, render host envelopes, and adapt protocols, but should not own domain behavior, domain validation copy, reusable agent guidance, or source-specific recovery guidance.
 
 ## Compatibility boundary
 
@@ -127,7 +131,7 @@ export type Toolset = {
 
 Required behavior:
 
-- `label` and `description` are user-facing Korean strings. The top-level `Toolset.description` is a concise purpose statement: what the toolset is for and, if useful, its evidence/safety posture. Do not put call sequences, action names, parameter hints, or other how-to-use instructions in this field; put those in `help()`, operation specs, prompt snippets, guidelines, parameter descriptions, or internal agent-native function tool descriptions. This purpose-only rule applies to the top-level toolset description, not to every field named `description` elsewhere.
+- `label` and `description` are English model-facing strings for the reusable package contract. They may preserve official Korean domain terms when those are the source-native names. The top-level `Toolset.description` is a concise purpose statement: what the toolset is for and, if useful, its evidence/safety posture. Do not put call sequences, action names, parameter hints, or other how-to-use instructions in this field; put those in `help()`, operation specs, prompt snippets, guidelines, parameter descriptions, or internal agent-native function tool descriptions. This purpose-only rule applies to the top-level toolset description, not to every field named `description` elsewhere.
 - `help()` is network-free and lists what the toolset can do.
 - `listOperations()` is network-free and returns canonical operation summaries.
 - `getCommandHelp(name)` is network-free and returns the operation contract.
@@ -282,7 +286,7 @@ Source packages should own domain and reusable agent messages:
 - source warnings and execution error messages,
 - shared single-tool action descriptions, prompt snippets, internal agent-native function tool descriptions, and model-facing formatters when more than one host can reuse them.
 
-These source-owned messages are user-facing and should be written in Korean, while preserving machine identifiers and proper nouns that should not be translated.
+These source-owned messages are model-facing control-plane copy and should be written in English, while preserving source-native Korean terms, machine identifiers, and proper nouns that should not be translated.
 
 Host adapters should own only host/protocol messages:
 
@@ -335,7 +339,7 @@ The CLI should be a thin adapter over the same operations.
 
 Required behavior:
 
-- `--help` and command help are human-readable Korean text.
+- `--help` and command help are human-readable English text for agents and developers, while preserving official Korean source terms where accuracy requires them.
 - Successful command execution prints exactly one JSON response object to stdout.
 - Command failure prints exactly one JSON failure object to stdout and exits non-zero.
 - The CLI should not hide structured errors that the neutral toolset exposes.
@@ -365,12 +369,12 @@ The Pi adapter should expose one package-level tool for the toolset unless there
 
 Required behavior:
 
-- The Pi tool `label` and `description` are user-facing Korean strings. The top-level Pi tool `description` stays purpose-only and does not teach the action protocol. Keep how-to-use text in `promptGuidelines`, `parameters`, `help`, `command_help` responses, operation-derived schemas, and internal agent-native function tool descriptions. This does not forbid instructional descriptions inside the Pi parameter schema, returned operation schemas, or internal function tools.
+- The Pi tool `label` and `description` are English model-facing strings for the agent contract. The top-level Pi tool `description` stays purpose-only and does not teach the action protocol. Keep how-to-use text in `promptGuidelines`, `parameters`, `help`, `command_help` responses, operation-derived schemas, and internal agent-native function tool descriptions. This does not forbid instructional descriptions inside the Pi parameter schema, returned operation schemas, or internal function tools.
 - `help` returns toolset-level guidance and operation summaries in the standard action output envelope.
 - `command_help` returns one operation spec in the standard action output envelope.
 - `validate` runs neutral validation without executing the operation and returns the standard action output envelope.
 - `run` validates, executes, and returns the standard action output envelope with the operation payload under `details.result`.
-- Result content should be model-readable Korean text, preferably formatted by reusable neutral helpers when another host can share it.
+- Result content should be model-readable English text, preferably formatted by reusable neutral helpers when another host can share it. Preserve official Korean document names, report types, section titles, addresses, legal-dong names, and other source-native terms as returned by the source.
 - Full structured details must be preserved in `details` or an equivalent host-specific structured channel that keeps the same action-result fields.
 - Parameters should include an action enum, a command enum using canonical operation names, and an `inputJson` object.
 
@@ -424,7 +428,7 @@ Human review is still required for:
 - result usefulness,
 - reference quality,
 - warning quality,
-- Korean quality for user-facing labels, descriptions, help, prompt guidance, validation copy, warnings, summaries, and errors,
+- English control-plane clarity for labels, descriptions, help, prompt guidance, validation copy, warnings, summaries, and errors, including correct preservation of official Korean source terms,
 - prompt guidance and whether reusable prompt/action copy is neutral-owned,
 - source drift and safety claims,
 - whether an adapter should exist at all.
@@ -434,7 +438,7 @@ Human review is still required for:
 A package follows this spec when:
 
 - all three required surfaces exist,
-- the neutral toolset owns operation discovery, validation, execution, reusable Korean agent guidance, source-owned messages, result summaries, recovery hints, and errors,
+- the neutral toolset owns operation discovery, validation, execution, reusable English agent guidance, source-owned messages, result summaries, recovery hints, and errors,
 - CLI and Pi are thin adapters over the neutral toolset,
 - every operation has stable schemas and examples,
 - invalid input produces useful recovery metadata,
