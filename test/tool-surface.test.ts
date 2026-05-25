@@ -9,6 +9,7 @@ import {
 } from "../src/toolset.ts";
 
 const asRecord = (value: unknown): Record<string, unknown> => value as Record<string, unknown>;
+const textContent = (value: { readonly content: readonly { readonly text: string }[] }): string => value.content[0]?.text ?? "";
 
 const createFakeOperation = (): KasbOperationDefinition => {
   const inputJsonSchema = {
@@ -219,6 +220,7 @@ describe("Pi KASB adapter surface", () => {
       command: "search-standards",
     });
     expect(asRecord(commandHelp.details).commandHelp).toBeObject();
+    expect(textContent(commandHelp)).toStartWith("Kasb search-standards command help.\n");
 
     const validate = await tool.execute("call-3", {
       action: "validate",
@@ -231,6 +233,7 @@ describe("Pi KASB adapter surface", () => {
       command: "search-standards",
       validation: { ok: true, input: { keyword: "리스" } },
     });
+    expect(textContent(validate)).toStartWith("Kasb search-standards input validation succeeded.\nNormalized input:");
 
     const run = await tool.execute("call-4", {
       action: "run",
@@ -244,6 +247,7 @@ describe("Pi KASB adapter surface", () => {
       normalizedInput: { keyword: "리스" },
       result: { result: { request: { keyword: "리스" } } },
     });
+    expect(textContent(run)).toStartWith("Kasb search-standards run succeeded.\n");
   });
 
   test("returns structured adapter and validation failures", async () => {
@@ -255,6 +259,7 @@ describe("Pi KASB adapter surface", () => {
       action: "adapter_validation",
       error: { code: "invalid_parameter", parameter: "action", retryable: true },
     });
+    expect(textContent(invalidAction)).toStartWith("Kasb tool input is invalid.\n");
 
     const missingInput = await tool.execute("call-2", {
       action: "run",
@@ -266,6 +271,7 @@ describe("Pi KASB adapter surface", () => {
       command: "search-standards",
       error: { code: "missing_parameter", parameter: "inputJson", retryable: true },
     });
+    expect(textContent(missingInput)).toStartWith("Kasb tool input is invalid.\n");
 
     const invalidCommandInput = await tool.execute("call-3", {
       action: "validate",
@@ -278,6 +284,50 @@ describe("Pi KASB adapter surface", () => {
       command: "search-standards",
       error: { code: "missing_parameter", parameter: "keyword", retryable: true },
     });
+    expect(textContent(invalidCommandInput)).toStartWith("Kasb search-standards input validation failed during validate.\nRepair guidance:");
+
+    const unknownCommand = await tool.execute("call-4", {
+      action: "command_help",
+      command: "missing",
+    });
+    expect(asRecord(unknownCommand.details)).toMatchObject({
+      ok: false,
+      action: "command_help",
+      command: "missing",
+      error: { code: "unknown_operation", operationName: "missing", retryable: false },
+    });
+    expect(textContent(unknownCommand)).toStartWith("Kasb command is unknown: missing\n");
+  });
+
+  test("returns English run failure text when operation execution fails", async () => {
+    const fakeOperation = createFakeOperation();
+    const tool = createKasbPiTool({
+      toolset: createKasbToolset({
+        operations: [{
+          ...fakeOperation,
+          operation: {
+            ...fakeOperation.operation,
+            execute: async () => {
+              throw new Error("source unavailable");
+            },
+          },
+        }],
+      }),
+    });
+
+    const failure = await tool.execute("call-1", {
+      action: "run",
+      command: "search-standards",
+      inputJson: { keyword: "리스" },
+    });
+
+    expect(asRecord(failure.details)).toMatchObject({
+      ok: false,
+      action: "run",
+      command: "search-standards",
+      error: { message: "source unavailable" },
+    });
+    expect(textContent(failure)).toStartWith("Kasb search-standards run failed.\nError:");
   });
 
   test("registers the Pi extension tool", () => {

@@ -333,7 +333,8 @@ export const formatKasbToolsetHelp = (help: KasbToolsetHelp): string => {
 
 export const formatKasbCommandHelp = (commandHelp: KasbCommandHelp): string =>
   [
-    `Kasb command ${commandHelp.name}: ${commandHelp.description}`,
+    `Kasb ${commandHelp.name} command help.`,
+    commandHelp.description,
     `Required input keys: ${commandHelp.requiredInputKeys.join(", ") || "none"}`,
     "",
     "Input JSON Schema:",
@@ -354,7 +355,7 @@ export const formatKasbValidationSuccess = (
   validation: Extract<KasbValidationResult, { ok: true }>,
 ): string =>
   [
-    `Kasb validation succeeded: ${command}`,
+    `Kasb ${command} input validation succeeded.`,
     "Normalized input:",
     json(validation.input),
   ].join("\n");
@@ -365,14 +366,14 @@ export const formatKasbValidationFailure = (
   error: KasbValidationFailure,
 ): string =>
   [
-    `Kasb ${action} input validation failed: ${command}`,
+    `Kasb ${command} input validation failed during ${action}.`,
     "Repair guidance:",
     json(error),
   ].join("\n");
 
 export const formatKasbRunSuccess = (command: string, result: unknown): string =>
   [
-    `Kasb run succeeded: ${command}`,
+    `Kasb ${command} run succeeded.`,
     "Use the returned references, warnings, metadata, and source URL for citations and follow-up commands.",
     "Result envelope:",
     json(result),
@@ -381,7 +382,7 @@ export const formatKasbRunSuccess = (command: string, result: unknown): string =
 export const formatKasbRunFailure = (
   command: string,
   error: KasbSerializedError,
-): string => [`Kasb run failed: ${command}`, "Error:", json(error)].join("\n");
+): string => [`Kasb ${command} run failed.`, "Error:", json(error)].join("\n");
 
 export const formatKasbInvalidToolInput = (
   error: KasbValidationFailure,
@@ -390,7 +391,7 @@ export const formatKasbInvalidToolInput = (
 export const formatKasbUnknownCommand = (
   command: string,
   error: KasbSerializedError,
-): string => `Unknown Kasb command: ${command}\n${json(error)}`;
+): string => `Kasb command is unknown: ${command}\n${json(error)}`;
 
 const isAbortSignalAborted = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
 
