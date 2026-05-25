@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/sjunepark/kasb/compare/v0.2.0...v0.2.1) (2026-05-25)
+
+
+### Bug Fixes
+
+* improve Pi adapter status text ([7b6ae3c](https://github.com/sjunepark/kasb/commit/7b6ae3c559b70992bbf66a8e5381b369ee50a365))
+* preserve get-section validation classification ([7a187e6](https://github.com/sjunepark/kasb/commit/7a187e6171d064b6d1cf18ccf3f4c66fdca45ccd))
+
 ## [0.2.0](https://github.com/sjunepark/kasb/compare/v0.1.2...v0.2.0) (2026-05-24)
 
 
