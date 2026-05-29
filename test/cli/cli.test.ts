@@ -65,7 +65,14 @@ describe("kasb CLI", () => {
     const stdout = decode(result.stdout);
     const stderr = decode(result.stderr);
     const envelope = JSON.parse(stdout) as {
-      readonly failure: { readonly code: string; readonly parameter?: string; readonly message: string };
+      readonly failure: {
+        readonly code: string;
+        readonly parameter?: string;
+        readonly message: string;
+        readonly recoverable?: boolean;
+        readonly retryable?: boolean;
+        readonly recoveryAction?: { readonly kind: string; readonly operationName?: string };
+      };
       readonly metadata: { readonly cliTransportVersion: string; readonly operation: string };
     };
 
@@ -74,6 +81,9 @@ describe("kasb CLI", () => {
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.parameter).toBe("paraNum");
     expect(envelope.failure.message).toContain('Missing required option "--para-num"');
+    expect(envelope.failure.recoverable).toBe(true);
+    expect(envelope.failure.retryable).toBe(false);
+    expect(envelope.failure.recoveryAction).toEqual({ kind: "inspect_command_help", operationName: "get-paragraph" });
     expect(envelope.metadata.cliTransportVersion).toBe("1");
     expect(envelope.metadata.operation).toBe("get-paragraph");
   });
@@ -120,13 +130,22 @@ describe("kasb CLI", () => {
   test("renders unknown commands as JSON failures on stdout", () => {
     const result = runCli(["missing-command"]);
     const envelope = JSON.parse(decode(result.stdout)) as {
-      readonly failure: { readonly code: string; readonly message: string };
+      readonly failure: {
+        readonly code: string;
+        readonly message: string;
+        readonly recoverable?: boolean;
+        readonly retryable?: boolean;
+        readonly recoveryAction?: { readonly kind: string };
+      };
     };
 
     expect(result.exitCode).toBe(1);
     expect(decode(result.stderr)).toBe("");
     expect(envelope.failure.code).toBe("invalid_input");
     expect(envelope.failure.message).toContain('Unknown command: "missing-command"');
+    expect(envelope.failure.recoverable).toBe(true);
+    expect(envelope.failure.retryable).toBe(false);
+    expect(envelope.failure.recoveryAction).toEqual({ kind: "inspect_tool_help" });
   });
 
   test.each([

@@ -71,7 +71,7 @@ export type KasbValidationFailureCode =
 
 export type KasbValidationRecoveryAction =
   | { readonly kind: "inspect_tool_help" }
-  | { readonly kind: "inspect_command_help"; readonly operationName: KasbOperationName };
+  | { readonly kind: "inspect_command_help"; readonly operationName: string };
 
 export type KasbValidationFailure = {
   readonly code: KasbValidationFailureCode;
@@ -83,6 +83,9 @@ export type KasbValidationFailure = {
   readonly actual?: unknown;
   readonly recoveryHint?: string;
   readonly exampleInput?: Record<string, unknown>;
+  /** True when a caller can repair the request by changing input or inspecting help. */
+  readonly recoverable: boolean;
+  /** True only when the same request might succeed later, such as transient source availability. */
   readonly retryable: boolean;
   readonly recoveryAction?: KasbValidationRecoveryAction;
 };
@@ -95,10 +98,12 @@ export type KasbSerializedError = {
   readonly name: string;
   readonly message: string;
   readonly code?: string;
+  readonly recoverable?: boolean;
   readonly retryable?: boolean;
   readonly parameter?: string;
   readonly sourceUrl?: string;
   readonly recoveryHint?: string;
+  readonly recoveryAction?: KasbValidationRecoveryAction;
   readonly operationName?: string;
 };
 
@@ -136,18 +141,27 @@ export type KasbToolsetErrorCode = "unknown_operation" | "aborted";
 export class KasbToolsetError extends Error {
   override readonly name = "KasbToolsetError";
   readonly code: KasbToolsetErrorCode;
+  readonly recoverable: boolean | undefined;
   readonly retryable: boolean;
+  readonly recoveryHint: string | undefined;
+  readonly recoveryAction: KasbValidationRecoveryAction | undefined;
   readonly operationName: string | undefined;
 
   constructor(input: {
     readonly code: KasbToolsetErrorCode;
     readonly message: string;
+    readonly recoverable?: boolean;
     readonly retryable: boolean;
+    readonly recoveryHint?: string;
+    readonly recoveryAction?: KasbValidationRecoveryAction;
     readonly operationName?: string;
   }) {
     super(input.message);
     this.code = input.code;
+    this.recoverable = input.recoverable;
     this.retryable = input.retryable;
+    this.recoveryHint = input.recoveryHint;
+    this.recoveryAction = input.recoveryAction;
     this.operationName = input.operationName;
   }
 }
@@ -156,7 +170,10 @@ export const createKasbUnknownOperationError = (operationName: string): KasbTool
   new KasbToolsetError({
     code: "unknown_operation",
     message: `Unknown KASB operation: ${operationName}`,
+    recoverable: true,
     retryable: false,
+    recoveryHint: "Use help() or listOperations() to choose a canonical KASB operation name.",
+    recoveryAction: { kind: "inspect_tool_help" },
     operationName,
   });
 
@@ -409,6 +426,7 @@ const createAbortError = (operationName?: string): KasbToolsetError =>
     message: operationName
       ? `KASB operation was aborted: ${operationName}`
       : "KASB operation was aborted.",
+    recoverable: false,
     retryable: true,
     ...(operationName === undefined ? {} : { operationName }),
   });
@@ -489,7 +507,8 @@ const createSingleToolValidationFailure = (input: {
   ...(input.expected === undefined ? {} : { expected: input.expected }),
   ...("actual" in input ? { actual: input.actual } : {}),
   ...(input.recoveryHint === undefined ? {} : { recoveryHint: input.recoveryHint }),
-  retryable: true,
+  recoverable: true,
+  retryable: false,
   recoveryAction: input.recoveryAction,
 });
 
@@ -546,7 +565,8 @@ const createUnknownOperationValidationFailure = (name: string): KasbValidationFa
   expected: kasbOperationNames.join(","),
   actual: name,
   recoveryHint: "Use help() or listOperations() to choose a canonical KASB operation name.",
-  retryable: true,
+  recoverable: true,
+  retryable: false,
   recoveryAction: inspectToolHelpRecoveryAction,
 });
 
@@ -555,14 +575,16 @@ const createInvalidInputValidationFailure = (
   actual: unknown,
   exampleInput: Record<string, unknown> | undefined,
 ): KasbValidationFailure => ({
-  code: "invalid_parameter",
+  code: "invalid_request",
   message: "KASB operation input must be an object.",
   operationName,
   parameter: "input",
   reason: "invalid_type",
   expected: "object",
-  actual,
-  retryable: true,
+  actual: safeValidationActual(actual),
+  recoveryHint: `Use getCommandHelp(${JSON.stringify(operationName)}) to inspect this operation's input schema and examples.`,
+  recoverable: true,
+  retryable: false,
   recoveryAction: inspectCommandHelpRecoveryAction(operationName),
   ...(exampleInput === undefined ? {} : { exampleInput }),
 });
@@ -570,13 +592,16 @@ const createInvalidInputValidationFailure = (
 const toValidationFailure = (
   error: unknown,
   operationName: KasbOperationName,
+  input: Record<string, unknown>,
   exampleInput: Record<string, unknown> | undefined,
 ): KasbValidationFailure => {
   if (isRecord(error)) {
     const parameter = hasString(error, "parameter") ? error.parameter : undefined;
     const code = toValidationFailureCode(error, parameter);
     const reason = hasString(error, "reason") ? error.reason : inferValidationReason(error, parameter);
-    const expected = hasString(error, "expected") ? error.expected : expectedForReason(reason);
+    const expected = hasString(error, "expected")
+      ? error.expected
+      : expectedFromMessage(error) ?? expectedForReason(reason);
     const recoveryHint = hasString(error, "recoveryHint")
       ? error.recoveryHint
       : recoveryHintForValidation(operationName, parameter, reason);
@@ -588,10 +613,11 @@ const toValidationFailure = (
       ...(parameter === undefined ? {} : { parameter }),
       ...(reason === undefined ? {} : { reason }),
       ...(expected === undefined ? {} : { expected }),
-      ...("actual" in error ? { actual: error.actual } : {}),
+      ...actualForValidationFailure(error, input, parameter),
       ...(recoveryHint === undefined ? {} : { recoveryHint }),
       ...(exampleInput === undefined ? {} : { exampleInput }),
-      retryable: true,
+      recoverable: true,
+      retryable: false,
       recoveryAction: inspectCommandHelpRecoveryAction(operationName),
     };
   }
@@ -601,7 +627,9 @@ const toValidationFailure = (
     message: "KASB input validation failed.",
     operationName,
     ...(exampleInput === undefined ? {} : { exampleInput }),
-    retryable: true,
+    recoveryHint: `Use getCommandHelp(${JSON.stringify(operationName)}) to inspect this operation's input schema and examples.`,
+    recoverable: true,
+    retryable: false,
     recoveryAction: inspectCommandHelpRecoveryAction(operationName),
   };
 };
@@ -639,8 +667,19 @@ const inferValidationReason = (
   if (normalizedMessage.includes("unknown parameter")) return "unknown_parameter";
   if (normalizedMessage.includes("must be a string")) return "invalid_type";
   if (normalizedMessage.includes("must be an integer")) return "invalid_type";
+  if (normalizedMessage.includes("must be one of")) return "invalid_enum";
+  if (normalizedMessage.includes("must be between")) return "out_of_range";
   if (normalizedMessage.includes("exactly one")) return "exclusive_or";
   return parameter === undefined ? undefined : "invalid_value";
+};
+
+const expectedFromMessage = (error: Record<string, unknown>): string | undefined => {
+  if (!hasString(error, "message")) return undefined;
+  const oneOf = error.message.match(/must be one of ([^.]+)\./u)?.[1];
+  if (oneOf !== undefined) return oneOf;
+  const range = error.message.match(/must be between ([^.]+)\./u)?.[1];
+  if (range !== undefined) return range;
+  return undefined;
 };
 
 const expectedForReason = (reason: string | undefined): string | undefined => {
@@ -651,11 +690,33 @@ const expectedForReason = (reason: string | undefined): string | undefined => {
       return "known semantic input field";
     case "invalid_type":
       return "value matching the operation input schema";
+    case "invalid_enum":
+      return "one of the documented allowed values";
+    case "out_of_range":
+      return "value within the documented range";
     case "exclusive_or":
       return "exactly one accepted section locator";
     default:
       return undefined;
   }
+};
+
+const safeValidationActual = (value: unknown): unknown => {
+  if (typeof value === "string") return value.length <= 200 ? value : `${value.slice(0, 200)}…`;
+  if (typeof value === "number" || typeof value === "boolean" || value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.length <= 10 ? value.map(safeValidationActual) : `[array:${value.length}]`;
+  if (isRecord(value)) return `[object:${Object.keys(value).slice(0, 10).join(",")}]`;
+  return String(value);
+};
+
+const actualForValidationFailure = (
+  error: Record<string, unknown>,
+  input: Record<string, unknown>,
+  parameter: string | undefined,
+): { readonly actual?: unknown } => {
+  if ("actual" in error) return { actual: safeValidationActual(error.actual) };
+  if (parameter !== undefined && parameter in input) return { actual: safeValidationActual(input[parameter]) };
+  return {};
 };
 
 const recoveryHintForValidation = (
@@ -681,15 +742,22 @@ const recoveryHintForValidation = (
   return undefined;
 };
 
+const isValidationRecoveryAction = (value: unknown): value is KasbValidationRecoveryAction =>
+  isRecord(value) &&
+  (value.kind === "inspect_tool_help" ||
+    (value.kind === "inspect_command_help" && typeof value.operationName === "string"));
+
 const copyKnownErrorFields = (
   record: Record<string, unknown>,
 ): Omit<KasbSerializedError, "name" | "message"> => ({
   ...(typeof record.code === "string" ? { code: record.code } : {}),
+  ...(typeof record.recoverable === "boolean" ? { recoverable: record.recoverable } : {}),
   ...(typeof record.retryable === "boolean" ? { retryable: record.retryable } : {}),
   ...(typeof record.parameter === "string" ? { parameter: record.parameter } : {}),
   ...(typeof record.operationName === "string" ? { operationName: record.operationName } : {}),
   ...(typeof record.sourceUrl === "string" ? { sourceUrl: record.sourceUrl } : {}),
   ...(typeof record.recoveryHint === "string" ? { recoveryHint: record.recoveryHint } : {}),
+  ...(isValidationRecoveryAction(record.recoveryAction) ? { recoveryAction: record.recoveryAction } : {}),
 });
 
 export const serializeKasbError = (error: unknown): KasbSerializedError => {
@@ -748,16 +816,17 @@ export const createKasbToolset = (options: CreateKasbToolsetOptions = {}): KasbT
       }
 
       const [exampleInput] = definition.examples;
+      if (!isRecord(input)) {
+        return {
+          ok: false,
+          error: createInvalidInputValidationFailure(definition.name, input, exampleInput),
+        };
+      }
+
       try {
-        if (!isRecord(input)) {
-          return {
-            ok: false,
-            error: createInvalidInputValidationFailure(definition.name, input, exampleInput),
-          };
-        }
         return { ok: true, input: definition.prepareInput(input) };
       } catch (error) {
-        return { ok: false, error: toValidationFailure(error, definition.name, exampleInput) };
+        return { ok: false, error: toValidationFailure(error, definition.name, input, exampleInput) };
       }
     },
     serializeError: serializeKasbError,

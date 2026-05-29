@@ -43,6 +43,10 @@ export type CliFailureNextAction = {
   readonly input?: Record<string, unknown>;
 };
 
+export type CliRecoveryAction =
+  | { readonly kind: "inspect_tool_help" }
+  | { readonly kind: "inspect_command_help"; readonly operationName: string };
+
 export type CliErrorDetails = {
   readonly message?: string;
   readonly cliOption?: string;
@@ -204,10 +208,13 @@ export type CliFailureEnvelope = {
   readonly failure: {
     readonly code: CliFailureCode;
     readonly message: string;
+    readonly recoverable?: boolean;
     readonly retryable: boolean;
     readonly parameter?: string;
     readonly cliOption?: string;
     readonly sourceUrl?: string;
+    readonly recoveryHint?: string;
+    readonly recoveryAction?: CliRecoveryAction;
     readonly nextAction?: CliFailureNextAction;
   };
   readonly metadata: { readonly cliTransportVersion: "1"; readonly operation?: string };
@@ -239,7 +246,10 @@ const toCliFailureEnvelope = (
   warnings: [],
 });
 
-const toCliFailureError = (error: unknown, options: CliErrorDetails): CliFailureEnvelope["failure"] => {
+const toCliFailureError = (
+  error: unknown,
+  options: CliErrorDetails & { readonly operation?: string },
+): CliFailureEnvelope["failure"] => {
   const message = options.message ?? toErrorMessage(error);
   const transportFields = {
     ...(options.cliOption === undefined ? {} : { cliOption: options.cliOption }),
@@ -249,6 +259,7 @@ const toCliFailureError = (error: unknown, options: CliErrorDetails): CliFailure
     return {
       code: error.code,
       message,
+      ...recoveryFieldsForTypedFailure(error, options.operation),
       retryable: error.retryable,
       ...(error.parameter === undefined ? {} : { parameter: error.parameter }),
       ...(error.sourceUrl === undefined ? {} : { sourceUrl: error.sourceUrl }),
@@ -256,9 +267,15 @@ const toCliFailureError = (error: unknown, options: CliErrorDetails): CliFailure
     };
   }
   if (isCommanderError(error)) {
-    return { code: "invalid_input", message, retryable: false, ...transportFields };
+    return {
+      code: "invalid_input",
+      message,
+      ...recoveryFieldsForCommanderError(error, options.operation),
+      retryable: false,
+      ...transportFields,
+    };
   }
-  return { code: "internal_failure", message, retryable: false, ...transportFields };
+  return { code: "internal_failure", message, recoverable: false, retryable: false, ...transportFields };
 };
 
 const toErrorMessage = (error: unknown): string => localizeCommanderMessage(rawErrorMessage(error));
@@ -276,6 +293,60 @@ const localizeCommanderMessage = (message: string): string => {
   return message;
 };
 
+const recoveryFieldsForTypedFailure = (
+  error: {
+    readonly code: CliFailureCode;
+    readonly parameter?: string | undefined;
+    readonly recoverable?: boolean | undefined;
+    readonly recoveryHint?: string | undefined;
+    readonly recoveryAction?: CliRecoveryAction | undefined;
+  },
+  operation: string | undefined,
+): {
+  readonly recoverable?: boolean;
+  readonly recoveryHint?: string;
+  readonly recoveryAction?: CliRecoveryAction;
+} => {
+  if (error.recoverable !== undefined || error.recoveryHint !== undefined || error.recoveryAction !== undefined) {
+    return {
+      ...(error.recoverable === undefined ? {} : { recoverable: error.recoverable }),
+      ...(error.recoveryHint === undefined ? {} : { recoveryHint: error.recoveryHint }),
+      ...(error.recoveryAction === undefined ? {} : { recoveryAction: error.recoveryAction }),
+    };
+  }
+  if (error.code !== "invalid_input") return { recoverable: false };
+  if (operation === undefined) return { recoverable: true, recoveryAction: { kind: "inspect_tool_help" } };
+  return {
+    recoverable: true,
+    recoveryHint: error.parameter === undefined
+      ? `Run kasb help ${operation} to inspect this command's options.`
+      : `Run kasb help ${operation} to inspect the ${error.parameter} option requirements.`,
+    recoveryAction: { kind: "inspect_command_help", operationName: operation },
+  };
+};
+
+const recoveryFieldsForCommanderError = (
+  error: unknown,
+  operation: string | undefined,
+): {
+  readonly recoverable: boolean;
+  readonly recoveryHint?: string;
+  readonly recoveryAction?: CliRecoveryAction;
+} => {
+  if (isCommanderUnknownCommand(error) || operation === undefined) {
+    return {
+      recoverable: true,
+      recoveryHint: "Run kasb --help to inspect available commands.",
+      recoveryAction: { kind: "inspect_tool_help" },
+    };
+  }
+  return {
+    recoverable: true,
+    recoveryHint: `Run kasb help ${operation} to inspect this command's options.`,
+    recoveryAction: { kind: "inspect_command_help", operationName: operation },
+  };
+};
+
 const cliFailureCodes = new Set<string>([
   "invalid_input",
   "not_found",
@@ -290,9 +361,12 @@ const isTypedCliFailure = (
 ): error is {
   readonly code: CliFailureCode;
   readonly message: string;
+  readonly recoverable?: boolean | undefined;
   readonly retryable: boolean;
   readonly parameter?: string | undefined;
   readonly sourceUrl?: string | undefined;
+  readonly recoveryHint?: string | undefined;
+  readonly recoveryAction?: CliRecoveryAction | undefined;
 } =>
   isRecord(error) &&
   typeof error.code === "string" &&
@@ -302,6 +376,9 @@ const isTypedCliFailure = (
 
 const isCommanderError = (error: unknown): boolean =>
   isRecord(error) && typeof error.code === "string" && error.code.startsWith("commander.");
+
+const isCommanderUnknownCommand = (error: unknown): boolean =>
+  isRecord(error) && error.code === "commander.unknownCommand";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object";

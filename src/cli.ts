@@ -341,7 +341,10 @@ if (process.argv.length <= 2) {
   program.outputHelp();
 } else {
   program.parseAsync(process.argv).catch((error) => {
-    const operationName = process.argv[2];
+    const argvCommand = process.argv[2];
+    const operationName = cliCommands.some((item) => item.command.name() === argvCommand)
+      ? argvCommand
+      : undefined;
     const errorDetails = renderCommandErrorDetails(operationName, error);
 
     writeStdout(

@@ -106,7 +106,8 @@ describe("neutral KASB toolset surface", () => {
         code: "missing_parameter",
         operationName: "get-paragraph",
         parameter: "paraNum",
-        retryable: true,
+        recoverable: true,
+        retryable: false,
         recoveryAction: { kind: "inspect_command_help", operationName: "get-paragraph" },
       });
       expect(invalid.error.recoveryHint).toContain("paragraph");
@@ -121,7 +122,8 @@ describe("neutral KASB toolset surface", () => {
         parameter: "indexDocumentId",
         reason: "exclusive_or",
         expected: "exactly one accepted section locator",
-        retryable: true,
+        recoverable: true,
+        retryable: false,
         recoveryAction: { kind: "inspect_command_help", operationName: "get-section" },
       });
     }
@@ -132,8 +134,52 @@ describe("neutral KASB toolset surface", () => {
       expect(unknown.error).toMatchObject({
         code: "invalid_request",
         parameter: "name",
-        retryable: true,
+        recoverable: true,
+        retryable: false,
         recoveryAction: { kind: "inspect_tool_help" },
+      });
+    }
+
+    const nonObject = toolset.validateInput("search-standards", "리스");
+    expect(nonObject.ok).toBe(false);
+    if (!nonObject.ok) {
+      expect(nonObject.error).toMatchObject({
+        code: "invalid_request",
+        operationName: "search-standards",
+        parameter: "input",
+        recoverable: true,
+        retryable: false,
+        recoveryAction: { kind: "inspect_command_help", operationName: "search-standards" },
+      });
+      expect(nonObject.error.recoveryHint).toContain("getCommandHelp");
+    }
+
+    const unknownParameter = toolset.validateInput("search-standards", { query: "리스" });
+    expect(unknownParameter.ok).toBe(false);
+    if (!unknownParameter.ok) {
+      expect(unknownParameter.error).toMatchObject({
+        code: "unknown_parameter",
+        operationName: "search-standards",
+        parameter: "query",
+        recoverable: true,
+        retryable: false,
+        recoveryAction: { kind: "inspect_command_help", operationName: "search-standards" },
+      });
+    }
+
+    const invalidEnum = toolset.validateInput("search-standards", { keyword: "리스", sort: "recent" });
+    expect(invalidEnum.ok).toBe(false);
+    if (!invalidEnum.ok) {
+      expect(invalidEnum.error).toMatchObject({
+        code: "invalid_parameter",
+        operationName: "search-standards",
+        parameter: "sort",
+        reason: "invalid_enum",
+        expected: "relevance, match-count, std-num, title",
+        actual: "recent",
+        recoverable: true,
+        retryable: false,
+        recoveryAction: { kind: "inspect_command_help", operationName: "search-standards" },
       });
     }
   });
@@ -160,6 +206,29 @@ describe("neutral KASB toolset surface", () => {
       code: "source_unavailable",
       retryable: true,
       sourceUrl: "https://db.kasb.or.kr/api/example",
+    });
+
+    const validationError = toolset.serializeError({
+      name: "ValidationError",
+      message: "keyword is required",
+      code: "missing_parameter",
+      parameter: "keyword",
+      recoverable: true,
+      retryable: false,
+      recoveryHint: "Inspect search-standards help and provide keyword.",
+      recoveryAction: { kind: "inspect_command_help", operationName: "search-standards" },
+      operationName: "search-standards",
+    });
+    expect(validationError).toEqual({
+      name: "ValidationError",
+      message: "keyword is required",
+      code: "missing_parameter",
+      parameter: "keyword",
+      recoverable: true,
+      retryable: false,
+      recoveryHint: "Inspect search-standards help and provide keyword.",
+      recoveryAction: { kind: "inspect_command_help", operationName: "search-standards" },
+      operationName: "search-standards",
     });
   });
 
@@ -196,6 +265,7 @@ describe("neutral KASB toolset surface", () => {
       name: "KasbToolsetError",
       code: "aborted",
       operationName: "search-standards",
+      recoverable: false,
       retryable: true,
     });
   });
@@ -272,7 +342,13 @@ describe("Pi KASB adapter surface", () => {
     expect(asRecord(invalidAction.details)).toMatchObject({
       ok: false,
       action: "adapter_validation",
-      error: { code: "invalid_parameter", parameter: "action", retryable: true },
+      error: {
+        code: "invalid_parameter",
+        parameter: "action",
+        recoverable: true,
+        retryable: false,
+        recoveryAction: { kind: "inspect_tool_help" },
+      },
     });
     expect(textContent(invalidAction)).toStartWith("Kasb tool input is invalid.\n");
 
@@ -284,7 +360,13 @@ describe("Pi KASB adapter surface", () => {
       ok: false,
       action: "run",
       command: "search-standards",
-      error: { code: "missing_parameter", parameter: "inputJson", retryable: true },
+      error: {
+        code: "missing_parameter",
+        parameter: "inputJson",
+        recoverable: true,
+        retryable: false,
+        recoveryAction: { kind: "inspect_command_help", operationName: "search-standards" },
+      },
     });
     expect(textContent(missingInput)).toStartWith("Kasb tool input is invalid.\n");
 
@@ -297,7 +379,13 @@ describe("Pi KASB adapter surface", () => {
       ok: false,
       action: "validate",
       command: "search-standards",
-      error: { code: "missing_parameter", parameter: "keyword", retryable: true },
+      error: {
+        code: "missing_parameter",
+        parameter: "keyword",
+        recoverable: true,
+        retryable: false,
+        recoveryAction: { kind: "inspect_command_help", operationName: "search-standards" },
+      },
     });
     expect(textContent(invalidCommandInput)).toStartWith("Kasb search-standards input validation failed during validate.\nRepair guidance:");
 
@@ -309,7 +397,13 @@ describe("Pi KASB adapter surface", () => {
       ok: false,
       action: "command_help",
       command: "missing",
-      error: { code: "unknown_operation", operationName: "missing", retryable: false },
+      error: {
+        code: "unknown_operation",
+        operationName: "missing",
+        recoverable: true,
+        retryable: false,
+        recoveryAction: { kind: "inspect_tool_help" },
+      },
     });
     expect(textContent(unknownCommand)).toStartWith("Kasb command is unknown: missing\n");
   });
