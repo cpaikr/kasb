@@ -370,7 +370,24 @@ describe("Pi KASB adapter surface", () => {
     });
     expect(textContent(missingInput)).toStartWith("Kasb tool input is invalid.\n");
 
-    const invalidCommandInput = await tool.execute("call-3", {
+    const longInputJson = "x".repeat(250);
+    const invalidInputJson = await tool.execute("call-3", {
+      action: "run",
+      command: "search-standards",
+      inputJson: longInputJson as never,
+    });
+    expect(asRecord(invalidInputJson.details)).toMatchObject({
+      ok: false,
+      action: "run",
+      command: "search-standards",
+      error: {
+        code: "invalid_parameter",
+        parameter: "inputJson",
+        actual: `${"x".repeat(200)}…`,
+      },
+    });
+
+    const invalidCommandInput = await tool.execute("call-4", {
       action: "validate",
       command: "search-standards",
       inputJson: {},
@@ -389,7 +406,7 @@ describe("Pi KASB adapter surface", () => {
     });
     expect(textContent(invalidCommandInput)).toStartWith("Kasb search-standards input validation failed during validate.\nRepair guidance:");
 
-    const unknownCommand = await tool.execute("call-4", {
+    const unknownCommand = await tool.execute("call-5", {
       action: "command_help",
       command: "missing",
     });

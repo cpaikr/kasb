@@ -505,7 +505,7 @@ const createSingleToolValidationFailure = (input: {
   parameter: input.parameter,
   reason: input.reason,
   ...(input.expected === undefined ? {} : { expected: input.expected }),
-  ...("actual" in input ? { actual: input.actual } : {}),
+  ...("actual" in input ? { actual: safeValidationActual(input.actual) } : {}),
   ...(input.recoveryHint === undefined ? {} : { recoveryHint: input.recoveryHint }),
   recoverable: true,
   retryable: false,
