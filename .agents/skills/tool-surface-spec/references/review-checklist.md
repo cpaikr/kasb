@@ -1,87 +1,102 @@
 # Reusable Tool Package Review Checklist
 
-Use this checklist after reading the target package and the surface spec.
+Use this checklist after reading the target package and the CLI + neutral toolset surface spec.
 
-## Package surfaces
+## Public package surfaces
 
-- [ ] `package.json` defines at least one CLI `bin`.
-- [ ] `package.json` exports `./toolset`.
-- [ ] `package.json` exports `./pi`.
-- [ ] `package.json` declares Pi extension metadata.
-- [ ] Build output files referenced by public exports exist.
+- [ ] `package.json` defines at least one CLI `bin` when the package is distributed through npm or an equivalent package manager.
+- [ ] `package.json` exports `./toolset` with an import target and type declarations when applicable.
+- [ ] Build output files referenced by `bin` and `./toolset` entries exist.
+- [ ] The README or install docs explain how to run the command as an installed command, explicit executable path, or package-runner command.
+- [ ] The package documents required runtime versions for the CLI and SDK.
+- [ ] The package does not require Pi extensions or another host-specific adapter for the reusable public contract.
 
-## Compatibility boundary
+## Neutral toolset SDK
 
-- [ ] The package keeps cross-project compatibility in shared shells: toolset methods, operation specs, validation results, serialized errors, and host action envelopes.
-- [ ] The package keeps project-specific domain data inside operation inputs and `details.result` / operation result payloads.
-- [ ] The package does not require greenfield projects or hosts to know another package's domain-specific result fields.
+- [ ] `./toolset` exports one clear `create<Name>Toolset()` factory, or the factory name is documented.
+- [ ] The toolset exposes stable `id`, `label`, and purpose-only `description` strings.
+- [ ] `help()`, `listOperations()`, and `getCommandHelp()` are network-free.
+- [ ] `listOperations()` returns stable kebab-case operation names with useful labels and descriptions.
+- [ ] Each operation spec includes semantic input schema, result schema, required input keys, examples, limitations, and result summary.
+- [ ] `validateInput()` is network-free, rejects unknown/invalid inputs, and returns normalized input for valid examples.
+- [ ] Unknown operations return a structured validation failure with `recoverable: true` and `recoveryAction: { kind: "inspect_tool_help" }` or an equivalent machine-readable path.
+- [ ] Known validation failures return structured recovery metadata, including `operationName`, relevant `parameter`, `reason`, `expected`, safe `actual`, `exampleInput`, `recoveryHint`, `recoveryAction`, and `recoverable` where applicable.
+- [ ] `execute()` runs one operation, accepts normalized inputs, and respects `ToolRunContext.signal` when the runtime supports cancellation.
+- [ ] `serializeError()` preserves name, message, code, recoverability, retryability, recovery action, parameter, source URL/reference, recovery hint, and operation name when available.
 
-## Neutral toolset
+## Source of truth
 
-- [ ] The toolset factory can be imported without starting network work.
-- [ ] The toolset exposes `id`, `label`, `description`.
-- [ ] Toolset, operation, host-tool, and internal agent-native function tool labels/descriptions are English-native model-facing copy, with source-native Korean terms, proper nouns, and stable machine ids preserved when appropriate.
-- [ ] The package does not maintain separate Korean, English, and agent-facing variants for reusable tool definitions; Korean UI copy, if needed, belongs to the host application's presentation layer.
-- [ ] Only top-level package/toolset descriptions and top-level host-tool descriptions, especially the single Pi extension tool description, are purpose-only and free of call sequences, action names, parameter hints, or other how-to-use instructions.
-- [ ] Operation specs, command help, JSON Schema property descriptions, parameter descriptions, `oneOf` branch descriptions, result-field descriptions, recovery hints, prompt snippets, and internal agent-native function tool descriptions still preserve concrete usage constraints, source provenance, mutually exclusive-field rules, accepted/rejected identifier types, and cross-operation references.
-- [ ] `help()` gives toolset-level guidance and limitations.
-- [ ] `listOperations()` returns stable canonical operation names.
-- [ ] `getCommandHelp(name)` returns one operation contract.
-- [ ] `validateInput(name, input)` is network-free and normalizes input.
-- [ ] `execute(name, input, { signal })` runs one operation, respects cancellation, and returns a payload described by that operation's `resultJsonSchema`.
-- [ ] `serializeError(error)` preserves structured error fields.
-- [ ] Domain messages, result summaries, validation copy, recovery hints, and reusable single-tool agent guidance live in the neutral toolset/capability layer rather than host adapters.
-- [ ] Help, operation descriptions, validation/error messages, recovery hints, warnings, summaries, limitations, citation guidance, and prompt guidance are written in English for agent reliability, while preserving official Korean source terms such as `사업보고서`, `감사보고서`, `표준지 공시지가`, and `개별공시지가`.
+- [ ] `<command> --help` exits 0 and prints current command, option, output, and example guidance.
+- [ ] Every meaningful subcommand has command-level help.
+- [ ] CLI help maps cleanly to toolset operation names and examples.
+- [ ] Docs and skills point agents to the CLI's own help and toolset discovery methods instead of duplicating a stale manual.
+- [ ] Help text states output behavior, including JSON stdout and stderr usage.
+- [ ] Help examples are current and runnable, or clearly marked as illustrative.
 
-## Operation contracts
+## Operation and command design
 
-- [ ] Operation names are host-neutral and kebab-case.
-- [ ] Inputs use semantic fields instead of raw transport flags.
-- [ ] Input schemas reject unknown or unsafe shapes where appropriate.
-- [ ] Result schemas describe the structured payload.
-- [ ] Examples are valid and realistic.
-- [ ] Limitations are concrete, not boilerplate.
+- [ ] Operation and subcommand names are stable, host-neutral, and kebab-case where applicable.
+- [ ] Inputs use semantic fields/flags instead of raw transport parameters unless source accuracy requires them.
+- [ ] CLI flags map to the same validated input object used by the toolset.
+- [ ] Unknown or unsafe input shapes are rejected where appropriate.
+- [ ] Each operation is one meaningful deterministic action, not a vague prompt wrapper.
+- [ ] The command set avoids future adapters, compatibility layers, or broad abstractions before a real user need exists.
+
+## Language and model ergonomics
+
+- [ ] Package, toolset, operation, command, option, help, validation, warning, summary, limitation, and error copy is English-native for agent reliability.
+- [ ] Top-level package/toolset descriptions are purpose-only and do not hide invocation instructions in description fields.
+- [ ] Official Korean source terms such as `사업보고서`, `감사보고서`, `표준지 공시지가`, and `개별공시지가` are preserved when translation would reduce accuracy.
+- [ ] The package does not maintain separate Korean, English, and agent-facing variants for reusable tool definitions; localized UI copy, if needed, belongs to the host application's presentation layer.
+- [ ] Help and error recovery guidance preserves concrete usage constraints, source provenance, mutually exclusive-field rules, accepted/rejected identifier types, and cross-command lookup paths.
+
+## Stdout, stderr, and exit codes
+
+- [ ] Successful command execution emits exactly one JSON object to stdout.
+- [ ] Command failure emits exactly one JSON failure object to stdout and exits non-zero.
+- [ ] Invalid command usage exits non-zero and emits a structured JSON failure object.
+- [ ] Stderr is not required to parse results; important warnings are also represented in stdout JSON.
+- [ ] Progress/debug diagnostics on stderr are predictable and do not duplicate source-owned errors in a confusing way.
+
+## Success result envelope
+
+- [ ] Success JSON includes a clear success marker such as `ok: true` or an equivalent stable shape.
+- [ ] Operation-specific data is kept under a clear result payload such as `result`.
+- [ ] Normalized input, command name, or request context is included when useful for replay and auditability.
 - [ ] Results preserve references, metadata, warnings, and source context when relevant.
-- [ ] Source-owned presentation fields such as summaries, findings, normalized sources, or warnings are produced by the neutral layer when the package needs host-ready presentation.
+- [ ] The result is useful for the next agent step without extra browsing.
+- [ ] Important claims can be cited or revisited through references.
 
-## CLI adapter
+## Failure and recovery envelope
 
-- [ ] CLI flags map to operation inputs without changing semantics.
-- [ ] Help is human-readable English text for agents and developers, with official Korean domain terms preserved where source accuracy requires them.
-- [ ] Successful command execution emits one JSON object to stdout.
-- [ ] Command failure emits one JSON object to stdout and exits non-zero.
-- [ ] CLI errors preserve neutral error metadata.
+- [ ] Failure JSON and toolset validation results include a clear failure marker such as `ok: false` or an equivalent stable shape.
+- [ ] Failures include a structured `error` object or equivalent typed error field.
+- [ ] Error metadata includes stable codes, messages, recoverability, retryability, parameter names, expected/actual details, source references, or recovery hints where relevant.
+- [ ] Validation failures distinguish input-repair `recoverable` cases from same-input-later `retryable` cases.
+- [ ] Validation failures point the model toward `--help`, command-level help, or `getCommandHelp()` through machine-readable `recoveryAction` values.
+- [ ] Hosts and adapters do not need to parse localized prose, CLI help text, freeform `message`, or `recoveryHint` to choose a recovery path.
+- [ ] Source-owned validation and execution error metadata is preserved instead of rewritten into generic prose.
+- [ ] Adapter/process-level errors are distinguishable from source/upstream errors.
 
-## Pi adapter
+## Validation recovery cases
 
-- [ ] The Pi factory returns one package-level tool unless many tools are clearly justified.
-- [ ] Actions include `help`, `command_help`, `validate`, and `run`.
-- [ ] `command` uses canonical operation names.
-- [ ] `inputJson` carries operation input.
-- [ ] English model-readable text and structured details are both returned, while official Korean document names, report types, addresses, section titles, and identifiers remain source-native.
-- [ ] Every action returns the standard outer shape: `content[]` plus `details`.
-- [ ] Successful `details` include stable `ok: true`, `action`, and action-specific fields (`help`, `commandHelp`, `validation`, or `result`).
-- [ ] `run` success puts operation-specific data under `details.result` and includes `details.normalizedInput`.
-- [ ] Failures include stable `ok: false`, `action`, optional `command`, and structured `error`.
-- [ ] Prompt snippet/guidelines explain in English when and how to use the tool.
-- [ ] When internal function tools are derived from operations, such as `darty_search_body` or `kasb_get_section`, their English descriptions preserve practical guidance about required identifiers, mutually exclusive fields, accepted/rejected identifier types, source provenance, and cross-command lookup paths; official Korean source terms remain untranslated.
-- [ ] Adapter validation failures point the model toward help or command help.
-- [ ] Pi presentation text wraps neutral details and reuses neutral formatters/copy when another host can share the same text.
+- [ ] Unknown command or operation returns a structured validation failure with `code: "invalid_request"`, `recoverable: true`, and a tool-help recovery action.
+- [ ] Non-object input returns a structured validation failure with `code: "invalid_request"`, an expected object shape, and command-help recovery when the operation is known.
+- [ ] Missing required parameters return `code: "missing_parameter"`, the missing `parameter`, expected shape, an example input when practical, and command-help recovery.
+- [ ] Invalid identifiers or invalid parameter values return `code: "invalid_parameter"`, the failed `parameter`, a concrete `reason`, expected shape, safe actual value when useful, and command-help recovery.
+- [ ] Unknown parameters return `code: "unknown_parameter"`, the unexpected `parameter`, valid-shape guidance through `expected` or `exampleInput`, and command-help recovery.
 
-## Host integration
+## Capability layering
 
-- [ ] Host-specific parameter quirks stay in the host adapter.
-- [ ] The host preserves source-owned validation and error metadata.
-- [ ] Host/protocol errors are distinguishable from source-owned errors.
-- [ ] Host-authored warnings do not duplicate source-owned validation or execution messages.
-- [ ] The host forwards `AbortSignal` when available.
-- [ ] Tool availability and activation are separate when the host supports selected tools.
-- [ ] UI activity summaries do not replace canonical operation results.
+- [ ] CLI argument parsing stays thin and does not own domain logic.
+- [ ] Domain messages, result summaries, validation copy, recovery hints, warnings, and source references live in reusable toolset/capability code behind the CLI.
+- [ ] Optional host adapters call the neutral toolset instead of shelling out to the CLI or duplicating capability logic.
+- [ ] Behavior is covered by tests at the toolset boundary and CLI boundary.
+- [ ] Cancellation/timeouts are handled safely at both the SDK and subprocess boundaries when the runtime supports them.
 
 ## Human judgment
 
-- [ ] Each operation is one meaningful action, not a vague prompt wrapper.
-- [ ] The result is useful for the next agent step without extra browsing.
-- [ ] Important claims can be cited or revisited through references.
-- [ ] The schemas are small enough for model use but complete enough for validation.
-- [ ] The package does not add future adapters, compatibility layers, or broad abstractions before a real host needs them.
+- [ ] The schemas or documented output shapes are small enough for model use but complete enough for validation.
+- [ ] Limitations are concrete, not boilerplate.
+- [ ] Source drift, auth gaps, partial coverage, and known unsupported cases are documented.
+- [ ] The toolset/CLI provides source-reference material without overstating legal, accounting, audit, tax, investment, appraisal, or official-government status.
