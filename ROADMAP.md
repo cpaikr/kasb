@@ -56,21 +56,22 @@ Delivered:
 
 Delivered:
 
-- `./toolset` export with operation discovery, command help, validation, execution dispatch, and error serialization
-- `./pi` export and Pi extension entrypoint wrapping the neutral toolset as one action-oriented tool
+- `./toolset` export with operation discovery, command help, validation, execution dispatch, cancellation, and error serialization
+- reusable package contract centered on the `kasb` CLI plus `@sjunepark/kasb/toolset`
+- retained `./pi` export and Pi extension entrypoint as a product-specific adapter wrapping the neutral toolset as one action-oriented tool
 - package metadata for CLI, toolset, Pi exports, and Pi extension registration
 - build output for ESM library modules and declaration files
-- tool-surface tests for neutral and Pi action envelopes
-- Korean user-facing copy across neutral toolset, Pi guidance, operation specs, JSON Schema descriptions, and CLI structured failures
+- tool-surface and package-smoke tests for the neutral SDK, packed package import, and retained Pi action envelope
+- English-native package copy that preserves source-native Korean terms where they identify KASB material
 
 ## Current Phase: Hardening And Release Readiness
 
 Focus:
 
-- broaden contract, validation, source-drift, CLI entrypoint, toolset, and Pi coverage
+- broaden contract, validation, source-drift, CLI entrypoint, neutral toolset, package-smoke, and retained Pi-adapter coverage
 - keep opt-in live checks gated by `LIVE_KASB_TESTS=1`
 - add CLI examples after command behavior settles
-- review packaging before publishing the CLI/tool package
+- keep package export/import smoke checks current before publishing the CLI/tool package
 
 ## Later
 

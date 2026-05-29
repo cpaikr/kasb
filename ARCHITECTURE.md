@@ -4,12 +4,12 @@ This repo tracks `../darty`'s app design while applying it to KASB standards acc
 
 The system is a read-only TypeScript tool package:
 
-- `src/`: reusable capability core, source adapters, neutral toolset, Pi adapter, CLI transport, and app composition
+- `src/`: reusable capability core, source adapters, neutral toolset, CLI transport, product-specific Pi adapter, and app composition
 - `fixtures/`: captured KASB API responses for deterministic tests
-- `test/`: CLI, fixture-backed, contract, and opt-in live checks
+- `test/`: CLI, package-surface, fixture-backed, contract, and opt-in live checks
 - `evals/`: later scenario evals after CLI behavior stabilizes
 
-The first CLI/toolset/Pi implementation exists. This document defines implemented boundaries and ongoing direction; exact files should follow the proven code shape rather than precommitting unused modules.
+The first CLI/toolset/Pi implementation exists. The reusable public contract is now centered on the CLI plus `@sjunepark/kasb/toolset`; the retained Pi adapter is a product-specific host exception over the neutral toolset, not the SDK basis. This document defines implemented boundaries and ongoing direction; exact files should follow the proven code shape rather than precommitting unused modules.
 
 ## Big Picture
 
@@ -24,7 +24,7 @@ The first public capabilities are:
 - `search-qna`
 - `get-qna`
 
-The planned public interfaces are the CLI, `./toolset`, and `./pi`. MCP, database persistence, and background ingestion are not implementation goals for this repo.
+The reusable package interfaces are the `kasb` CLI and `@sjunepark/kasb/toolset`. The `@sjunepark/kasb/pi` export and `pi.extensions` metadata remain supported only as the Pi host adapter for products that need that runtime. MCP, database persistence, and background ingestion are not implementation goals for this repo.
 
 ## Layering
 
@@ -62,16 +62,16 @@ graph TD
 | Layer | Path | Owns |
 |---|---|---|
 | CLI transport | `src/cli.ts`, `src/cli/` | Parse CLI input, own help/examples/output flags, call shared operations, serialize JSON |
-| Neutral toolset | `src/toolset.ts` | Public operation discovery, command help, examples, validation, execution dispatch, reusable agent guidance, and error serialization |
-| Pi adapter | `src/pi.ts`, `src/pi-extension.ts` | One host tool with `help`, `command_help`, `validate`, and `run` actions over the neutral toolset |
+| Neutral toolset | `src/toolset.ts` | Public operation discovery, command help, examples, validation, execution dispatch, reusable agent guidance, cancellation, and error serialization |
+| Pi adapter | `src/pi.ts`, `src/pi-extension.ts` | Product-specific Pi host wrapper with `help`, `command_help`, `validate`, and `run` actions over the neutral toolset |
 | App composition | `src/app/` | Operation names, JSON Schemas, and default provider wiring for public surfaces |
 | Capability | `src/capabilities/` | Public semantic request/result schemas, request resolution, typed failures, execution |
 | Source | `src/sources/kasb/` | KASB API URLs, source response schemas, fetchers, normalization, source error mapping |
 
 ## Implementation Roots
 
-- `src/toolset.ts` for neutral operation discovery, validation, execution dispatch, and error serialization
-- `src/pi.ts` and `src/pi-extension.ts` for the Pi host adapter
+- `src/toolset.ts` for neutral operation discovery, validation, execution dispatch, cancellation, and error serialization
+- `src/pi.ts` and `src/pi-extension.ts` for the retained product-specific Pi host adapter
 - `src/app/` for operation composition and default wiring
 - `src/capabilities/` for public contracts and execution
 - `src/cli/` for Commander commands, flags, help, and JSON serialization
@@ -130,9 +130,9 @@ Runtime CLI flow:
 argv -> CLI transport -> app operation -> capability execution -> KASB source adapter -> https://db.kasb.or.kr/api/...
 ```
 
-The CLI and neutral toolset both dispatch to the same app operations; the CLI keeps terminal-specific flags and output projections local.
+The CLI and neutral toolset both dispatch to the same app operations; the CLI keeps terminal-specific flags and output projections local. Trusted JS/TS hosts should use the neutral toolset in-process rather than depending on CLI flags or Pi parameters.
 
-Runtime Pi flow:
+Runtime Pi flow for the retained product-specific adapter:
 
 ```text
 Pi tool params -> Pi adapter -> neutral toolset -> app operation -> capability execution -> KASB source adapter
@@ -185,6 +185,8 @@ Keep two schema families separate:
 - Provider implementations return capability-shaped results, not raw source payloads.
 - CLI commands import app/capability surfaces, not `sources/kasb/*` internals.
 - CLI help, examples, and presentation options stay CLI-local.
+- The neutral toolset is transport-neutral, server-friendly, and independent of Pi runtime types.
+- The Pi adapter may wrap the neutral toolset, but it does not define the reusable SDK contract.
 - Internal agent-eval tool names use the `kasb_*` namespace while preserving existing operation ids and CLI command names.
 - CLI success output is JSON on `stdout`; CLI failure output is JSON on `stdout` with a nonzero exit code.
 - MCP, database persistence, and background ingestion are not current implementation targets.
@@ -203,4 +205,4 @@ Implemented roots:
 - `scripts/build-cli.ts`
 - `tsconfig.build.json`
 
-The current milestone is to keep hardening the implementation with broader contract tests, source-drift coverage, CLI/toolset/Pi entrypoint coverage, and docs/examples after command behavior settles.
+The current milestone is to keep hardening the implementation with broader contract tests, source-drift coverage, CLI/toolset/package smoke coverage, retained Pi-adapter coverage, and docs/examples after command behavior settles.

@@ -184,6 +184,21 @@ describe("neutral KASB toolset surface", () => {
 
     expect(receivedSignal).toBe(controller.signal);
   });
+
+  test("rejects aborted execution with a serialized toolset error shape", async () => {
+    const toolset = createKasbToolset({ operations: [createFakeOperation()] });
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      toolset.execute("search-standards", { keyword: "리스" }, { signal: controller.signal }),
+    ).rejects.toMatchObject({
+      name: "KasbToolsetError",
+      code: "aborted",
+      operationName: "search-standards",
+      retryable: true,
+    });
+  });
 });
 
 describe("Pi KASB adapter surface", () => {
