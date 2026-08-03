@@ -84,6 +84,9 @@ const hasString = (value, key) =>
 const hasFunction = (value, key) =>
   isRecord(value) && typeof value[key] === "function";
 
+const isInspectToolHelpRecoveryAction = (value) =>
+  isRecord(value) && value.kind === "inspect_tool_help";
+
 const isKebabCaseOperationName = (value) =>
   typeof value === "string" && /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(value);
 
@@ -267,16 +270,17 @@ const expectValidationFailureShape = (reporter, value, label) => {
     reporter.check(typeof value.error.code === "string", `${label} error has code`);
     reporter.check(typeof value.error.message === "string", `${label} error has message`);
     reporter.check(
-      typeof value.error.retryable === "boolean",
-      `${label} error has retryable flag`,
+      value.error.recoverable === true,
+      `${label} error is recoverable`,
     );
-
-    if (value.error.retryable === true) {
-      reporter.check(
-        isRecord(value.error.recoveryAction) || typeof value.error.recoveryHint === "string",
-        `${label} retryable error has recovery metadata`,
-      );
-    }
+    reporter.check(
+      isInspectToolHelpRecoveryAction(value.error.recoveryAction),
+      `${label} error uses inspect_tool_help recovery action`,
+    );
+    reporter.check(
+      value.error.retryable === undefined || value.error.retryable === false,
+      `${label} error does not mark caller-repairable input as retryable`,
+    );
   }
 };
 
@@ -299,10 +303,16 @@ const checkStructuredFailure = (reporter, value, label) => {
       reporter.warn(`${label} error lacks recommended code`);
     }
 
+    if (typeof value.error.recoverable === "boolean") {
+      reporter.pass(`${label} error has recoverable flag`);
+    } else {
+      reporter.warn(`${label} error lacks recommended recoverable flag`);
+    }
+
     if (typeof value.error.retryable === "boolean") {
       reporter.pass(`${label} error has retryable flag`);
-    } else {
-      reporter.warn(`${label} error lacks recommended retryable flag`);
+    } else if (value.error.retryable !== undefined) {
+      reporter.warn(`${label} error has a non-boolean retryable field`);
     }
 
     if (
