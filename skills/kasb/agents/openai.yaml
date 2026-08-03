@@ -1,0 +1,4 @@
+interface:
+  display_name: "KASB"
+  short_description: "Research KASB standards and Q&A sources"
+  default_prompt: "Use $kasb to find and cite current KASB source material for this question."
