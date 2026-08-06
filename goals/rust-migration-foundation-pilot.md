@@ -1,6 +1,6 @@
 # Goal: Rust migration foundation and get-paragraph pilot
 
-Status: active
+Status: complete
 Planning scope: ROADMAP.md
 
 ## Original contract
@@ -34,17 +34,17 @@ _None._
   pilot rulebook.
 - Migration phase 3: the independently buildable TypeScript/Rust workspace with
   shared root fixtures, conformance cases, evals, and documentation.
+- Migration phase 4: the contract-compatible Rust `get-paragraph` vertical
+  pilot and its reviewed PR lifecycle.
 
 ### Current in-scope result
 
-Migration phase 4 delivery: contract-compatible Rust `get-paragraph` vertical
-pilot implementation, local exit gate, and independent review are complete;
-the PR lifecycle remains.
+All included results and migration phases 1–4 exit gates are complete. This
+terminal record is delivered with the integration-to-main promotion.
 
 ### Next in-scope action
 
-Deliver the implementation PR through feedback resolution, then finish the
-integration-to-main promotion PR.
+None under this goal. Migration phase 5 requires separate authorization.
 
 ### Evidence and blockers
 
@@ -76,6 +76,8 @@ integration-to-main promotion PR.
   for request-construction validation, automatic transport retries, empty
   parent identifiers, Unicode-digit normalization, and ECMAScript trimming.
   Root validation and packaged-crate verification pass after those fixes.
-- Implementation PR #13 review feedback is applied and fully revalidated;
-  thread replies, resolution, and merge remain before promotion.
+- Implementation [PR #13](https://github.com/sjunepark/kasb/pull/13) merged as
+  `07d1ee5` after all ten posted review threads were fixed, replied to, and
+  resolved. CodeRabbit and GitGuardian passed on the final head; the full local
+  validation and packaged-crate verification also passed.
 - Migration phase 5 and later release/performance work remain outside this goal.

@@ -1,14 +1,14 @@
 # Rust migration execution progress
 
-Current gate: phases 1–3 delivered; phase 4 implementation and independent
-review complete, with PR delivery in progress.
+Current gate: phases 1–4 complete and validated. The integration branch is
+ready for final promotion to `main`.
 
 | Phase | Exit evidence | State |
 | --- | --- | --- |
 | 1. Freeze compatibility evidence | multi-language docs; 12-case serialized TypeScript baseline; 3 path-pinned known-bad controls rejected; counts in `parity.md` | delivered in PR #12 |
 | 2. Translation rulebook | complete v1 request/result/failure/fixture/cancellation inventory and resolved pilot mappings in `rulebook.md` | delivered in PR #12 |
 | 3. Workspace layout | independent npm and Cargo builds/tests with shared root evidence | completed at the phase-3 commit gate |
-| 4. Rust `get-paragraph` pilot | complete `wreq` path and success/failure/timeout/cancellation conformance | local exit gate and independent review passing; PR delivery pending |
+| 4. Rust `get-paragraph` pilot | complete `wreq` path and success/failure/timeout/cancellation conformance | delivered in PR #13 after feedback resolution |
 
 ## Durable decisions
 
@@ -42,7 +42,7 @@ review complete, with PR delivery in progress.
   bypass, `wreq`'s default automatic retry policy, empty parent identifiers,
   Unicode digit normalization, and ECMAScript whitespace trimming. The actual
   persona replay test passed five repeated runs with exactly one connection.
-- PR #13 review feedback is applied locally: completion-time metadata,
+- PR #13 review feedback was applied and merged: completion-time metadata,
   camelCase recovery hints, content trimming, status-first error handling,
   exact-paragraph schema parity, surrogate rejection, dependency floors, and
   consumer setup documentation now match their contracts. Broader suggestions
@@ -56,5 +56,5 @@ review complete, with PR delivery in progress.
 
 ## Next action
 
-Complete the phase-4 PR lifecycle and integration-to-main promotion. Do not
-begin phase 5.
+Promote this completed phases 1–4 integration state to `main`. Any phase 5 work
+requires a separate authorized goal.
