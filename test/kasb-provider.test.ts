@@ -610,6 +610,19 @@ describe("KASB provider operations", () => {
     } satisfies Partial<KasbFailure>);
   });
 
+  test("classifies rate limiting as retryable source_unavailable", async () => {
+    globalThis.fetch = (async () => ({
+      ok: false,
+      status: 429,
+      json: async () => ({}),
+    }) as unknown as Response) as unknown as typeof fetch;
+
+    await expect(defaultSearchStandardsOperation.execute({ keyword: "리스" })).rejects.toMatchObject({
+      code: "source_unavailable",
+      retryable: true,
+    } satisfies Partial<KasbFailure>);
+  });
+
   test("passes execution AbortSignal into source fetch", async () => {
     let fetchSignal: AbortSignal | undefined;
     globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
@@ -846,6 +859,21 @@ describe("KASB provider operations", () => {
 
     await expect(defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" })).rejects.toMatchObject({
       code: "source_changed",
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("rejects multiple exact paragraph rows as source_changed", async () => {
+    const fixtures = makeFixtureMap();
+    const paragraph = clone(readFixture("fixtures/kasb/paragraph-1116-23.json")) as {
+      paraContents: Array<Record<string, unknown>>;
+    };
+    paragraph.paraContents.push({ ...paragraph.paraContents[0] });
+    fixtures.set("/api/paragraphs/content/1116/23", paragraph);
+    useFixtureMap(fixtures);
+
+    await expect(defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" })).rejects.toMatchObject({
+      code: "source_changed",
+      retryable: false,
     } satisfies Partial<KasbFailure>);
   });
 

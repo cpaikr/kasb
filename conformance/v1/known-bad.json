@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "wrong-success-value",
+      "baselineCase": "get-paragraph-success",
+      "actual": "conformance/v1/known-bad/wrong-success-value.json",
+      "expectedDifference": "value",
+      "expectedPath": "$.value.result.paragraph.uniqueKey"
+    },
+    {
+      "id": "wrong-typed-failure",
+      "baselineCase": "get-paragraph-invalid-input",
+      "actual": "conformance/v1/known-bad/wrong-typed-failure.json",
+      "expectedDifference": "value",
+      "expectedPath": "$.error.code"
+    },
+    {
+      "id": "serialization-mismatch",
+      "baselineCase": "get-paragraph-success",
+      "actual": "conformance/v1/known-bad/serialization-mismatch.json",
+      "expectedDifference": "type",
+      "expectedPath": "$.value.result.request.stdNum"
+    }
+  ]
+}

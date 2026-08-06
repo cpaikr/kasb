@@ -1,0 +1,56 @@
+{
+  "ok": true,
+  "value": {
+    "metadata": {
+      "completeness": "complete",
+      "fetchedAt": "<normalized-fetched-at>",
+      "source": {
+        "endpoint": "https://db.kasb.or.kr/api/standard?searchWord=%EB%A6%AC%EC%8A%A4",
+        "system": "kasb"
+      },
+      "sourceBehavior": {
+        "apiBase": "https://db.kasb.or.kr/api",
+        "observationStatus": "observed"
+      }
+    },
+    "references": {
+      "searchUrl": "https://db.kasb.or.kr/api/standard?searchWord=%EB%A6%AC%EC%8A%A4"
+    },
+    "result": {
+      "request": {
+        "keyword": "리스",
+        "limit": 1,
+        "sort": "match-count"
+      },
+      "returnedCount": 1,
+      "standards": [
+        {
+          "matchCount": 519,
+          "nextActions": {
+            "getStandardStructure": {
+              "input": {
+                "stdNum": "1116"
+              },
+              "operation": "get-standard-structure"
+            }
+          },
+          "references": {
+            "apiUrl": "https://db.kasb.or.kr/api/standard-indexes/1116"
+          },
+          "standardKind": "k-ifrs-standard",
+          "standardTitle": "기업회계기준서 제1116호 리스",
+          "stdNum": "1116"
+        }
+      ],
+      "suggestedKeywords": [],
+      "totalMatchCount": 1043,
+      "totalStandardCount": 68
+    },
+    "warnings": [
+      {
+        "code": "truncated_results",
+        "message": "Search results were limited to 1 items."
+      }
+    ]
+  }
+}

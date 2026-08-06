@@ -1,13 +1,20 @@
 # kasb
 
-A read-only tool package for searching and retrieving KASB standards and Q&A material.
+A read-only dual-SDK project for searching and retrieving KASB standards and Q&A material.
+
+The existing npm SDK, CLI, and Pi adapter remain supported while a native Rust
+SDK is added. Both SDKs implement the same v1 semantics and share fixtures and
+serialized conformance cases; neither depends on the other language at runtime.
+See [MIGRATION.md](MIGRATION.md) for the approved migration gates.
 
 ## Public surfaces
 
-The reusable package contract is the `kasb` CLI plus the neutral TypeScript toolset SDK:
+The public product surfaces are:
 
 - `kasb`: for humans, subprocess-based agents, and desktop hosts that need a process boundary. CLI commands and options are not duplicated here; treat `kasb --help` and `kasb help <command>` as the usage reference.
 - `@sjunepark/kasb/toolset`: for trusted JS/TS server hosts that run KASB in-process and need operation discovery, schemas, validation, execution, error serialization, and `AbortSignal` cancellation support without adopting any host-specific tool protocol.
+- native Rust SDK: under active migration; it will expose the same domain
+  operations and serialized contract through a Rust-native API using `wreq`.
 
 ```ts
 import { createKasbToolset } from "@sjunepark/kasb/toolset";
@@ -23,7 +30,29 @@ Toolset validation failures include structured recovery metadata for host adapte
 
 `@sjunepark/kasb/pi` and the package `pi.extensions` entry are retained as a product-specific Pi adapter for Pi hosts that need one single action-oriented tool over the neutral toolset. They are not the basis for the SDK contract; trusted server hosts should import `@sjunepark/kasb/toolset` directly.
 
-npm/npx usage requires Node.js 20.18.1 or newer; source development and tests use Bun. This package reads observed public KASB web/API behavior in read-only mode, so upstream KASB changes can affect results.
+The Node.js `kasb` command remains the sole CLI. A separate Rust CLI is not part
+of the approved migration.
+
+## Development commands
+
+Until the phase-3 workspace move lands, the TypeScript package remains at the
+repository root:
+
+```sh
+bun install
+bun run typecheck
+bun test
+bun run build
+```
+
+Shared compatibility inputs live under `fixtures/` and `conformance/`. The
+workspace phase will move the npm package to `packages/kasb-ts/`, add
+`crates/kasb/`, and document package-local commands once they exist.
+
+npm/npx usage requires Node.js 20.18.1 or newer; TypeScript source development
+and tests use Bun. The Rust toolchain requirement will be recorded with the
+workspace. Both implementations read observed public KASB web/API behavior in
+read-only mode, so upstream KASB changes can affect results.
 
 ## License
 

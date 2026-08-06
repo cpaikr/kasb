@@ -1,6 +1,6 @@
 # Rust Migration
 
-Status: approved direction; implementation has not started.
+Status: approved direction; phases 1–2 are in progress.
 
 Decision date: 2026-07-30.
 
@@ -204,6 +204,10 @@ When implementation starts, keep the execution evidence under
   resolutions;
 - `progress.md` records the current gate, pilot findings, validation, blockers,
   and next step.
+
+Execution evidence now exists in those paths. The durable goal boundary and
+current checkpoint are recorded in
+[`goals/rust-migration-foundation-pilot.md`](goals/rust-migration-foundation-pilot.md).
 
 ## Migration Sequence
 

@@ -49,8 +49,8 @@ export const ResultMetadataSchema = Schema.Struct({
   source: Schema.Struct({
     system: Schema.Literal("kasb").annotations({ description: "Source system identifier." }),
     endpoint: Schema.String.annotations({
-      description: "KASB API endpoint family used by this operation.",
-      examples: ["/api/paragraphs/content/{stdNum}/{paraNum}"],
+      description: "Absolute KASB API request URL used by this operation.",
+      examples: ["https://db.kasb.or.kr/api/paragraphs/content/1116/23"],
     }),
   }).annotations({ description: "Source endpoint metadata." }),
   sourceBehavior: Schema.Struct({
