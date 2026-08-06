@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import {
   canonicalizeConformanceOutcome,
+  conformanceRequestUrl,
   executeConformanceCase,
   findConformanceDifference,
   readConformanceJson,
@@ -27,6 +28,16 @@ type KnownBadManifest = {
 const knownBad = readConformanceJson(repoRoot, "conformance/v1/known-bad.json") as KnownBadManifest;
 
 describe("language-neutral KASB v1 conformance cases", () => {
+  test("resolves fixture routes from Request, URL, and string fetch inputs", () => {
+    const url = "https://db.kasb.or.kr/api/paragraphs/content/1116/23?keyword=lease";
+    for (const input of [url, new URL(url), new Request(url)]) {
+      const resolved = conformanceRequestUrl(input);
+      expect(`${resolved.pathname}${resolved.search}`).toBe(
+        "/api/paragraphs/content/1116/23?keyword=lease",
+      );
+    }
+  });
+
   test("judges the serialized JSON boundary instead of live JavaScript values", () => {
     expect(canonicalizeConformanceOutcome({
       array: [undefined],
@@ -77,7 +88,10 @@ describe("conformance judge negative controls", () => {
       const baseline = manifest.cases.find((testCase) => testCase.id === knownBadCase.baselineCase);
       if (baseline === undefined) throw new Error(`Unknown baseline case: ${knownBadCase.baselineCase}`);
       const expected = readConformanceJson(repoRoot, baseline.expected);
-      const actual = readConformanceJson(repoRoot, knownBadCase.actual);
+      const actual = canonicalizeConformanceOutcome(
+        readConformanceJson(repoRoot, knownBadCase.actual),
+        manifest,
+      );
       const difference = findConformanceDifference(expected, actual);
       expect(difference?.kind).toBe(knownBadCase.expectedDifference);
       expect(difference?.path).toBe(knownBadCase.expectedPath);

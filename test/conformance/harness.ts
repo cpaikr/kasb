@@ -79,6 +79,9 @@ export const serializeConformanceOutcome = (value: unknown): unknown => {
   return JSON.parse(serialized) as unknown;
 };
 
+export const conformanceRequestUrl = (input: RequestInfo | URL): URL =>
+  new URL(input instanceof Request ? input.url : String(input));
+
 const installFixtureFetch = (
   repoRoot: string,
   routes: readonly ConformanceRoute[],
@@ -90,7 +93,7 @@ const installFixtureFetch = (
   );
 
   globalThis.fetch = (async (input: RequestInfo | URL) => {
-    const url = new URL(String(input));
+    const url = conformanceRequestUrl(input);
     const requestPath = `${url.pathname}${url.search}`;
     if (!fixtureByPath.has(requestPath)) {
       undeclaredRequests.push(requestPath);

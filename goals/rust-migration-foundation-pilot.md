@@ -36,8 +36,8 @@ Migration phases 1–2: foundation delivery through the required review and PR l
 
 ### Next in-scope action
 
-Freeze the reviewed foundation diff, rerun complete validation, and deliver its
-PR before starting the workspace phase.
+Resolve the remaining PR threads and merge the validated foundation slice before
+starting the workspace phase.
 
 ### Evidence and blockers
 
@@ -45,6 +45,8 @@ PR before starting the workspace phase.
 - PR delivery uses `codex/rust-migration-pilot-integration` as the non-production integration branch so goal metadata can be committed directly while implementation remains reviewable.
 - Multi-language docs, 12 serialized TypeScript baselines, three path-pinned
   known-bad controls, and the complete v1 translation inventory are implemented
-  locally. Independent review findings were applied; final validation and PR
-  review remain.
+  locally. Independent review and PR findings were applied; the latest complete
+  validation passes with 177 tests and one opt-in live test skipped.
+- Foundation delivery is [PR #12](https://github.com/sjunepark/kasb/pull/12)
+  against the integration branch; thread resolution and merge remain.
 - Migration phase 5 and later release/performance work remain outside this goal.

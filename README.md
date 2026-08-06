@@ -3,9 +3,10 @@
 A read-only dual-SDK project for searching and retrieving KASB standards and Q&A material.
 
 The existing npm SDK, CLI, and Pi adapter remain supported while a native Rust
-SDK is added. Both SDKs implement the same v1 semantics and share fixtures and
-serialized conformance cases; neither depends on the other language at runtime.
-See [MIGRATION.md](MIGRATION.md) for the approved migration gates.
+SDK is developed through the approved migration. The Rust SDK will implement
+the same v1 semantics and share fixtures and serialized conformance cases with
+TypeScript; neither SDK will depend on the other language at runtime. See
+[MIGRATION.md](MIGRATION.md) for the migration gates and current status.
 
 ## Public surfaces
 

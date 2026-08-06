@@ -125,7 +125,7 @@ authorized by the active goal.
 
 ## `wreq` persona
 
-- Pin `wreq = =6.0.0-rc.29` and `wreq-util = =3.0.0-rc.14`; commit
+- Pin `wreq = "=6.0.0-rc.29"` and `wreq-util = "=3.0.0-rc.14"`; commit
   `Cargo.lock`. Any upgrade must rerun conformance and persona/fingerprint
   checks.
 - The minimum Rust version is 1.85, matching the pinned crates.

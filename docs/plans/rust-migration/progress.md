@@ -22,7 +22,8 @@ validation and PR delivery pending.
 - `bun test test/conformance/conformance.test.ts`: 18 passing tests, including
   the JSON-serialization regression, 12 TypeScript baseline cases, and 3
   path-pinned negative controls.
-- `bun test`: 176 passing tests and 1 opt-in live test skipped after review fixes.
+- `bun test`: 177 passing tests and 1 opt-in live test skipped after PR review
+  fixes.
 - `bun run typecheck`, `bun run build`, and `git diff --check`: passing after
   review fixes.
 
