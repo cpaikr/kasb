@@ -11,8 +11,8 @@
       "operation": "search-standards",
       "input": { "keyword": "리스", "limit": 1, "sort": "match-count" },
       "routes": [
-        { "requestPath": "/api/standard?searchWord=%EB%A6%AC%EC%8A%A4", "fixture": "fixtures/kasb/search-standards-lease.json" },
-        { "requestPath": "/api/standard-indexes/1116", "fixture": "fixtures/kasb/standard-indexes-1116.json" }
+        { "requestUrl": "https://db.kasb.or.kr/api/standard?searchWord=%EB%A6%AC%EC%8A%A4", "fixture": "fixtures/kasb/search-standards-lease.json" },
+        { "requestUrl": "https://db.kasb.or.kr/api/standard-indexes/1116", "fixture": "fixtures/kasb/standard-indexes-1116.json" }
       ],
       "expected": "conformance/v1/expected/search-standards-success.json"
     },
@@ -28,8 +28,8 @@
       "operation": "get-standard-structure",
       "input": { "stdNum": "1116", "keyword": "리스" },
       "routes": [
-        { "requestPath": "/api/standard-indexes/1116/searchWord?searchWord=%EB%A6%AC%EC%8A%A4", "fixture": "fixtures/kasb/standard-indexes-1116-search-lease.json" },
-        { "requestPath": "/api/standard-indexes/1116", "fixture": "fixtures/kasb/standard-indexes-1116.json" }
+        { "requestUrl": "https://db.kasb.or.kr/api/standard-indexes/1116/searchWord?searchWord=%EB%A6%AC%EC%8A%A4", "fixture": "fixtures/kasb/standard-indexes-1116-search-lease.json" },
+        { "requestUrl": "https://db.kasb.or.kr/api/standard-indexes/1116", "fixture": "fixtures/kasb/standard-indexes-1116.json" }
       ],
       "expected": "conformance/v1/expected/get-standard-structure-success.json"
     },
@@ -45,8 +45,8 @@
       "operation": "get-section",
       "input": { "stdNum": "1116", "indexDocumentId": "ZB2hJW" },
       "routes": [
-        { "requestPath": "/api/paragraphs/1116/ZB2hJW", "fixture": "fixtures/kasb/section-1116-ZB2hJW.json" },
-        { "requestPath": "/api/standard-indexes/1116", "fixture": "fixtures/kasb/standard-indexes-1116.json" }
+        { "requestUrl": "https://db.kasb.or.kr/api/paragraphs/1116/ZB2hJW", "fixture": "fixtures/kasb/section-1116-ZB2hJW.json" },
+        { "requestUrl": "https://db.kasb.or.kr/api/standard-indexes/1116", "fixture": "fixtures/kasb/standard-indexes-1116.json" }
       ],
       "expected": "conformance/v1/expected/get-section-success.json"
     },
@@ -62,8 +62,8 @@
       "operation": "get-paragraph",
       "input": { "stdNum": "1116", "paraNum": "23" },
       "routes": [
-        { "requestPath": "/api/paragraphs/content/1116/23", "fixture": "fixtures/kasb/paragraph-1116-23.json" },
-        { "requestPath": "/api/standard-indexes/1116", "fixture": "fixtures/kasb/standard-indexes-1116.json" }
+        { "requestUrl": "https://db.kasb.or.kr/api/paragraphs/content/1116/23", "fixture": "fixtures/kasb/paragraph-1116-23.json" },
+        { "requestUrl": "https://db.kasb.or.kr/api/standard-indexes/1116", "fixture": "fixtures/kasb/standard-indexes-1116.json" }
       ],
       "expected": "conformance/v1/expected/get-paragraph-success.json"
     },
@@ -79,7 +79,7 @@
       "operation": "search-qna",
       "input": { "keyword": "리스", "page": 1, "rows": 5 },
       "routes": [
-        { "requestPath": "/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=5", "fixture": "fixtures/kasb/search-qna-lease.json" }
+        { "requestUrl": "https://db.kasb.or.kr/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=5", "fixture": "fixtures/kasb/search-qna-lease.json" }
       ],
       "expected": "conformance/v1/expected/search-qna-success.json"
     },
@@ -95,7 +95,7 @@
       "operation": "get-qna",
       "input": { "docNumber": "SSI-35629" },
       "routes": [
-        { "requestPath": "/api/qnas/v2/SSI-35629", "fixture": "fixtures/kasb/qna-SSI-35629.json" }
+        { "requestUrl": "https://db.kasb.or.kr/api/qnas/v2/SSI-35629", "fixture": "fixtures/kasb/qna-SSI-35629.json" }
       ],
       "expected": "conformance/v1/expected/get-qna-success.json"
     },

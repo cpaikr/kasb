@@ -1,8 +1,9 @@
 # KASB v1 conformance
 
 This directory is the language-neutral compatibility boundary for the TypeScript
-and Rust SDKs. `v1/cases.json` declares serialized inputs, fixture-backed source
-routes, and committed expected outcomes. It contains no imports from either SDK.
+and Rust SDKs. `v1/cases.json` declares serialized inputs, fixture-backed full
+source URLs, and committed expected outcomes. It contains no imports from either
+SDK.
 
 Each SDK runner must:
 

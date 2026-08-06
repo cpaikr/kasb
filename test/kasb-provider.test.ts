@@ -607,6 +607,7 @@ describe("KASB provider operations", () => {
     await expect(defaultSearchStandardsOperation.execute({ keyword: "리스" })).rejects.toMatchObject({
       code: "source_unavailable",
       retryable: true,
+      sourceUrl: "https://db.kasb.or.kr/api/standard?searchWord=%EB%A6%AC%EC%8A%A4",
     } satisfies Partial<KasbFailure>);
   });
 
@@ -620,6 +621,7 @@ describe("KASB provider operations", () => {
     await expect(defaultSearchStandardsOperation.execute({ keyword: "리스" })).rejects.toMatchObject({
       code: "source_unavailable",
       retryable: true,
+      sourceUrl: "https://db.kasb.or.kr/api/standard?searchWord=%EB%A6%AC%EC%8A%A4",
     } satisfies Partial<KasbFailure>);
   });
 

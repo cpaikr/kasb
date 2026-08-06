@@ -6,6 +6,7 @@ import {
   conformanceRequestUrl,
   executeConformanceCase,
   findConformanceDifference,
+  installFixtureFetch,
   readConformanceJson,
   readConformanceManifest,
   type DifferenceKind,
@@ -35,6 +36,23 @@ describe("language-neutral KASB v1 conformance cases", () => {
       expect(`${resolved.pathname}${resolved.search}`).toBe(
         "/api/paragraphs/content/1116/23?keyword=lease",
       );
+    }
+  });
+
+  test("rejects an undeclared origin even when path and query match", async () => {
+    const fixtureFetch = installFixtureFetch(repoRoot, [{
+      requestUrl: "https://db.kasb.or.kr/api/paragraphs/content/1116/23",
+      fixture: "fixtures/kasb/paragraph-1116-23.json",
+    }]);
+    try {
+      await expect(fetch("https://other.example/api/paragraphs/content/1116/23")).rejects.toThrow(
+        "Conformance case made an undeclared source request",
+      );
+      expect(fixtureFetch.undeclaredRequests).toEqual([
+        "https://other.example/api/paragraphs/content/1116/23",
+      ]);
+    } finally {
+      fixtureFetch.restore();
     }
   });
 

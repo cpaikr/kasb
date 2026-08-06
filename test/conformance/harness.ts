@@ -18,7 +18,7 @@ export type ConformanceOperationName =
   | "get-qna";
 
 export type ConformanceRoute = {
-  readonly requestPath: string;
+  readonly requestUrl: string;
   readonly fixture: string;
 };
 
@@ -82,24 +82,24 @@ export const serializeConformanceOutcome = (value: unknown): unknown => {
 export const conformanceRequestUrl = (input: RequestInfo | URL): URL =>
   new URL(input instanceof Request ? input.url : String(input));
 
-const installFixtureFetch = (
+export const installFixtureFetch = (
   repoRoot: string,
   routes: readonly ConformanceRoute[],
 ): { readonly restore: () => void; readonly undeclaredRequests: string[] } => {
   const originalFetch = globalThis.fetch;
   const undeclaredRequests: string[] = [];
-  const fixtureByPath = new Map(
-    routes.map((route) => [route.requestPath, readConformanceJson(repoRoot, route.fixture)]),
+  const fixtureByUrl = new Map(
+    routes.map((route) => [new URL(route.requestUrl).href, readConformanceJson(repoRoot, route.fixture)]),
   );
 
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = conformanceRequestUrl(input);
-    const requestPath = `${url.pathname}${url.search}`;
-    if (!fixtureByPath.has(requestPath)) {
-      undeclaredRequests.push(requestPath);
-      throw new Error(`Conformance case made an undeclared source request: ${requestPath}`);
+    const requestUrl = url.href;
+    if (!fixtureByUrl.has(requestUrl)) {
+      undeclaredRequests.push(requestUrl);
+      throw new Error(`Conformance case made an undeclared source request: ${requestUrl}`);
     }
-    const payload = structuredClone(fixtureByPath.get(requestPath));
+    const payload = structuredClone(fixtureByUrl.get(requestUrl));
     return {
       ok: true,
       status: 200,

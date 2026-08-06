@@ -46,7 +46,7 @@ starting the workspace phase.
 - Multi-language docs, 12 serialized TypeScript baselines, three path-pinned
   known-bad controls, and the complete v1 translation inventory are implemented
   locally. Independent review and PR findings were applied; the latest complete
-  validation passes with 177 tests and one opt-in live test skipped.
+  validation passes with 178 tests and one opt-in live test skipped.
 - Foundation delivery is [PR #12](https://github.com/sjunepark/kasb/pull/12)
   against the integration branch; thread resolution and merge remain.
 - Migration phase 5 and later release/performance work remain outside this goal.
