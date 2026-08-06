@@ -81,7 +81,12 @@ const decodeHtmlEntities = (value: string): string =>
     .replace(/&#(\d+);/gu, (_match, codePoint: string) => decodeCodePoint(Number.parseInt(codePoint, 10)));
 
 const decodeCodePoint = (codePoint: number): string => {
-  if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 0x10ffff) return "";
+  if (
+    !Number.isInteger(codePoint)
+    || codePoint < 0
+    || codePoint > 0x10ffff
+    || (codePoint >= 0xd800 && codePoint <= 0xdfff)
+  ) return "";
   try {
     return String.fromCodePoint(codePoint);
   } catch {

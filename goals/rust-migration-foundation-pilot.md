@@ -32,17 +32,19 @@ _None._
   serialized, language-neutral parity judge with known-bad detection.
 - Migration phase 2: the complete v1 translation inventory and resolved Rust
   pilot rulebook.
+- Migration phase 3: the independently buildable TypeScript/Rust workspace with
+  shared root fixtures, conformance cases, evals, and documentation.
 
 ### Current in-scope result
 
-Migration phase 3: independently buildable TypeScript/Rust workspace with
-shared root evidence.
+Migration phase 4 delivery: contract-compatible Rust `get-paragraph` vertical
+pilot implementation, local exit gate, and independent review are complete;
+the PR lifecycle remains.
 
 ### Next in-scope action
 
-Move the existing TypeScript package without behavior or export drift, scaffold
-the Rust workspace/crate, and prove both package roots build and test
-independently before implementing the pilot.
+Deliver the implementation PR through feedback resolution, then finish the
+integration-to-main promotion PR.
 
 ### Evidence and blockers
 
@@ -56,4 +58,24 @@ independently before implementing the pilot.
   `ecf8da5` after all seven review threads were resolved. Its final validation
   passed 178 tests with one opt-in live test skipped, typecheck, build, and
   diff checks.
+- Phase 3 passes root aggregate, package-local TypeScript, and crate-local Cargo
+  build/test gates, and independent review found no remaining implementation
+  blocker after three findings were corrected. The TypeScript package still
+  passes 178 tests with one opt-in live skip from the root and 170 tests with
+  one skip package-locally; its packed exports and built Node CLI smoke tests
+  remain green.
+- Phase 4 now implements the public Rust request/result types, exact validation,
+  typed failures, injected clock and async transport, pinned `wreq` persona,
+  KASB URL/source normalization, best-effort enrichment, and distinct
+  cancellation. Fourteen unit tests and twelve integration tests pass, including
+  the two shared serialized paragraph cases and a local persona header/cookie
+  exchange; clippy passes with warnings denied. The full suite also passes on
+  the corrected Rust 1.88 minimum after exact 1.85 validation exposed an
+  upstream transitive syntax incompatibility.
+- Independent phase-4 review has no remaining actionable blocker after fixes
+  for request-construction validation, automatic transport retries, empty
+  parent identifiers, Unicode-digit normalization, and ECMAScript trimming.
+  Root validation and packaged-crate verification pass after those fixes.
+- Implementation PR #13 review feedback is applied and fully revalidated;
+  thread replies, resolution, and merge remain before promotion.
 - Migration phase 5 and later release/performance work remain outside this goal.

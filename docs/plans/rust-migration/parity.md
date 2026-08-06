@@ -39,7 +39,8 @@ Negative controls in [`conformance/v1/known-bad.json`](../../../conformance/v1/k
 | wrong typed failure code | value mismatch at `$.error.code` | rejected at the declared path |
 | numeric request `stdNum` replacing a string | type mismatch at `$.value.result.request.stdNum` | rejected at the declared path |
 
-Validation command: `bun test test/conformance/conformance.test.ts`.
+Validation command:
+`bun test packages/kasb-ts/test/conformance/conformance.test.ts`.
 
 ## Resolved baseline discrepancies
 
@@ -57,10 +58,31 @@ Validation command: `bun test test/conformance/conformance.test.ts`.
 - Caller cancellation is SDK execution control rather than a capability failure
   code. TypeScript exposes `aborted` at its public toolset boundary; Rust will
   expose `Cancelled` without serializing a false source failure.
+- The pinned `wreq` packages declare Rust 1.85, but their required
+  `typed-builder-macro` release uses syntax stabilized in Rust 1.88. An exact
+  1.85 build reproduced the failure; the workspace minimum is therefore 1.88,
+  and the full Rust suite passes on that toolchain without vendoring a patched
+  transitive macro.
+
+## Phase-4 Rust pilot
+
+The Rust runner independently consumes the two `get-paragraph` entries in the
+same root `conformance/v1/cases.json` manifest and compares its serialized
+success and invalid-input outcomes with the TypeScript baselines. Both pass;
+only `metadata.fetchedAt` is canonicalized.
+
+The fixture-backed Rust suite additionally covers numeric, Korean-prefixed,
+appendix, and basis-for-conclusions paragraph forms. Injected transport cases
+cover empty exact lookup, multiple rows, required-field and identity drift,
+non-JSON success, 4xx/429/5xx retryability, timeout, zero retry, failed or
+missing enrichment, and cancellation during both source requests. Cancellation
+remains an SDK-local control outcome, so it is tested against the rulebook
+rather than forced into the shared serialized capability-failure envelope.
+
+No TypeScript/Rust semantic discrepancy was found in the two shared paragraph
+cases. Rust-specific persona ownership and cancellation are the already-approved
+runtime differences recorded in the rulebook.
 
 ## Next gate
 
-Phase 3 must keep all 12 TypeScript cases and all 3 negative controls green
-after the package move. Phase 4 adds Rust pilot cases for all four paragraph
-forms plus not-found, source-drift, timeout, cancellation, and enrichment
-behavior. Every difference must be classified here before phase 5 can begin.
+Complete review and PR delivery without beginning phase 5.

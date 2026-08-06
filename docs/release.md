@@ -1,6 +1,9 @@
 # Release
 
-Release Please owns normal version bumps, `CHANGELOG.md`, source tags, and GitHub Releases for the npm package `@sjunepark/kasb`. The tag-triggered release workflow validates the package and publishes the npm CLI/tool package.
+Release Please owns normal version bumps,
+`packages/kasb-ts/CHANGELOG.md`, source tags, and GitHub Releases for the npm
+package `@sjunepark/kasb`. The tag-triggered release workflow validates and
+publishes that package from `packages/kasb-ts/`.
 
 This repo no longer builds or uploads standalone OS-native binaries.
 
@@ -22,16 +25,16 @@ npm publishing uses OIDC trusted publishing, so no npm publish token is required
 ## Automated release flow
 
 1. Land normal work on `main` using Conventional Commits, especially `feat:`, `fix:`, and `docs:`. Use `!` or a `BREAKING CHANGE:` footer for breaking changes.
-2. `.github/workflows/release-please.yml` opens or updates a release PR that bumps `package.json`, updates `.release-please-manifest.json`, and writes `CHANGELOG.md`.
+2. `.github/workflows/release-please.yml` opens or updates a release PR that bumps `packages/kasb-ts/package.json`, updates `.release-please-manifest.json`, and writes `packages/kasb-ts/CHANGELOG.md`.
 3. Review and merge the release PR.
 4. Release Please creates the source tag and GitHub Release.
 5. The source tag triggers `.github/workflows/release.yml`, which typechecks, tests, builds, and publishes the npm package.
 
-The source tag must match `package.json` exactly. Version `x.y.z` uses source tag `vx.y.z`.
+The source tag must match `packages/kasb-ts/package.json` exactly. Version `x.y.z` uses source tag `vx.y.z`.
 
 ## Manual fallback
 
-If automation needs to be bypassed, update `package.json` and `.release-please-manifest.json` to the same version, commit the change, and push a matching source tag:
+If automation needs to be bypassed, update `packages/kasb-ts/package.json` and `.release-please-manifest.json` to the same version, commit the change, and push a matching source tag:
 
 ```sh
 git tag vx.y.z

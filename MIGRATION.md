@@ -1,6 +1,6 @@
 # Rust Migration
 
-Status: approved direction; phases 1–2 are in progress.
+Status: phases 1–3 complete; phase 4 Rust pilot validated and in PR delivery.
 
 Decision date: 2026-07-30.
 
@@ -24,10 +24,11 @@ The migration is additive:
 The existing TypeScript CLI remains the sole CLI during this migration. A Rust
 CLI is not part of the approved scope.
 
-This document records the approved transition direction. Before Rust code or
-the workspace reorganization lands, update `VISION.md`, `ARCHITECTURE.md`, and
-the repository command guidance so their TypeScript-only descriptions reflect
-the active phase of the migration.
+This document records the approved transition direction. The phase-3 workspace
+reorganization and command alignment are complete. The phase-4 Rust
+`get-paragraph` pilot now passes local implementation, conformance, package,
+and independent-review gates; PR delivery remains before the migration
+milestone is closed.
 
 ## Rationale
 
@@ -49,6 +50,8 @@ The accepted tradeoffs are:
 - `wreq` and `wreq-util` are currently release-candidate dependencies, so exact
   versions must be pinned and upgrades must pass fingerprint and conformance
   tests;
+- their declared Rust 1.85 floor is not sufficient for the currently required
+  `typed-builder-macro`; the validated workspace minimum is Rust 1.88;
 - BoringSSL introduces native build and linker considerations;
 - the inspected `wreq` release does not provide the operational HTTP/3 and QUIC
   fingerprinting available in `tls-client`.

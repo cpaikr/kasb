@@ -1,0 +1,10 @@
+[workspace]
+members = ["crates/kasb"]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+license = "Elastic-2.0"
+repository = "https://github.com/sjunepark/kasb"
+rust-version = "1.88"
+version = "0.1.0"

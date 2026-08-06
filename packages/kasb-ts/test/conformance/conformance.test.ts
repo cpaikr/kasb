@@ -12,7 +12,7 @@ import {
   type DifferenceKind,
 } from "./harness.ts";
 
-const repoRoot = join(import.meta.dir, "../..");
+const repoRoot = join(import.meta.dir, "../../../..");
 const manifest = readConformanceManifest(repoRoot);
 
 type KnownBadManifest = {

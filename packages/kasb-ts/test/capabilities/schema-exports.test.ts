@@ -128,6 +128,7 @@ describe("capability JSON Schema exports", () => {
     expect(propertyAt(getSectionInput, ["indexDocumentId"]).description).toContain("get-standard-structure");
     expect(propertyAt(getSectionInput, ["indexDocumentId"]).description).toContain("titleDocumentId");
     expect(propertyAt(getParagraphInput, ["paraNum"]).examples).toEqual(["23", "한2.1", "B3", "BC240A"]);
+    expect(propertyAt(getParagraphInput, ["paraNum"]).pattern).toBe("^[^~]*$");
     expect(propertyAt(getQnaInput, ["docNumber"]).examples).toEqual(["SSI-35629"]);
     const qnaTypes = propertyAt(searchQnaInput, ["types"]);
     expect(qnaTypes.description).toContain("11,12,13,14,15,24,25");

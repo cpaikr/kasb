@@ -15,13 +15,17 @@ import {
 } from "../types.ts";
 
 const fields = new Set(["stdNum", "paraNum"]);
+const ExactParaNumSchema = ParaNumSchema.pipe(Schema.pattern(/^[^~]*$/u)).annotations({
+  description: "Exact paragraph reference within one standard; ranges belong to get-section ref.",
+  examples: ["23", "한2.1", "B3", "BC240A"],
+});
 
 export const GetParagraphRequestSchema = Schema.Struct({
   stdNum: StdNumSchema.annotations({
     description: "KASB standard number containing the paragraph to retrieve.",
     examples: ["1116"],
   }),
-  paraNum: ParaNumSchema,
+  paraNum: ExactParaNumSchema,
 });
 export type GetParagraphRawInput = typeof GetParagraphRequestSchema.Encoded;
 export type GetParagraphRequest = typeof GetParagraphRequestSchema.Type;

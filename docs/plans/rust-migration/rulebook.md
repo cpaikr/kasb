@@ -128,7 +128,11 @@ authorized by the active goal.
 - Pin `wreq = "=6.0.0-rc.29"` and `wreq-util = "=3.0.0-rc.14"`; commit
   `Cargo.lock`. Any upgrade must rerun conformance and persona/fingerprint
   checks.
-- The minimum Rust version is 1.85, matching the pinned crates.
+- The validated minimum Rust version is 1.88. Although the pinned `wreq` crates
+  declare 1.85, `wreq-util` requires `typed-builder-macro` 0.23.2, whose
+  let-chain syntax needs Rust 1.88. Do not claim the dependency metadata's lower
+  version unless that transitive requirement changes and the exact toolchain
+  suite passes.
 - One `PersonaClient` owns one long-lived `wreq::Client`, connection pool,
   in-memory cookie store, optional fixed proxy, concurrency semaphore, timeouts,
   and immutable emulation profile.
