@@ -83,6 +83,12 @@ impl KasbClient<PersonaClient, SystemClock> {
 }
 
 impl Default for KasbClient<PersonaClient, SystemClock> {
+    /// Builds a KASB client with the default browser persona and system clock.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the underlying default [`PersonaClient`] cannot be built. Use
+    /// [`KasbClient::new`] to handle that construction failure explicitly.
     fn default() -> Self {
         Self::from_parts(PersonaClient::default(), SystemClock)
     }

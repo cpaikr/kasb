@@ -475,7 +475,7 @@ async fn cancellation_interrupts_primary_and_enrichment_requests() {
     let primary_transport = FixtureTransport::new([(paragraph_url("23"), Outcome::Pending)]);
     let primary_client =
         KasbClient::from_parts(primary_transport.clone(), FixedClock::new(FIXED_TIME));
-    cancel_pending(primary_client).await;
+    cancel_pending(primary_client, &primary_transport, 1).await;
     assert_eq!(primary_transport.calls(), [paragraph_url("23")]);
 
     let enrichment_transport = FixtureTransport::new([
@@ -487,7 +487,7 @@ async fn cancellation_interrupts_primary_and_enrichment_requests() {
     ]);
     let enrichment_client =
         KasbClient::from_parts(enrichment_transport.clone(), FixedClock::new(FIXED_TIME));
-    cancel_pending(enrichment_client).await;
+    cancel_pending(enrichment_client, &enrichment_transport, 2).await;
     assert_eq!(
         enrichment_transport.calls(),
         [paragraph_url("23"), structure_url()]
@@ -511,7 +511,11 @@ async fn an_already_cancelled_request_does_not_start_source_access() {
     assert!(transport.calls().is_empty());
 }
 
-async fn cancel_pending(client: KasbClient<FixtureTransport, FixedClock>) {
+async fn cancel_pending(
+    client: KasbClient<FixtureTransport, FixedClock>,
+    transport: &FixtureTransport,
+    expected_call_count: usize,
+) {
     let cancellation = CancellationToken::new();
     let task_cancellation = cancellation.clone();
     let task = tokio::spawn(async move {
@@ -522,7 +526,13 @@ async fn cancel_pending(client: KasbClient<FixtureTransport, FixedClock>) {
             )
             .await
     });
-    tokio::task::yield_now().await;
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while transport.calls().len() < expected_call_count {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("request should reach the pending source before cancellation");
     cancellation.cancel();
     let result = tokio::time::timeout(Duration::from_secs(1), task)
         .await

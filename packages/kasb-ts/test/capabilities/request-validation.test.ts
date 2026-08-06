@@ -160,6 +160,25 @@ describe("capability request validation", () => {
     );
   });
 
+  test.each([
+    ["stdNum", { stdNum: "..", paraNum: "23" }],
+    ["paraNum", { stdNum: "1116", paraNum: "." }],
+    ["stdNum", { stdNum: " . ", paraNum: "23" }],
+    ["paraNum", { stdNum: "1116", paraNum: "\u{FEFF}..\u{3000}" }],
+  ] as const)("rejects URL dot segment %s identifiers", (parameter, input) => {
+    expectInvalid(
+      () => resolveGetParagraphRequest(input),
+      { parameter, messageIncludes: "cannot be a URL dot segment" },
+    );
+  });
+
+  test("preserves embedded line terminators in opaque paragraph identifiers", () => {
+    expect(resolveGetParagraphRequest({ stdNum: "11\n16", paraNum: "2\n3" })).toEqual({
+      stdNum: "11\n16",
+      paraNum: "2\n3",
+    });
+  });
+
   test("rejects numeric-only Q&A doc numbers with a search-qna recovery hint", () => {
     expectInvalid(
       () => resolveGetQnaRequest({ docNumber: "35629" }),

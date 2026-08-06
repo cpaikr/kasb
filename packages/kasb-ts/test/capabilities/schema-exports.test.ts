@@ -127,8 +127,16 @@ describe("capability JSON Schema exports", () => {
     expect(getSectionInput.description).toContain("exactly one section locator");
     expect(propertyAt(getSectionInput, ["indexDocumentId"]).description).toContain("get-standard-structure");
     expect(propertyAt(getSectionInput, ["indexDocumentId"]).description).toContain("titleDocumentId");
+    const stdNumPattern = propertyAt(getParagraphInput, ["stdNum"]).pattern;
+    const paraNumPattern = propertyAt(getParagraphInput, ["paraNum"]).pattern;
+    expect(stdNumPattern).toBeString();
+    expect(paraNumPattern).toBeString();
+    expect(new RegExp(stdNumPattern as string, "u").test(" . ")).toBe(false);
+    expect(new RegExp(stdNumPattern as string, "u").test("11\n16")).toBe(true);
     expect(propertyAt(getParagraphInput, ["paraNum"]).examples).toEqual(["23", "한2.1", "B3", "BC240A"]);
-    expect(propertyAt(getParagraphInput, ["paraNum"]).pattern).toBe("^[^~]*$");
+    expect(new RegExp(paraNumPattern as string, "u").test("\u{FEFF}..\u{3000}")).toBe(false);
+    expect(new RegExp(paraNumPattern as string, "u").test("2\n3")).toBe(true);
+    expect(new RegExp(paraNumPattern as string, "u").test("22~30")).toBe(false);
     expect(propertyAt(getQnaInput, ["docNumber"]).examples).toEqual(["SSI-35629"]);
     const qnaTypes = propertyAt(searchQnaInput, ["types"]);
     expect(qnaTypes.description).toContain("11,12,13,14,15,24,25");

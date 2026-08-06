@@ -22,7 +22,7 @@ ready for final promotion to `main`.
 - `bun test packages/kasb-ts/test/conformance/conformance.test.ts`: 18 passing tests, including
   the JSON-serialization regression, 12 TypeScript baseline cases, and 3
   path-pinned negative controls.
-- `bun test`: 178 passing tests and 1 opt-in live test skipped after PR review
+- `bun test`: 183 passing tests and 1 opt-in live test skipped after PR review
   fixes.
 - `bun run typecheck`, `bun run build`, and `git diff --check`: passing after
   review fixes.
@@ -32,7 +32,7 @@ ready for final promotion to `main`.
 - Phase 3 package roots: `bun run typecheck && bun test && bun run build` plus
   the built Node CLI smoke pass from `packages/kasb-ts`; `cargo build --locked`
   and `cargo test --locked` pass from `crates/kasb`.
-- Phase 4 Rust suite: 14 unit tests and 12 integration tests pass. Evidence
+- Phase 4 Rust suite: 16 unit tests and 12 integration tests pass. Evidence
   includes four captured paragraph forms, both shared serialized paragraph
   cases, exact invalid/not-found/source-drift failures, HTTP retryability,
   zero retry, timeout, primary/enrichment cancellation, enrichment warnings,
@@ -48,7 +48,7 @@ ready for final promotion to `main`.
   consumer setup documentation now match their contracts. Broader suggestions
   on unchanged TypeScript capabilities remain outside this phase-4 pilot.
 - `cargo clippy --workspace --all-targets --locked -- -D warnings` passes.
-- `cargo +1.88.0 test --workspace --locked` passes all 26 Rust tests, validating
+- `cargo +1.88.0 test --workspace --locked` passes all 28 Rust tests, validating
   the corrected minimum toolchain after an exact 1.85 run exposed upstream
   `typed-builder-macro` syntax incompatibility.
 - `cargo +1.88.0 package --locked --allow-dirty` builds and verifies the

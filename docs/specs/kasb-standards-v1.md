@@ -21,10 +21,12 @@ Generic browsing is insufficient because:
 
 ## 3. Capability Boundary
 
-This product provides read-only TypeScript SDK, native Rust SDK, Node.js CLI,
-and Pi access to public KASB standards content through the current
-`https://db.kasb.or.kr/api/` surface. The SDKs use native language types and
-transport implementations while preserving the serialized semantics below.
+This product provides a read-only TypeScript SDK, Node.js CLI, and Pi access to
+the six v1 operations over the current `https://db.kasb.or.kr/api/` surface.
+The native Rust SDK currently implements the contract-compatible
+`get-paragraph` vertical pilot; the other Rust operations remain migration
+phase 5 work. Both SDKs use native language types and transports while the
+implemented shared operation preserves the serialized semantics below.
 
 In scope:
 
@@ -39,7 +41,7 @@ In scope:
 - Commander CLI commands for the v1 operations
 - runtime-neutral TypeScript toolset export for operation discovery, validation, execution, and error serialization
 - Pi adapter export and extension entrypoint wrapping the neutral toolset as one action-oriented host tool
-- native Rust SDK with the same operation names, request/result meaning, typed failures, and serialized success envelopes
+- native Rust `get-paragraph` with the same request/result meaning, typed failures, and serialized success envelope
 - language-neutral fixtures and conformance cases shared by both SDKs
 
 Out of scope:

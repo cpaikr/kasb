@@ -103,6 +103,13 @@ impl PersonaClient {
 }
 
 impl Default for PersonaClient {
+    /// Builds the default browser-persona client.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `wreq` cannot construct a client from the library-owned
+    /// default configuration. Use [`PersonaClient::new`] to handle that
+    /// construction failure explicitly.
     fn default() -> Self {
         Self::new(PersonaConfig::default()).expect("default persona configuration is valid")
     }

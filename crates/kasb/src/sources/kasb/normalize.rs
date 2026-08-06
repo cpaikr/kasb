@@ -2,11 +2,11 @@ use std::sync::LazyLock;
 
 use regex::{Captures, Regex};
 
-use crate::text::{ECMASCRIPT_WHITESPACE_PATTERN, trim_ecmascript_whitespace};
+use crate::text::{ECMASCRIPT_WHITESPACE_CLASS, trim_ecmascript_whitespace};
 
 static BLOCK_TAGS: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(&format!(
-        r"(?i)<{ECMASCRIPT_WHITESPACE_PATTERN}*/?{ECMASCRIPT_WHITESPACE_PATTERN}*(?:br|div|p|li|ul|ol|table|thead|tbody|tr|td|th|h[1-6])(?:{ECMASCRIPT_WHITESPACE_PATTERN}+[^>]*)?{ECMASCRIPT_WHITESPACE_PATTERN}*/?>",
+        r"(?i)<[{ECMASCRIPT_WHITESPACE_CLASS}]*/?[{ECMASCRIPT_WHITESPACE_CLASS}]*(?:br|div|p|li|ul|ol|table|thead|tbody|tr|td|th|h[1-6])(?:[{ECMASCRIPT_WHITESPACE_CLASS}]+[^>]*)?[{ECMASCRIPT_WHITESPACE_CLASS}]*/?>",
     ))
     .expect("block tag regex is valid")
 });
@@ -37,18 +37,21 @@ static MANY_NEWLINES: LazyLock<Regex> =
 static LIST_MARKER_AFTER_SENTENCE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(&format!(
         concat!(
-            r"([.!?。．]){ecmascript_whitespace}*",
+            r"([.!?。．])[{ecmascript_whitespace}]*",
             r"(\((?:[0-9]{{1,3}}|[가-힣ㄱ-ㅎA-Za-z]|[ivxlcdmIVXLCDM]{{1,6}})\)|[①-⑳㈀-㈞㉠-㉭])"
         ),
-        ecmascript_whitespace = ECMASCRIPT_WHITESPACE_PATTERN,
+        ecmascript_whitespace = ECMASCRIPT_WHITESPACE_CLASS,
     ))
     .expect("sentence list marker regex is valid")
 });
 static LIST_MARKER_AT_LINE_START: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(concat!(
-        r"(?m)^([\t\x0c\x0b ]*)",
-        r"(\((?:[0-9]{1,3}|[가-힣ㄱ-ㅎA-Za-z]|[ivxlcdmIVXLCDM]{1,6})\)|[①-⑳㈀-㈞㉠-㉭])",
-        r"(\S)"
+    Regex::new(&format!(
+        concat!(
+            r"(?m)^([\t\x0c\x0b ]*)",
+            r"(\((?:[0-9]{{1,3}}|[가-힣ㄱ-ㅎA-Za-z]|[ivxlcdmIVXLCDM]{{1,6}})\)|[①-⑳㈀-㈞㉠-㉭])",
+            r"([^{ecmascript_whitespace}])"
+        ),
+        ecmascript_whitespace = ECMASCRIPT_WHITESPACE_CLASS,
     ))
     .expect("line list marker regex is valid")
 });
@@ -109,6 +112,8 @@ mod tests {
         assert_eq!(normalize_kasb_plain_text("&amp;lt;"), "<");
         assert_eq!(normalize_kasb_plain_text("&#xD800;"), "");
         assert_eq!(normalize_kasb_plain_text("\u{FEFF}A\u{FEFF}"), "A");
+        assert_eq!(normalize_kasb_plain_text("(1)\u{FEFF}A"), "(1)\u{FEFF}A");
+        assert_eq!(normalize_kasb_plain_text("(1)\u{0085}A"), "(1) \u{0085}A");
         assert_eq!(
             normalize_kasb_plain_text("\u{0085}A\u{0085}"),
             "\u{0085}A\u{0085}"

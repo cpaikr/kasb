@@ -15,13 +15,19 @@ import {
 } from "../types.ts";
 
 const fields = new Set(["stdNum", "paraNum"]);
-const ExactParaNumSchema = ParaNumSchema.pipe(Schema.pattern(/^[^~]*$/u)).annotations({
+const ecmascriptWhitespaceClass = "\\x09-\\x0D\\x20\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF";
+const ExactStdNumSchema = StdNumSchema.pipe(Schema.pattern(
+  new RegExp(`^(?![${ecmascriptWhitespaceClass}]*\\.{1,2}[${ecmascriptWhitespaceClass}]*$)[\\s\\S]+$`, "u"),
+));
+const ExactParaNumSchema = ParaNumSchema.pipe(Schema.pattern(
+  new RegExp(`^(?![${ecmascriptWhitespaceClass}]*\\.{1,2}[${ecmascriptWhitespaceClass}]*$)[^~]+$`, "u"),
+)).annotations({
   description: "Exact paragraph reference within one standard; ranges belong to get-section ref.",
   examples: ["23", "한2.1", "B3", "BC240A"],
 });
 
 export const GetParagraphRequestSchema = Schema.Struct({
-  stdNum: StdNumSchema.annotations({
+  stdNum: ExactStdNumSchema.annotations({
     description: "KASB standard number containing the paragraph to retrieve.",
     examples: ["1116"],
   }),
@@ -42,10 +48,22 @@ export const resolveGetParagraphRequest = (
       message: "Parameter \"paraNum\" must be one exact paragraph number. Retrieve paragraph ranges with get-section ref.",
     });
   }
+  assertNotUrlDotSegment("paraNum", paraNum);
+  const stdNum = readRequiredString(input, "stdNum");
+  assertNotUrlDotSegment("stdNum", stdNum);
   return {
-    stdNum: readRequiredString(input, "stdNum"),
+    stdNum,
     paraNum,
   };
+};
+
+const assertNotUrlDotSegment = (parameter: "stdNum" | "paraNum", value: string): void => {
+  if (value === "." || value === "..") {
+    throw new InvalidCapabilityRequest({
+      parameter,
+      message: `Parameter "${parameter}" cannot be a URL dot segment ("." or "..").`,
+    });
+  }
 };
 
 export const ParagraphSchema = Schema.Struct({

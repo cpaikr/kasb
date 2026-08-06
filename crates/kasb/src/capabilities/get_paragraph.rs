@@ -18,6 +18,7 @@ impl GetParagraphRequest {
     ) -> Result<Self, KasbFailure> {
         let para_num = required_para_num_value(para_num.into())?;
         let std_num = required_string_value("stdNum", std_num.into())?;
+        reject_url_dot_segment("stdNum", &std_num)?;
         Ok(Self { std_num, para_num })
     }
 
@@ -60,10 +61,16 @@ impl<'de> Deserialize<'de> for GetParagraphRequest {
 }
 
 fn reject_unknown_keys(object: &Map<String, Value>) -> Result<(), KasbFailure> {
-    if let Some(key) = object
+    let unknown_keys = object
         .keys()
-        .find(|key| !matches!(key.as_str(), "stdNum" | "paraNum"))
-    {
+        .filter(|key| !matches!(key.as_str(), "stdNum" | "paraNum"));
+    let key = unknown_keys
+        .clone()
+        .filter_map(|key| javascript_property_index(key).map(|index| (index, key)))
+        .min_by_key(|(index, _)| *index)
+        .map(|(_, key)| key)
+        .or_else(|| unknown_keys.into_iter().next());
+    if let Some(key) = key {
         let base = format!("Unknown parameter: \"{key}\".");
         let message = suggest_allowed_key(key)
             .map(|allowed| format!("{base} This typed API uses the JSON field \"{allowed}\"."))
@@ -71,6 +78,11 @@ fn reject_unknown_keys(object: &Map<String, Value>) -> Result<(), KasbFailure> {
         return Err(KasbFailure::invalid(key, message));
     }
     Ok(())
+}
+
+fn javascript_property_index(key: &str) -> Option<u32> {
+    let index = key.parse::<u32>().ok()?;
+    (index != u32::MAX && index.to_string() == key).then_some(index)
 }
 
 fn required_json_string(object: &Map<String, Value>, key: &str) -> Result<String, KasbFailure> {
@@ -108,7 +120,18 @@ fn required_para_num_value(value: String) -> Result<String, KasbFailure> {
             "Parameter \"paraNum\" must be one exact paragraph number. Retrieve paragraph ranges with get-section ref.",
         ));
     }
+    reject_url_dot_segment("paraNum", &value)?;
     Ok(value)
+}
+
+fn reject_url_dot_segment(key: &str, value: &str) -> Result<(), KasbFailure> {
+    if matches!(value, "." | "..") {
+        return Err(KasbFailure::invalid(
+            key,
+            format!("Parameter \"{key}\" cannot be a URL dot segment (\".\" or \"..\")."),
+        ));
+    }
+    Ok(())
 }
 
 fn suggest_allowed_key(key: &str) -> Option<&'static str> {
@@ -175,11 +198,10 @@ pub struct GetParagraphPayload {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ResultMetadata {
-    #[serde(rename = "fetchedAt")]
     pub fetched_at: String,
     pub source: SourceMetadata,
-    #[serde(rename = "sourceBehavior")]
     pub source_behavior: SourceBehavior,
     pub completeness: Completeness,
     pub content: ContentMetadata,
@@ -283,6 +305,13 @@ mod tests {
             (json!({"stdNum": " ", "paraNum": " "}), "paraNum"),
             (json!({"paraNum": " "}), "paraNum"),
             (json!({"paraNum": "22~30"}), "paraNum"),
+            (json!({"stdNum": "1116", "paraNum": "."}), "paraNum"),
+            (json!({"stdNum": "..", "paraNum": "23"}), "stdNum"),
+            (json!({"stdNum": " . ", "paraNum": "23"}), "stdNum"),
+            (
+                json!({"stdNum": "1116", "paraNum": "\u{FEFF}..\u{3000}"}),
+                "paraNum",
+            ),
         ];
         for (input, parameter) in cases {
             let failure = GetParagraphRequest::from_json(input).expect_err("input should fail");
@@ -314,6 +343,26 @@ mod tests {
         }))
         .expect_err("non-alias fields should not receive a typed-field hint");
         assert_eq!(failure.message, "Unknown parameter: \"std-num-\".");
+
+        let failure = GetParagraphRequest::from_json(json!({
+            "z": true,
+            "a": true,
+            "stdNum": "1116",
+            "paraNum": "23"
+        }))
+        .expect_err("the first inserted unknown field should win");
+        assert_eq!(failure.parameter.as_deref(), Some("z"));
+
+        let failure = GetParagraphRequest::from_json(json!({
+            "z": true,
+            "10": true,
+            "2": true,
+            "a": true,
+            "stdNum": "1116",
+            "paraNum": "23"
+        }))
+        .expect_err("JavaScript-compatible integer keys should precede string keys");
+        assert_eq!(failure.parameter.as_deref(), Some("2"));
     }
 
     #[test]
@@ -335,5 +384,10 @@ mod tests {
         let request = GetParagraphRequest::new("\u{0085}1116\u{0085}", "23")
             .expect("non-ECMAScript whitespace is an opaque identifier character");
         assert_eq!(request.std_num(), "\u{0085}1116\u{0085}");
+
+        let request = GetParagraphRequest::new("11\n16", "2\n3")
+            .expect("embedded line terminators are opaque identifier characters");
+        assert_eq!(request.std_num(), "11\n16");
+        assert_eq!(request.para_num(), "2\n3");
     }
 }

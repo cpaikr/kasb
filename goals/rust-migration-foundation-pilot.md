@@ -53,7 +53,7 @@ None under this goal. Migration phase 5 requires separate authorization.
 - Multi-language docs, 12 serialized TypeScript baselines, three path-pinned
   known-bad controls, and the complete v1 translation inventory are implemented
   locally. Independent review and PR findings were applied; the latest complete
-  validation passes with 178 tests and one opt-in live test skipped.
+  validation passes with 183 tests and one opt-in live test skipped.
 - Foundation [PR #12](https://github.com/sjunepark/kasb/pull/12) merged as
   `ecf8da5` after all seven review threads were resolved. Its final validation
   passed 178 tests with one opt-in live test skipped, typecheck, build, and
@@ -67,7 +67,7 @@ None under this goal. Migration phase 5 requires separate authorization.
 - Phase 4 now implements the public Rust request/result types, exact validation,
   typed failures, injected clock and async transport, pinned `wreq` persona,
   KASB URL/source normalization, best-effort enrichment, and distinct
-  cancellation. Fourteen unit tests and twelve integration tests pass, including
+  cancellation. Sixteen unit tests and twelve integration tests pass, including
   the two shared serialized paragraph cases and a local persona header/cookie
   exchange; clippy passes with warnings denied. The full suite also passes on
   the corrected Rust 1.88 minimum after exact 1.85 validation exposed an

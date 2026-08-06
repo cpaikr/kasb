@@ -35,7 +35,7 @@ impl KasbFailure {
         }
     }
 
-    pub(crate) fn source(
+    pub(crate) fn source_failure(
         code: KasbFailureCode,
         message: impl Into<String>,
         retryable: bool,
@@ -56,11 +56,21 @@ pub enum KasbError {
     #[error("KASB request was cancelled")]
     Cancelled,
     #[error("{0}")]
-    Failure(KasbFailure),
+    Failure(#[from] KasbFailure),
 }
 
-impl From<KasbFailure> for KasbError {
-    fn from(value: KasbFailure) -> Self {
-        Self::Failure(value)
+#[cfg(test)]
+mod tests {
+    use std::error::Error;
+
+    use super::*;
+
+    #[test]
+    fn failure_exposes_the_typed_cause() {
+        let error = KasbError::from(KasbFailure::invalid("stdNum", "invalid standard"));
+        assert_eq!(
+            error.source().map(ToString::to_string),
+            Some("invalid standard".to_owned())
+        );
     }
 }

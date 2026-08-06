@@ -37,8 +37,10 @@ This is worth standardizing because standards work is repetitive, citation-sensi
 
 ## Product Shape
 
-The v1 product exposes a narrow set of read-only capabilities through the
-TypeScript SDK, native Rust SDK, Node.js CLI, and retained Pi adapter:
+The TypeScript SDK, Node.js CLI, and retained Pi adapter expose the six v1
+read-only capabilities below. The native Rust SDK currently exposes the exact
+paragraph capability as a contract-compatible vertical pilot; the remaining
+Rust capabilities belong to migration phase 5.
 
 - search standards by keyword
 - retrieve the structural index for a standard
@@ -50,7 +52,7 @@ TypeScript SDK, native Rust SDK, Node.js CLI, and retained Pi adapter:
 
 ## Principles
 
-- `dual-sdk`: TypeScript and Rust use native language APIs and the same serialized capability semantics
+- `dual-sdk`: each implemented cross-language capability uses native language APIs and the same serialized semantics
 - `tool-package`: CLI, neutral TypeScript toolset, and Pi adapter share the TypeScript capability implementation
 - `reference first`: every returned item should be easy to cite and revisit
 - `discovery and retrieval`: search alone is not enough
@@ -68,7 +70,7 @@ TypeScript SDK, native Rust SDK, Node.js CLI, and retained Pi adapter:
 - stable references to standards, sections, and paragraphs where possible
 - source metadata that makes results verifiable
 - a supported Bun/TypeScript capability core following `../darty`
-- a native Rust SDK with the same v1 operation, result, and typed-failure semantics
+- a native Rust `get-paragraph` pilot with the same result and typed-failure semantics as TypeScript
 - shared fixture and conformance evidence at the serialized contract boundary
 - a Commander CLI as the human/debuggable transport
 - a runtime-neutral `./toolset` export for operation discovery, validation, execution, and error serialization

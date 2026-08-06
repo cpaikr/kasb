@@ -34,7 +34,7 @@ pub(crate) async fn get_paragraph<T: HttpTransport, F: FnOnce() -> String>(
     let paragraphs = required_array(payload.get("paraContents"), &source_url, "paraContents")?;
 
     if paragraphs.is_empty() {
-        return Err(KasbFailure::source(
+        return Err(KasbFailure::source_failure(
             KasbFailureCode::NotFound,
             format!(
                 "Could not find paragraph {}-{}.",
@@ -150,7 +150,7 @@ async fn fetch_json<T: HttpTransport>(
         Ok(response) => response,
         Err(TransportError::Cancelled) => return Err(KasbError::Cancelled),
         Err(TransportError::Timeout | TransportError::Unavailable(_)) => {
-            return Err(KasbFailure::source(
+            return Err(KasbFailure::source_failure(
                 KasbFailureCode::SourceUnavailable,
                 "Could not connect to the KASB API.",
                 true,
@@ -165,7 +165,7 @@ async fn fetch_json<T: HttpTransport>(
 
 fn ensure_success(response: HttpResponse, source_url: &str) -> Result<Value, KasbError> {
     if !(200..300).contains(&response.status) {
-        return Err(KasbFailure::source(
+        return Err(KasbFailure::source_failure(
             if response.status == 404 {
                 KasbFailureCode::NotFound
             } else {
@@ -269,22 +269,10 @@ fn to_string_value(value: &Value) -> Option<String> {
 }
 
 fn number_to_string(value: &Number) -> String {
-    if let Some(value) = value.as_i64() {
-        return value.to_string();
-    }
-    if let Some(value) = value.as_u64() {
-        return value.to_string();
-    }
     let value = value
         .as_f64()
         .expect("serde_json numbers are finite and representable as f64");
-    if value == 0.0 {
-        return "0".to_owned();
-    }
-    if value.fract() == 0.0 && value.abs() < 1e21 {
-        return format!("{value:.0}");
-    }
-    value.to_string()
+    ryu_js::Buffer::new().format_finite(value).to_owned()
 }
 
 fn optional_number(value: Option<&Value>) -> Option<Number> {
@@ -292,7 +280,7 @@ fn optional_number(value: Option<&Value>) -> Option<Number> {
 }
 
 fn source_changed(source_url: &str, message: impl Into<String>) -> KasbFailure {
-    KasbFailure::source(KasbFailureCode::SourceChanged, message, false, source_url)
+    KasbFailure::source_failure(KasbFailureCode::SourceChanged, message, false, source_url)
 }
 
 #[derive(Debug)]
@@ -460,6 +448,26 @@ mod tests {
         assert_eq!(
             to_string_value(&serde_json::json!(-0.0)),
             Some("0".to_owned())
+        );
+        assert_eq!(
+            to_string_value(&serde_json::json!(1e20)),
+            Some("100000000000000000000".to_owned())
+        );
+        assert_eq!(
+            to_string_value(&serde_json::json!(1e21)),
+            Some("1e+21".to_owned())
+        );
+        assert_eq!(
+            to_string_value(&serde_json::json!(0.000001)),
+            Some("0.000001".to_owned())
+        );
+        assert_eq!(
+            to_string_value(&serde_json::json!(0.0000001)),
+            Some("1e-7".to_owned())
+        );
+        assert_eq!(
+            to_string_value(&serde_json::json!(u64::MAX)),
+            Some("18446744073709552000".to_owned())
         );
     }
 }
