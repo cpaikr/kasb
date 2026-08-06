@@ -1,12 +1,11 @@
 # Rust migration execution progress
 
-Current gate: phases 1–2 implemented and independently reviewed locally; final
-validation and PR delivery pending.
+Current gate: phases 1–2 delivered; phase 3 workspace layout in progress.
 
 | Phase | Exit evidence | State |
 | --- | --- | --- |
-| 1. Freeze compatibility evidence | multi-language docs; 12-case serialized TypeScript baseline; 3 path-pinned known-bad controls rejected; counts in `parity.md` | reviewed locally |
-| 2. Translation rulebook | complete v1 request/result/failure/fixture/cancellation inventory and resolved pilot mappings in `rulebook.md` | reviewed locally |
+| 1. Freeze compatibility evidence | multi-language docs; 12-case serialized TypeScript baseline; 3 path-pinned known-bad controls rejected; counts in `parity.md` | delivered in PR #12 |
+| 2. Translation rulebook | complete v1 request/result/failure/fixture/cancellation inventory and resolved pilot mappings in `rulebook.md` | delivered in PR #12 |
 | 3. Workspace layout | independent npm and Cargo builds/tests with shared root evidence | not started |
 | 4. Rust `get-paragraph` pilot | complete `wreq` path and success/failure/timeout/cancellation conformance | not started |
 
@@ -29,6 +28,6 @@ validation and PR delivery pending.
 
 ## Next action
 
-Run the complete repository validation and required implementation review,
-deliver phases 1–2 through their PR lifecycle, then begin phase 3 only after the
-PR is merged.
+Move TypeScript under `packages/kasb-ts`, add the root Cargo workspace and
+`crates/kasb`, then record independent build/test evidence at the phase-3 commit
+gate before beginning the pilot implementation.

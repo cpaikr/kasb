@@ -28,16 +28,21 @@ _None._
 
 ### Completed included results
 
-_None._
+- Migration phase 1: multi-language product/command alignment and the validated
+  serialized, language-neutral parity judge with known-bad detection.
+- Migration phase 2: the complete v1 translation inventory and resolved Rust
+  pilot rulebook.
 
 ### Current in-scope result
 
-Migration phases 1–2: foundation delivery through the required review and PR lifecycle.
+Migration phase 3: independently buildable TypeScript/Rust workspace with
+shared root evidence.
 
 ### Next in-scope action
 
-Resolve the remaining PR threads and merge the validated foundation slice before
-starting the workspace phase.
+Move the existing TypeScript package without behavior or export drift, scaffold
+the Rust workspace/crate, and prove both package roots build and test
+independently before implementing the pilot.
 
 ### Evidence and blockers
 
@@ -47,6 +52,8 @@ starting the workspace phase.
   known-bad controls, and the complete v1 translation inventory are implemented
   locally. Independent review and PR findings were applied; the latest complete
   validation passes with 178 tests and one opt-in live test skipped.
-- Foundation delivery is [PR #12](https://github.com/sjunepark/kasb/pull/12)
-  against the integration branch; thread resolution and merge remain.
+- Foundation [PR #12](https://github.com/sjunepark/kasb/pull/12) merged as
+  `ecf8da5` after all seven review threads were resolved. Its final validation
+  passed 178 tests with one opt-in live test skipped, typecheck, build, and
+  diff checks.
 - Migration phase 5 and later release/performance work remain outside this goal.
