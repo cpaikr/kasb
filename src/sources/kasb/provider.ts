@@ -701,14 +701,20 @@ const getParagraph: GetParagraphProvider["getParagraph"] = async (request, conte
   const sourceUrl = paragraphContentUrl(request.stdNum, request.paraNum);
   const payload = asRecord(await fetchKasbJson(sourceUrl, context), sourceUrl, "paragraph content");
   const paragraphs = asArray(payload.paraContents, sourceUrl, "paraContents");
-  const first = paragraphs[0];
-  if (first === undefined) {
+  if (paragraphs.length === 0) {
     throw new ProviderFailure({
       code: "not_found",
       message: `Could not find paragraph ${request.stdNum}-${request.paraNum}.`,
       retryable: false,
       sourceUrl,
     });
+  }
+  if (paragraphs.length !== 1) {
+    throw sourceChanged(sourceUrl, "Exact paragraph lookup returned multiple rows.");
+  }
+  const first = paragraphs[0];
+  if (first === undefined) {
+    throw sourceChanged(sourceUrl, "Exact paragraph lookup result could not be read.");
   }
   const paragraph = toParagraph(first, sourceUrl);
   if (

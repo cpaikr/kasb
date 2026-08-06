@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "not_found",
+    "message": "Parameter \"paraNum\" must be one exact paragraph number. Retrieve paragraph ranges with get-section ref.",
+    "parameter": "paraNum",
+    "retryable": false
+  },
+  "ok": false
+}

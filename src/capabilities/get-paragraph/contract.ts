@@ -52,7 +52,7 @@ export const ParagraphSchema = Schema.Struct({
     examples: ["1116-23"],
   }),
   indexDocumentId: IndexDocumentIdSchema.annotations({
-    description: "Parent retrieval-facing section id returned by source paragraph lookup, when available.",
+    description: "Required parent retrieval-facing section id returned by source paragraph lookup.",
     examples: ["bdbwhT"],
   }),
   standardTitle: Schema.optional(Schema.String.annotations({

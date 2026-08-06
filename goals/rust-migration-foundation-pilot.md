@@ -32,14 +32,21 @@ _None._
 
 ### Current in-scope result
 
-Migration phase 1: multi-language product and command alignment plus a validated language-neutral parity judge.
+Migration phases 1–2: foundation delivery through the required review and PR lifecycle.
 
 ### Next in-scope action
 
-Align the product and repository command documentation, then establish shared conformance cases that pass against TypeScript and reject controlled known-bad results.
+Resolve the remaining PR threads and merge the validated foundation slice before
+starting the workspace phase.
 
 ### Evidence and blockers
 
 - The execution base includes commit `6ee3842`, which strengthens the approved phase 1–4 gates in `MIGRATION.md` and is intentionally retained.
 - PR delivery uses `codex/rust-migration-pilot-integration` as the non-production integration branch so goal metadata can be committed directly while implementation remains reviewable.
+- Multi-language docs, 12 serialized TypeScript baselines, three path-pinned
+  known-bad controls, and the complete v1 translation inventory are implemented
+  locally. Independent review and PR findings were applied; the latest complete
+  validation passes with 178 tests and one opt-in live test skipped.
+- Foundation delivery is [PR #12](https://github.com/sjunepark/kasb/pull/12)
+  against the integration branch; thread resolution and merge remain.
 - Migration phase 5 and later release/performance work remain outside this goal.

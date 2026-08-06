@@ -6,7 +6,7 @@
 - `owner`: repo-local spec
 - `status`: implemented draft contract; hardening in progress
 - `domain`: Korean accounting standards access
-- `users`: LLM agents, agent developers, researchers, and humans using the CLI
+- `users`: LLM agents, agent developers, researchers, and humans using an SDK or the CLI
 
 ## 2. Problem
 
@@ -21,7 +21,10 @@ Generic browsing is insufficient because:
 
 ## 3. Capability Boundary
 
-This tool package provides read-only CLI, neutral TypeScript toolset, and Pi access to public KASB standards content through the current `https://db.kasb.or.kr/api/` surface.
+This product provides read-only TypeScript SDK, native Rust SDK, Node.js CLI,
+and Pi access to public KASB standards content through the current
+`https://db.kasb.or.kr/api/` surface. The SDKs use native language types and
+transport implementations while preserving the serialized semantics below.
 
 In scope:
 
@@ -36,6 +39,8 @@ In scope:
 - Commander CLI commands for the v1 operations
 - runtime-neutral TypeScript toolset export for operation discovery, validation, execution, and error serialization
 - Pi adapter export and extension entrypoint wrapping the neutral toolset as one action-oriented host tool
+- native Rust SDK with the same operation names, request/result meaning, typed failures, and serialized success envelopes
+- language-neutral fixtures and conformance cases shared by both SDKs
 
 Out of scope:
 
@@ -46,6 +51,8 @@ Out of scope:
 - broad multi-source abstraction
 - database persistence or background ingestion
 - MCP or additional host adapters beyond Pi
+- a Rust CLI
+- FFI or runtime coupling between the TypeScript and Rust SDKs
 
 ## 4. Domain Model
 
@@ -87,7 +94,7 @@ Out of scope:
 Returned references should also include:
 
 - `uniqueKey` when available
-- parent `indexDocumentId` for paragraph results, normalized from the upstream paragraph `documentId`
+- required parent `indexDocumentId` for paragraph results, normalized from the upstream paragraph `documentId`
 - source API URL
 - section title and `ref` when available
 
@@ -159,6 +166,21 @@ Allowed public failure codes:
 - `source_changed`
 - `partial_retrieval`
 - `internal_failure`
+
+Caller cancellation is execution control, not a public capability failure code.
+Each SDK must expose it distinctly from timeout or source failure; transport
+adapters may serialize a transport-local `aborted` error. A request timeout is
+`source_unavailable` with `retryable: true` and the attempted `sourceUrl`.
+
+### Cross-language conformance
+
+Committed cases under `conformance/` compare the serialized capability
+boundary. The judge treats object key order as insignificant while preserving
+array order and distinguishing missing fields, `null`, strings, numbers,
+booleans, and collections. It canonicalizes only `metadata.fetchedAt`; source
+URLs, warnings, content normalization, identifiers, and failure fields remain
+exact. Controlled wrong-value, wrong-failure, and serialization-type outcomes
+must be rejected on every baseline run.
 
 ### Output Modes
 
@@ -262,6 +284,8 @@ Implementation notes:
 
 - Use `GET /api/paragraphs/content/{stdNum}/{paraNum}`.
 - Normalize the direct paragraph response into a single exact result or a typed `not_found` failure.
+- Treat more than one returned paragraph row as `source_changed`; an exact lookup must not silently choose one row.
+- Treat missing `documentId`, `fullContent`, or other required paragraph fields as `source_changed`; do not synthesize them from optional fields.
 - Direct paragraph lookup should not require the caller to know the section id.
 - Reject paragraph ranges such as `22~30` as `invalid_input` and direct callers to `get-section --ref`.
 - Record routine `paraContent` HTML preservation in `metadata.content`, not as a warning.

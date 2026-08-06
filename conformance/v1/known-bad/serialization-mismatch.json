@@ -1,0 +1,61 @@
+{
+  "ok": true,
+  "value": {
+    "metadata": {
+      "completeness": "complete",
+      "content": {
+        "htmlFields": [
+          "result.paragraph.paraContent"
+        ],
+        "notes": [
+          "paraContent is a source HTML fragment; fullContent is the normalized plain-text result."
+        ],
+        "textFields": [
+          "result.paragraph.fullContent"
+        ]
+      },
+      "fetchedAt": "<normalized-fetched-at>",
+      "source": {
+        "endpoint": "https://db.kasb.or.kr/api/paragraphs/content/1116/23",
+        "system": "kasb"
+      },
+      "sourceBehavior": {
+        "apiBase": "https://db.kasb.or.kr/api",
+        "observationStatus": "observed"
+      }
+    },
+    "references": {
+      "indexDocumentId": "bdbwhT",
+      "paragraphUrl": "https://db.kasb.or.kr/api/paragraphs/content/1116/23",
+      "paraNum": "23",
+      "sectionRef": "23~25",
+      "sectionTitle": "사용권자산의 최초 측정",
+      "standardKind": "k-ifrs-standard",
+      "standardTitle": "기업회계기준서 제1116호 리스",
+      "stdNum": "1116",
+      "uniqueKey": "1116-23"
+    },
+    "result": {
+      "paragraph": {
+        "faqCount": 1,
+        "faqDocNumbers": "SSI-35570",
+        "fullContent": "리스이용자는 리스개시일에 사용권자산을 원가로 측정한다.",
+        "indexDocumentId": "bdbwhT",
+        "paraContent": "<div class=\"para-inner-para\"><b>리스이용자는 리스개시일에 사용권자산을 원가로 측정한다.</b></div>",
+        "paraNum": "23",
+        "sectionRef": "23~25",
+        "sectionTitle": "사용권자산의 최초 측정",
+        "sort": 24,
+        "standardKind": "k-ifrs-standard",
+        "standardTitle": "기업회계기준서 제1116호 리스",
+        "stdNum": "1116",
+        "uniqueKey": "1116-23"
+      },
+      "request": {
+        "paraNum": "23",
+        "stdNum": 1116
+      }
+    },
+    "warnings": []
+  }
+}

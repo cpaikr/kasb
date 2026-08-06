@@ -2,6 +2,14 @@
 
 This roadmap records the path from docs-only planning to the first Darty-shaped tool package implementation. It is historical context plus broad release direction; use [TODO.md](TODO.md) for active work.
 
+## Active Goal Overlay
+
+The repository is executing migration phases 1–4 through
+[`goals/rust-migration-foundation-pilot.md`](goals/rust-migration-foundation-pilot.md).
+That active closed-scope goal currently takes precedence for execution while the unrelated
+hardening and product ideas in `TODO.md` remain the project queue. Migration
+phase 5 remaining Rust capabilities is explicitly outside the active goal.
+
 ## Completed
 
 ### Phase 0: Darty Parity Reset

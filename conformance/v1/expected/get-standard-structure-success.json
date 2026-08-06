@@ -1,0 +1,60 @@
+{
+  "ok": true,
+  "value": {
+    "metadata": {
+      "completeness": "complete",
+      "fetchedAt": "<normalized-fetched-at>",
+      "source": {
+        "endpoint": "https://db.kasb.or.kr/api/standard-indexes/1116/searchWord?searchWord=%EB%A6%AC%EC%8A%A4",
+        "system": "kasb"
+      },
+      "sourceBehavior": {
+        "apiBase": "https://db.kasb.or.kr/api",
+        "observationStatus": "observed"
+      }
+    },
+    "references": {
+      "stdNum": "1116",
+      "structureUrl": "https://db.kasb.or.kr/api/standard-indexes/1116/searchWord?searchWord=%EB%A6%AC%EC%8A%A4"
+    },
+    "result": {
+      "request": {
+        "keyword": "리스",
+        "stdNum": "1116"
+      },
+      "returnedCount": 2,
+      "sections": [
+        {
+          "indexDocumentId": "ZB2hJW",
+          "level": 2,
+          "parentDocumentIds": [
+            "2MIunt",
+            "NhCkqh"
+          ],
+          "ref": "1~2",
+          "sort": 40,
+          "stdNum": "1116",
+          "title": "목적"
+        },
+        {
+          "indexDocumentId": "fgc8eT",
+          "level": 2,
+          "parentDocumentIds": [
+            "2MIunt",
+            "NhCkqh"
+          ],
+          "ref": "한2.1",
+          "sort": 41,
+          "stdNum": "1116",
+          "title": "적용"
+        }
+      ]
+    },
+    "warnings": [
+      {
+        "code": "search_filtered_structure",
+        "message": "Structure results are filtered by keyword."
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "invalid_input",
+    "message": "Parameter \"keyword\" cannot be blank.",
+    "parameter": "keyword",
+    "retryable": false
+  },
+  "ok": false
+}

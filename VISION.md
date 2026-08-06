@@ -3,13 +3,15 @@
 ## Product
 
 - `name`: `kasb-standards`
-- `status`: first CLI implementation exists; hardening in progress
+- `status`: TypeScript package implemented; additive Rust SDK migration phases 1–4 in progress
 - `domain`: Korean accounting standards and related interpretation material exposed through KASB public read surfaces
-- `users`: LLM agents, agent developers, researchers, and humans who need reliable CLI access to standards content
+- `users`: LLM agents, agent developers, researchers, and humans who need reliable SDK or CLI access to standards content
 
 ## Goal
 
-Build a CLI that gives agents and humans a stable, programmatic way to search and retrieve Korean accounting standards from `https://db.kasb.or.kr/`.
+Build independently usable TypeScript and Rust SDKs, plus the existing Node.js
+CLI, that give agents and humans a stable, programmatic way to search and
+retrieve Korean accounting standards from `https://db.kasb.or.kr/`.
 
 The target experience should be closer to `yfinance` than browser automation:
 
@@ -18,7 +20,8 @@ The target experience should be closer to `yfinance` than browser automation:
 - stable identifiers and references
 - easy local scripting through a CLI
 - parseable JSON for both success and failure paths
-- a reusable neutral toolset behind CLI and Pi surfaces so behavior is testable and not tied to one transport
+- independently usable TypeScript and Rust implementations sharing one serialized semantic contract
+- a reusable neutral TypeScript toolset behind CLI and Pi surfaces so behavior is testable and not tied to one transport
 
 ## Why This Exists
 
@@ -34,7 +37,8 @@ This is worth standardizing because standards work is repetitive, citation-sensi
 
 ## Product Shape
 
-The v1 package exposes a narrow set of read-only capabilities through the CLI, `./toolset`, and `./pi` surfaces:
+The v1 product exposes a narrow set of read-only capabilities through the
+TypeScript SDK, native Rust SDK, Node.js CLI, and retained Pi adapter:
 
 - search standards by keyword
 - retrieve the structural index for a standard
@@ -46,13 +50,14 @@ The v1 package exposes a narrow set of read-only capabilities through the CLI, `
 
 ## Principles
 
-- `tool-package`: CLI, neutral TypeScript toolset, and Pi adapter share one capability contract
+- `dual-sdk`: TypeScript and Rust use native language APIs and the same serialized capability semantics
+- `tool-package`: CLI, neutral TypeScript toolset, and Pi adapter share the TypeScript capability implementation
 - `reference first`: every returned item should be easy to cite and revisit
 - `discovery and retrieval`: search alone is not enough
 - `structured over prose`: return typed records, not generated explanations
 - `source-explicit`: state which KASB endpoint produced the result
 - `kasb-shaped first`: model KASB standards, sections, paragraphs, and identifiers before adding generic abstractions
-- `transport-light`: keep one reusable core/toolset; let CLI and Pi stay thin
+- `transport-light`: keep transport code below each capability boundary; let CLI and Pi stay thin
 - `public-read first`: v1 targets public read-only access only
 
 ## v1 Boundaries
@@ -62,7 +67,9 @@ The v1 package exposes a narrow set of read-only capabilities through the CLI, `
 - read-only access to public KASB standards content
 - stable references to standards, sections, and paragraphs where possible
 - source metadata that makes results verifiable
-- a reusable Bun/TypeScript capability core following `../darty`
+- a supported Bun/TypeScript capability core following `../darty`
+- a native Rust SDK with the same v1 operation, result, and typed-failure semantics
+- shared fixture and conformance evidence at the serialized contract boundary
 - a Commander CLI as the human/debuggable transport
 - a runtime-neutral `./toolset` export for operation discovery, validation, execution, and error serialization
 - a Pi adapter export and extension entrypoint wrapping the neutral toolset as one action-oriented tool
@@ -75,6 +82,8 @@ The v1 package exposes a narrow set of read-only capabilities through the CLI, `
 - browser automation as the primary access method
 - database persistence or background ingestion
 - MCP or other host adapters beyond Pi
+- a separate Rust CLI
+- FFI or a runtime dependency between the TypeScript and Rust SDKs
 - premature multi-source abstraction
 
 ## Expected Output Shape
@@ -104,6 +113,9 @@ The product is successful when an agent or human can reliably:
 - The v1 public contract is documented in [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md).
 - The implementation follows `../darty`'s layer split; see [ARCHITECTURE.md](ARCHITECTURE.md).
 - The first Bun/TypeScript package version exists with CLI, neutral toolset, Pi adapter, standards and Q&A operations, fixture-backed tests, and gated live checks.
+- The approved additive Rust direction and phase gates are recorded in
+  [MIGRATION.md](MIGRATION.md); shared conformance evidence is established
+  before the workspace move and Rust pilot.
 
 ## Remaining Product Questions
 

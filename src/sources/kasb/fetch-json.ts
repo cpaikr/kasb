@@ -29,7 +29,7 @@ export const fetchKasbJson = async (
       throw new ProviderFailure({
         code: response.status === 404 ? "not_found" : "source_unavailable",
         message: `KASB API request failed (status=${response.status}).`,
-        retryable: response.status >= 500,
+        retryable: response.status === 429 || response.status >= 500,
         sourceUrl,
       });
     }
