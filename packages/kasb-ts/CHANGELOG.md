@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.0](https://github.com/sjunepark/kasb/compare/v0.2.1...v0.3.0) (2026-08-06)
+
+
+### Features
+
+* deliver Rust migration foundation pilot ([fbee4ad](https://github.com/sjunepark/kasb/commit/fbee4adab145e1365ce39c886f0e6c1cd5e2adbf))
+* **rust:** deliver get-paragraph pilot ([07d1ee5](https://github.com/sjunepark/kasb/commit/07d1ee5f33287cd8b2da1b575ecac66999433084))
+* **workspace:** establish independent TypeScript and Rust packages ([3ef1937](https://github.com/sjunepark/kasb/commit/3ef193770da01ef2bbd97439988449ca007e57bc))
+
+
+### Bug Fixes
+
+* close Rust pilot promotion review ([a3f7760](https://github.com/sjunepark/kasb/commit/a3f77608d76003f89b1742927034c0825f2b2ed4))
+* **rust:** apply pilot review feedback ([a66b85b](https://github.com/sjunepark/kasb/commit/a66b85b5cd4e628667c1d0bdee0f6b0f7a010ccb))
+
 ## [0.2.1](https://github.com/sjunepark/kasb/compare/v0.2.0...v0.2.1) (2026-05-25)
 
 
