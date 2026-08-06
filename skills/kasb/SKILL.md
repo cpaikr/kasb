@@ -35,7 +35,10 @@ If Node.js, `npx`, or the package is unavailable, report the missing prerequisit
 ## Report the Result
 
 - Answer in the user's language when practical while preserving exact Korean titles and source terminology.
-- Preserve identifiers, paragraph references, Q&A document numbers, source URLs, warnings, truncation, partial-result markers, and source-drift notices needed to verify the answer.
+- For each reported standard section, provide a human-readable KASB browser link in the form `https://db.kasb.or.kr/s/{stdNum}/{indexDocumentId}`.
+- For each reported standard paragraph, append `?selected={paraNum}` to its section link so the browser page selects that paragraph. Use the exact `stdNum`, `indexDocumentId`, and `paraNum` returned by the CLI, URL-encode components, and label the link with the standard title and paragraph reference.
+- Never substitute an API URL or a browser-route `titleDocumentId` for the `indexDocumentId` in these browser links. If the CLI result lacks an `indexDocumentId`, retrieve the paragraph or section through the CLI before linking; if it remains unavailable, state that no verified browser link can be constructed rather than guessing.
+- Preserve identifiers, paragraph references, Q&A document numbers, API source URLs, warnings, truncation, partial-result markers, and source-drift notices needed to verify the answer, but do not make a JSON API URL the only user-facing link when a standard browser link can be constructed.
 - Distinguish retrieved content from interpretation or inference. If the source or package cannot provide the requested evidence, state that limitation instead of filling the gap from memory.
 
-Finish when the relevant current help was inspected, the required evidence was retrieved or a concrete limitation was established, and the response retains enough source detail for the user to verify it.
+Finish when the relevant current help was inspected, the required evidence was retrieved or a concrete limitation was established, the response retains enough source detail for the user to verify it, and every reported standard section or paragraph has a browser link or an explicit explanation of why one could not be constructed.
