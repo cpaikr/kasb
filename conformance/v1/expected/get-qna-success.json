@@ -1,0 +1,59 @@
+{
+  "ok": true,
+  "value": {
+    "metadata": {
+      "completeness": "complete",
+      "content": {
+        "htmlFields": [
+          "result.qna.contentHtml",
+          "result.qna.relStds"
+        ],
+        "notes": [
+          "contentHtml and relStds are source HTML fragments; fullContent is the source plain-text body."
+        ],
+        "textFields": [
+          "result.qna.fullContent"
+        ]
+      },
+      "fetchedAt": "<normalized-fetched-at>",
+      "source": {
+        "endpoint": "https://db.kasb.or.kr/api/qnas/v2/SSI-35629",
+        "system": "kasb"
+      },
+      "sourceBehavior": {
+        "apiBase": "https://db.kasb.or.kr/api",
+        "observationStatus": "observed"
+      }
+    },
+    "references": {
+      "docNumber": "SSI-35629",
+      "qnaUrl": "https://db.kasb.or.kr/api/qnas/v2/SSI-35629"
+    },
+    "result": {
+      "qna": {
+        "contentHtml": "<h3>질의</h3><p></p><p>리스 기준서에서는 리스개시일에 사용권자산과 리스부채를 인식하도록 하는데, 리스개시일이 계약일을 말하는 것인지?</p><p></p><p> </p><p></p><h3>회신</h3><p></p><p>□ 리스개시일은 리스제공자가 리스이용자에게 기초자산을 사용할 수 있게 하는 날을 말하므로(제1116호 부록A. 용어의정의) 계약일과 리스개시일은 같을 수도 있고 다를 수도 있음</p><p></p><p> </p><p></p><h3>관련회계기준</h3><p></p><p>K-IFRS 제1116호 ‘리스’</p><p>리스개시일 : 리스제공자가 리스이용자에게 기초자산을 사용할 수 있게 하는 날</p><p>22    리스이용자는 리스개시일에 사용권자산과 리스부채를 인식한다.</p><p></p><p></p>",
+        "contentLink": "https://facility-qnas.s3.ap-northeast-2.amazonaws.com/kasb/quick/kifrs/html/35629.html",
+        "deprecated": false,
+        "docNumber": "SSI-35629",
+        "fullContent": "관련 회계기준 K-IFRS 제1116호\n본문\n질의리스 기준서에서는 리스개시일에 사용권자산과 리스부채를 인식하도록 하는데, 리스개시일이 계약일을 말하는 것인지? 회신□ 리스개시일은 리스제공자가 리스이용자에게 기초자산을 사용할 수 있게 하는 날을 말하므로(제1116호 부록A. 용어의정의) 계약일과 리스개시일은 같을 수도 있고 다를 수도 있음 관련회계기준K-IFRS 제1116호 ‘리스’리스개시일 : 리스제공자가 리스이용자에게 기초자산을 사용할 수 있게 하는 날22    리스이용자는 리스개시일에 사용권자산과 리스부채를 인식한다.",
+        "id": 4717,
+        "nextDocNumber": "SSI-35628",
+        "prevDocNumber": "SSI-35627",
+        "publishDate": "2019-12-23T15:00:00.000Z",
+        "relStds": "K-IFRS 제1116호 <span class='mundan-finder' data-std='1116' data-id='22'>문단 22</span>",
+        "tags": [
+          "리스부채",
+          "리스개시일",
+          "계약일"
+        ],
+        "title": "리스 개시일과 계약일",
+        "type": 15,
+        "typeLabel": "K-IFRS · 신속처리질의"
+      },
+      "request": {
+        "docNumber": "SSI-35629"
+      }
+    },
+    "warnings": []
+  }
+}

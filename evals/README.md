@@ -4,7 +4,7 @@ This directory holds internal evaluation artifacts for KASB capability ergonomic
 
 ## Typed tool eval track
 
-`typed-tools.ts` exposes internal `kasb_*` tool-like definitions backed directly by `src/app/agent-tools.ts` and the app operations:
+`typed-tools.ts` exposes internal `kasb_*` tool-like definitions backed directly by `packages/kasb-ts/src/app/agent-tools.ts` and the app operations:
 
 - tool names are namespaced for agent use, such as `kasb_search_standards` and `kasb_get_section`
 - inputs use capability JSON field names such as `stdNum`, `indexDocumentId`, `paraNum`, and `docNumber`

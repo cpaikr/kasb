@@ -1,6 +1,6 @@
 # Rust Migration
 
-Status: approved direction; implementation has not started.
+Status: phases 1–3 complete; phase 4 Rust pilot validated and in PR delivery.
 
 Decision date: 2026-07-30.
 
@@ -24,10 +24,11 @@ The migration is additive:
 The existing TypeScript CLI remains the sole CLI during this migration. A Rust
 CLI is not part of the approved scope.
 
-This document records the approved transition direction. Before Rust code or
-the workspace reorganization lands, update `VISION.md`, `ARCHITECTURE.md`, and
-the repository command guidance so their TypeScript-only descriptions reflect
-the active phase of the migration.
+This document records the approved transition direction. The phase-3 workspace
+reorganization and command alignment are complete. The phase-4 Rust
+`get-paragraph` pilot now passes local implementation, conformance, package,
+and independent-review gates; PR delivery remains before the migration
+milestone is closed.
 
 ## Rationale
 
@@ -49,6 +50,8 @@ The accepted tradeoffs are:
 - `wreq` and `wreq-util` are currently release-candidate dependencies, so exact
   versions must be pinned and upgrades must pass fingerprint and conformance
   tests;
+- their declared Rust 1.85 floor is not sufficient for the currently required
+  `typed-builder-macro`; the validated workspace minimum is Rust 1.88;
 - BoringSSL introduces native build and linker considerations;
 - the inspected `wreq` release does not provide the operational HTTP/3 and QUIC
   fingerprinting available in `tls-client`.
@@ -166,50 +169,142 @@ Fingerprint emulation does not execute JavaScript or reproduce browser-only
 state. Keep that limitation explicit rather than treating `wreq` as browser
 automation.
 
+## Adapted Migration Method
+
+The execution method selectively adapts Anthropic's
+[Claude Code Migration Kit](https://github.com/anthropics/code-migration-kit-with-claude-code/blob/cf91c9d5068d9aaf95a36164169f08c3e636c909/README.md).
+That kit is primarily designed for total, structure-preserving language ports.
+This migration instead adds a separately released Rust implementation while the
+TypeScript implementation remains supported.
+
+Adopt these practices:
+
+- establish and validate the behavioral judge before Rust implementation;
+- record cross-language translation decisions once in a rulebook;
+- complete one representative vertical pilot before implementing every
+  capability; and
+- end each phase at an evidence-backed gate before starting the next phase.
+
+The approved decision and rationale in this document serve as the feasibility
+gate. Reopen that decision if its transport, platform, verification, or
+independent-release assumptions fail during the pilot.
+
+Do not adopt the kit's file-by-file translation queue, delayed survey-build
+loop, large translation fan-out, or eventual deletion of the source-language
+implementation. Compile and test each Rust capability as it lands.
+
+The v1 spec is the normative semantic authority. The TypeScript implementation
+is an executable reference and regression comparator, not the specification by
+itself. When the spec, source evidence, and TypeScript behavior disagree,
+classify and resolve the discrepancy explicitly rather than automatically
+reproducing a TypeScript defect in Rust.
+
+When implementation starts, keep the execution evidence under
+`docs/plans/rust-migration/`:
+
+- `rulebook.md` records durable TypeScript-to-Rust mapping decisions;
+- `parity.md` records judge coverage, validation, baselines, and discrepancy
+  resolutions;
+- `progress.md` records the current gate, pilot findings, validation, blockers,
+  and next step.
+
+Execution evidence now exists in those paths. The durable goal boundary and
+current checkpoint are recorded in
+[`goals/rust-migration-foundation-pilot.md`](goals/rust-migration-foundation-pilot.md).
+
 ## Migration Sequence
 
-1. **Freeze compatibility evidence**
+Do not begin a phase until the preceding exit gate is satisfied and its evidence
+is recorded.
+
+1. **Freeze compatibility evidence and validate the judge**
    - Promote the approved multi-language product shape into `VISION.md` and
      `ARCHITECTURE.md` before implementation begins.
    - Record representative success and failure envelopes for every v1
      operation.
-   - Separate shared conformance cases from TypeScript-runner-specific tests.
+   - Separate language-neutral conformance cases from TypeScript-runner-specific
+     tests and run them against the TypeScript baseline.
+   - Prove that the judge rejects controlled known-bad results, including a
+     wrong success value, a wrong typed failure, and a serialization mismatch.
+   - **Exit gate:** `parity.md` records the scenario inventory, passing baseline
+     counts, and evidence that each controlled divergence was detected.
 
-2. **Create the workspace layout**
+2. **Write the translation rulebook**
+   - Inventory every v1 operation, public request/result type, source endpoint,
+     typed failure, fixture family, and cancellation path.
+   - Decide Rust mappings for validation, error variants, cancellation and
+     timeouts, retry policy, ordering, optional values, JSON serialization,
+     source drift, and HTML normalization.
+   - Record `wreq` persona ownership, proxy and cookie affinity, concurrency,
+     and rotation rules.
+   - Update the rulebook when a pilot or later capability exposes a recurring
+     ambiguity; do not resolve the same translation question independently in
+     multiple modules.
+   - **Exit gate:** `rulebook.md` covers the inventory and has no unresolved
+     decision required by the pilot.
+
+3. **Create the workspace layout**
    - Move the existing TypeScript package under `packages/kasb-ts/` without
      changing behavior or published entrypoints.
    - Add the root Cargo workspace and the single `crates/kasb/` SDK crate.
+   - Keep shared fixtures, conformance cases, evals, and documentation at the
+     repository root.
+   - **Exit gate:** the npm package, CLI, Pi adapter, and package exports retain
+     their existing behavior; both package roots build and test independently.
 
-3. **Implement the Rust domain path**
-   - Port public request/result types and typed failures.
-   - Port KASB source response models, URL construction, and normalization.
-   - Keep operation semantics aligned with the v1 spec.
-
-4. **Add the `wreq` request path**
+4. **Run one vertical pilot**
+   - Implement `get-paragraph` through the complete Rust path: public types,
+     validation, typed failures, KASB source model, URL construction,
+     normalization, and a reusable `wreq` persona client.
    - Pin exact dependency versions.
-   - Implement reusable persona clients, proxy and cookie ownership, timeouts,
-     bounded retries, and concurrency limits.
-   - Add fingerprint checks for supported profile families.
+   - Exercise success, not-found, invalid-input, source-drift, timeout, and
+     cancellation behavior against fixtures and the shared judge.
+   - Review every TypeScript/Rust difference, update the rulebook, and rerun the
+     judge before expanding the implementation.
+   - **Exit gate:** the pilot passes its conformance cases, the TypeScript
+     baseline remains green, controlled known-bad results still fail, and no
+     pilot mapping decision remains unresolved.
 
-5. **Establish parity**
+5. **Implement the remaining Rust capabilities**
+   - Implement each remaining operation as a vertical capability slice across
+     public types, source adaptation, normalization, and errors.
+   - Compile, test, and run the relevant shared conformance cases within every
+     slice rather than deferring feedback to a repository-wide survey build.
+   - Add or amend a rule when reviews find a recurring mismatch class.
+   - **Exit gate:** every approved v1 operation is implemented and passes its
+     fixture-backed and conformance cases in both languages.
+
+6. **Establish parity and operational evidence**
    - Run both SDKs against the shared fixtures and conformance cases.
+   - Classify every difference as a spec defect, stale source evidence,
+     TypeScript defect, Rust defect, or explicitly permitted runtime metadata.
    - Run opt-in live checks separately because upstream KASB behavior can drift.
+   - Define the representative workload and acceptance thresholds before
+     measuring performance.
    - Run bounded load tests that record throughput, latency, memory, connection
      use, and error rates across representative persona mixes.
+   - Run fingerprint checks for every supported profile family.
    - Treat observable contract differences as migration blockers.
+   - **Exit gate:** `parity.md` records zero unexplained contract differences,
+     passing live-check results or explained upstream drift, supported
+     fingerprint profiles, and accepted load-test baselines.
 
-6. **Release independently**
+7. **Release independently**
    - Continue publishing the npm package and CLI.
    - Publish the Rust crate separately once its API and conformance suite are
      stable.
    - Version each package independently while declaring the same supported KASB
      contract version.
+   - **Exit gate:** each package can be built, tested, installed, and released
+     without the other language's runtime or artifacts.
 
 ## Invariants
 
 - The TypeScript SDK, CLI, and Pi adapter remain supported and independently
   installable.
 - The Rust SDK is a native Rust API, not a wrapper around the TypeScript CLI.
+- The v1 spec is normative; TypeScript behavior is reference evidence, not an
+  authority for carrying defects into Rust.
 - The CLI stays thin and does not own domain or source behavior.
 - TypeScript and Rust use the same operation semantics and serialized envelopes.
 - Shared fixtures and conformance cases are not copied into language-specific
@@ -229,6 +324,10 @@ The migration is complete when:
 - the existing npm SDK, CLI, and Pi behavior remains compatible;
 - the Rust SDK implements every approved v1 operation;
 - both SDKs pass the shared fixture and conformance suite;
+- the shared judge has demonstrated that it rejects controlled contract
+  divergences rather than merely passing both implementations;
+- the translation rulebook and parity record contain no unresolved decisions or
+  unexplained behavioral differences;
 - the Rust request path supports controlled high concurrency and multiple
   coherent browser persona families, with load-test evidence;
 - dependency pinning, supported platforms, and BoringSSL build requirements are

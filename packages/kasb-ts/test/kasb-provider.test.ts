@@ -1,0 +1,911 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { defaultGetParagraphOperation } from "../src/app/get-paragraph.ts";
+import { defaultGetQnaOperation } from "../src/app/get-qna.ts";
+import { defaultGetSectionOperation } from "../src/app/get-section.ts";
+import { defaultGetStandardStructureOperation } from "../src/app/get-standard-structure.ts";
+import { defaultSearchQnaOperation } from "../src/app/search-qna.ts";
+import { defaultSearchStandardsOperation } from "../src/app/search-standards.ts";
+import { KasbFailure } from "../src/capabilities/types.ts";
+import { normalizeKasbPlainText } from "../src/sources/kasb/source-helpers.ts";
+
+const repoRoot = join(import.meta.dir, "../../..");
+const originalFetch = globalThis.fetch;
+
+const readFixture = (path: string): unknown =>
+  JSON.parse(readFileSync(join(repoRoot, path), "utf8"));
+
+const makeFixtureMap = (): Map<string, unknown> => new Map([
+  ["/api/standard?searchWord=%EB%A6%AC%EC%8A%A4", readFixture("fixtures/kasb/search-standards-lease.json")],
+  ["/api/standard-indexes/1116", readFixture("fixtures/kasb/standard-indexes-1116.json")],
+  ["/api/standard-indexes/1116/searchWord?searchWord=%EB%A6%AC%EC%8A%A4", readFixture("fixtures/kasb/standard-indexes-1116-search-lease.json")],
+  ["/api/paragraphs/1116/ZB2hJW", readFixture("fixtures/kasb/section-1116-ZB2hJW.json")],
+  ["/api/paragraphs/content/1116/23", readFixture("fixtures/kasb/paragraph-1116-23.json")],
+  ["/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=5", readFixture("fixtures/kasb/search-qna-lease.json")],
+  ["/api/qnas/v2/SSI-35629", readFixture("fixtures/kasb/qna-SSI-35629.json")],
+  ["/api/paragraphs/1116/19970f", { status: 200, clauses: [], mainTitle: null }],
+]);
+
+const clone = <T>(value: T): T => structuredClone(value);
+
+const useFixtureMap = (fixtureByPath: Map<string, unknown>): Map<string, number> => {
+  const requestCounts = new Map<string, number>();
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = new URL(String(input));
+    const key = `${url.pathname}${url.search}`;
+    requestCounts.set(key, (requestCounts.get(key) ?? 0) + 1);
+    const payload = fixtureByPath.get(key);
+    if (payload === undefined) {
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    }
+    return { ok: true, status: 200, json: async () => payload } as Response;
+  }) as typeof fetch;
+  return requestCounts;
+};
+
+const standardSearchPath = (keyword: string): string => {
+  const params = new URLSearchParams({ searchWord: keyword });
+  return `/api/standard?${params.toString()}`;
+};
+
+const qnaSearchPath = (keyword: string, page: number, rows: number, types = "11,12,13,14,15,24,25"): string => {
+  const params = new URLSearchParams({ types, searchWord: keyword, page: String(page), rows: String(rows) });
+  return `/api/qnas/v2?${params.toString()}`;
+};
+
+const standardTitleFixture = (stdNum: string, title: string): unknown => ({
+  standardIndexes: [{ documentId: `${stdNum}-root`, stdNum, title, level: 1, parentDocumentIds: [] }],
+});
+
+beforeEach(() => {
+  useFixtureMap(makeFixtureMap());
+});
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+});
+
+describe("KASB provider operations", () => {
+  test("searches standards from the captured standard fixture with relevance ranking", async () => {
+    const result = await defaultSearchStandardsOperation.execute({ keyword: "리스", limit: 2 });
+
+    expect(result.result.totalMatchCount).toBe(1043);
+    expect(result.result.request.sort).toBe("relevance");
+    expect(result.result.returnedCount).toBe(2);
+    expect(result.result.standards[0]).toMatchObject({
+      stdNum: "1116",
+      matchCount: 519,
+      nextActions: {
+        getStandardStructure: {
+          operation: "get-standard-structure",
+          input: { stdNum: "1116" },
+        },
+      },
+    });
+    expect(result.warnings[0]?.code).toBe("truncated_results");
+  });
+
+  test("can sort standards by match count or standard number", async () => {
+    const byMatchCount = await defaultSearchStandardsOperation.execute({ keyword: "리스", limit: 1, sort: "match-count" });
+    const byStdNum = await defaultSearchStandardsOperation.execute({ keyword: "리스", limit: 2, sort: "std-num" });
+
+    expect(byMatchCount.result.standards[0]).toMatchObject({ stdNum: "1116", matchCount: 519 });
+    expect(byStdNum.result.standards.map((item) => item.stdNum)).toEqual(["3", "4"]);
+  });
+
+  test("sorts standards by enriched title with missing titles last", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(standardSearchPath("정렬"), {
+      standards: { totalCount: 3, stdCountArr: [{ key: "300", doc_count: 99 }, { key: "200", doc_count: 1 }, { key: "100", doc_count: 5 }] },
+    });
+    fixtures.set("/api/standard-indexes/200", standardTitleFixture("200", "나 기준"));
+    fixtures.set("/api/standard-indexes/100", standardTitleFixture("100", "가 기준"));
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchStandardsOperation.execute({ keyword: "정렬", limit: 3, sort: "title" });
+
+    expect(result.result.standards.map((item) => item.stdNum)).toEqual(["100", "200", "300"]);
+    expect(result.result.standards[2]?.standardTitle).toBeUndefined();
+  });
+
+  test("lets normalized title relevance beat higher match counts", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(standardSearchPath("수익 인식"), {
+      standards: { totalCount: 2, stdCountArr: [{ key: "900", doc_count: 1000 }, { key: "1115", doc_count: 1 }] },
+    });
+    fixtures.set("/api/standard-indexes/1115", standardTitleFixture("1115", "기업회계기준서 제1115호 수익-인식"));
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchStandardsOperation.execute({ keyword: "수익 인식", limit: 2 });
+
+    expect(result.result.standards.map((item) => item.stdNum)).toEqual(["1115", "900"]);
+  });
+
+  test.each([
+    {
+      keyword: "리스",
+      rows: [{ key: "1017", doc_count: 97 }, { key: "1116", doc_count: 519 }, { key: "13", doc_count: 120 }],
+      titles: { "1116": "기업회계기준서 제1116호 리스", "13": "제13장 리스" },
+      limit: 1,
+      expected: ["1116"],
+    },
+    {
+      keyword: "수익인식",
+      rows: [{ key: "1011", doc_count: 4 }, { key: "16", doc_count: 21 }, { key: "1115", doc_count: 132 }],
+      titles: { "1115": "기업회계기준서 제1115호 고객과의 계약에서 생기는 수익" },
+      limit: 1,
+      expected: ["1115"],
+    },
+    {
+      keyword: "충당부채",
+      rows: [{ key: "10", doc_count: 9 }, { key: "1037", doc_count: 77 }, { key: "14", doc_count: 34 }, { key: "21", doc_count: 25 }],
+      titles: { "1037": "기업회계기준서 제1037호 충당부채, 우발부채, 우발자산", "14": "제14장 충당부채, 우발부채 및 우발자산" },
+      limit: 2,
+      expected: ["1037", "14"],
+    },
+    {
+      keyword: "종업원급여",
+      rows: [{ key: "1103", doc_count: 14 }, { key: "1019", doc_count: 80 }, { key: "21", doc_count: 12 }],
+      titles: { "1019": "기업회계기준서 제1019호 종업원급여" },
+      limit: 1,
+      expected: ["1019"],
+    },
+  ] as const)("keeps core target standards in the default page for $keyword", async ({ keyword, rows, titles, limit, expected }) => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(standardSearchPath(keyword), { standards: { totalCount: 999, stdCountArr: rows } });
+    for (const [stdNum, title] of Object.entries(titles)) {
+      fixtures.set(`/api/standard-indexes/${stdNum}`, standardTitleFixture(stdNum, title));
+    }
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchStandardsOperation.execute({ keyword, limit });
+
+    expect(result.result.standards.map((item) => item.stdNum)).toEqual([...expected]);
+  });
+
+  test("enriches standard search rows with available titles", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set("/api/standard?searchWord=%EB%A6%AC%EC%8A%A4", {
+      standards: { totalCount: 519, stdCountArr: [{ key: "1116", doc_count: 519 }] },
+    });
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchStandardsOperation.execute({ keyword: "리스", limit: 1 });
+
+    expect(result.result.standards[0]).toMatchObject({
+      stdNum: "1116",
+      standardTitle: "기업회계기준서 제1116호 리스",
+      standardKind: "k-ifrs-standard",
+    });
+  });
+
+  test("suggests broader standard keywords for narrow terms", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(`/api/standard?searchWord=${encodeURIComponent("장기종업원급여")}`, {
+      standards: { totalCount: 0, stdCountArr: [] },
+    });
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchStandardsOperation.execute({ keyword: "장기종업원급여" });
+
+    expect(result.result.suggestedKeywords).toContain("종업원급여");
+  });
+
+  test("returns section identifiers from the captured structure fixture", async () => {
+    const result = await defaultGetStandardStructureOperation.execute({ stdNum: "1116" });
+    const purpose = result.result.sections.find((item) => item.indexDocumentId === "ZB2hJW");
+
+    expect(result.result.returnedCount).toBe(248);
+    expect(purpose?.title).toBe("목적");
+    expect(purpose?.ref).toBe("1~2");
+  });
+
+  test("filters standard structure with keyword search metadata", async () => {
+    const result = await defaultGetStandardStructureOperation.execute({ stdNum: "1116", keyword: "리스" });
+
+    expect(result.result.returnedCount).toBe(2);
+    expect(result.result.sections.map((section) => section.indexDocumentId)).toEqual(["ZB2hJW", "fgc8eT"]);
+    expect(result.references.structureUrl).toBe("https://db.kasb.or.kr/api/standard-indexes/1116/searchWord?searchWord=%EB%A6%AC%EC%8A%A4");
+    expect(result.warnings.map((warning) => warning.code)).toContain("search_filtered_structure");
+  });
+
+  test("returns empty filtered structure results when keyword metadata has no hits", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(
+      `/api/standard-indexes/1116/searchWord?searchWord=${encodeURIComponent("없는단어")}`,
+      readFixture("fixtures/kasb/standard-indexes-1116-search-empty.json"),
+    );
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetStandardStructureOperation.execute({ stdNum: "1116", keyword: "없는단어" });
+
+    expect(result.result.returnedCount).toBe(0);
+    expect(result.result.sections).toEqual([]);
+    expect(result.warnings.map((warning) => warning.code)).toContain("search_filtered_structure");
+  });
+
+  test("rejects keyword structure metadata with unknown section ids", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set("/api/standard-indexes/1116/searchWord?searchWord=%EB%A6%AC%EC%8A%A4", {
+      searchedUniqueKeys: ["1116-1"],
+      searchedIndexCountMap: { unknown: 1 },
+    });
+    useFixtureMap(fixtures);
+
+    await expect(defaultGetStandardStructureOperation.execute({ stdNum: "1116", keyword: "리스" })).rejects.toMatchObject({
+      code: "source_changed",
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("fetches a section by indexDocumentId", async () => {
+    const result = await defaultGetSectionOperation.execute({
+      stdNum: "1116",
+      indexDocumentId: "ZB2hJW",
+    });
+
+    expect(result.result.section).toMatchObject({
+      title: "목적",
+      ref: "1~2",
+      standardTitle: "기업회계기준서 제1116호 리스",
+      standardKind: "k-ifrs-standard",
+    });
+    expect(result.references).toMatchObject({
+      standardTitle: "기업회계기준서 제1116호 리스",
+      standardKind: "k-ifrs-standard",
+      sectionTitle: "목적",
+      sectionRef: "1~2",
+    });
+    expect(result.result.clauses.map((clause) => clause.paraNum)).toEqual(["1", "2"]);
+    expect(result.warnings.map((warning) => warning.code)).not.toContain("source_html_preserved");
+    expect(result.metadata.content?.htmlFields).toContain("result.clauses[].paraContent");
+  });
+
+  test("fetches a section by structure ref", async () => {
+    const requestCounts = useFixtureMap(makeFixtureMap());
+
+    const result = await defaultGetSectionOperation.execute({
+      stdNum: "1116",
+      ref: "1~2",
+    });
+
+    expect(result.result.section).toMatchObject({
+      indexDocumentId: "ZB2hJW",
+      ref: "1~2",
+      title: "목적",
+    });
+    expect(result.references.indexDocumentId).toBe("ZB2hJW");
+    expect(result.result.clauses.map((clause) => clause.paraNum)).toEqual(["1", "2"]);
+    expect(requestCounts.get("/api/standard-indexes/1116")).toBe(1);
+  });
+
+  test("rejects a route-facing titleDocumentId that is not a section id", async () => {
+    await expect(
+      defaultGetSectionOperation.execute({ stdNum: "1116", indexDocumentId: "19970f" }),
+    ).rejects.toMatchObject({
+      code: "not_found",
+      message: expect.stringContaining("titleDocumentId"),
+    });
+  });
+
+  test("treats partially malformed structure rows as existing empty sections", async () => {
+    const emptySectionId = "empty-malformed";
+    const fixtures = makeFixtureMap();
+    const structure = clone(readFixture("fixtures/kasb/standard-indexes-1116.json")) as {
+      standardIndexes: unknown[];
+    };
+    structure.standardIndexes = [structure.standardIndexes[0], { documentId: emptySectionId, stdNum: "1116" }];
+    fixtures.set("/api/standard-indexes/1116", structure);
+    fixtures.set(`/api/paragraphs/1116/${emptySectionId}`, { status: 200, clauses: [], mainTitle: null });
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetSectionOperation.execute({ stdNum: "1116", indexDocumentId: emptySectionId });
+
+    expect(result.result.section.indexDocumentId).toBe(emptySectionId);
+    expect(result.result.clauses).toEqual([]);
+    expect(result.warnings.map((warning) => warning.code)).toContain("empty_section");
+  });
+
+  test("rejects mismatched raw structure identity for empty sections", async () => {
+    const wrongStandardSectionId = "wrong-std";
+    const fixtures = makeFixtureMap();
+    const structure = clone(readFixture("fixtures/kasb/standard-indexes-1116.json")) as {
+      standardIndexes: unknown[];
+    };
+    structure.standardIndexes = [
+      structure.standardIndexes[0],
+      { documentId: wrongStandardSectionId, stdNum: "9999" },
+    ];
+    fixtures.set("/api/standard-indexes/1116", structure);
+    fixtures.set(`/api/paragraphs/1116/${wrongStandardSectionId}`, { status: 200, clauses: [], mainTitle: null });
+    useFixtureMap(fixtures);
+
+    await expect(
+      defaultGetSectionOperation.execute({ stdNum: "1116", indexDocumentId: wrongStandardSectionId }),
+    ).rejects.toMatchObject({
+      code: "source_changed",
+      message: "Standard structure row stdNum does not match the request.",
+    });
+  });
+
+  test("fetches an exact paragraph by stdNum and paraNum", async () => {
+    const result = await defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" });
+
+    expect(result.result.paragraph).toMatchObject({
+      uniqueKey: "1116-23",
+      indexDocumentId: "bdbwhT",
+      standardTitle: "기업회계기준서 제1116호 리스",
+      standardKind: "k-ifrs-standard",
+      sectionTitle: "사용권자산의 최초 측정",
+      sectionRef: "23~25",
+    });
+    expect(result.references).toMatchObject({
+      standardTitle: "기업회계기준서 제1116호 리스",
+      standardKind: "k-ifrs-standard",
+      sectionTitle: "사용권자산의 최초 측정",
+      sectionRef: "23~25",
+    });
+    expect(result.result.paragraph.fullContent).toContain("사용권자산을 원가로 측정");
+  });
+
+  test("normalizes paragraph plain text around source list markers and entities", async () => {
+    const fixtures = makeFixtureMap();
+    const paragraph = clone(readFixture("fixtures/kasb/paragraph-1116-23.json")) as {
+      paraContents: Array<Record<string, unknown>>;
+    };
+    paragraph.paraContents[0] = {
+      ...paragraph.paraContents[0],
+      fullContent: "리스이용자는 다음 금액을 인식한다.(1)리스료 &amp; 선급리스료이다.(2)복구원가",
+    };
+    fixtures.set("/api/paragraphs/content/1116/23", paragraph);
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" });
+
+    expect(result.result.paragraph.fullContent).toBe("리스이용자는 다음 금액을 인식한다.\n(1) 리스료 & 선급리스료이다.\n(2) 복구원가");
+    expect(normalizeKasbPlainText("&amp;lt;")).toBe("<");
+    expect(normalizeKasbPlainText("&#xD800;")).toBe("");
+  });
+
+  test("does not split parenthetical paragraph references as list markers", async () => {
+    const fixtures = makeFixtureMap();
+    const paragraph = clone(readFixture("fixtures/kasb/paragraph-1116-23.json")) as {
+      paraContents: Array<Record<string, unknown>>;
+    };
+    paragraph.paraContents[0] = {
+      ...paragraph.paraContents[0],
+      fullContent: "문단 (1)의 요구사항과 (2)의 예외",
+    };
+    fixtures.set("/api/paragraphs/content/1116/23", paragraph);
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" });
+
+    expect(result.result.paragraph.fullContent).toBe("문단 (1)의 요구사항과 (2)의 예외");
+  });
+
+  test("normalizes indented line-start list markers", async () => {
+    const fixtures = makeFixtureMap();
+    const paragraph = clone(readFixture("fixtures/kasb/paragraph-1116-23.json")) as {
+      paraContents: Array<Record<string, unknown>>;
+    };
+    paragraph.paraContents[0] = {
+      ...paragraph.paraContents[0],
+      fullContent: "리스 조건은 다음과 같다.\n\t(가)리스료\n  (나)복구원가",
+    };
+    fixtures.set("/api/paragraphs/content/1116/23", paragraph);
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" });
+
+    expect(result.result.paragraph.fullContent).toBe("리스 조건은 다음과 같다.\n(가) 리스료\n(나) 복구원가");
+  });
+
+  test("derives normalized section fullContent from paragraph HTML when source text is absent", async () => {
+    const fixtures = makeFixtureMap();
+    const section = clone(readFixture("fixtures/kasb/section-1116-ZB2hJW.json")) as {
+      clauses: Array<Record<string, unknown>>;
+    };
+    delete section.clauses[0]?.fullContent;
+    section.clauses[0] = {
+      ...section.clauses[0],
+      paraContent: "<div>리스이용자는 다음 금액을 인식한다.<br>(1)&nbsp;리스료 &amp; 선급리스료</div>",
+    };
+    fixtures.set("/api/paragraphs/1116/ZB2hJW", section);
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetSectionOperation.execute({ stdNum: "1116", indexDocumentId: "ZB2hJW" });
+
+    expect(result.result.clauses[0]?.fullContent).toBe("리스이용자는 다음 금액을 인식한다.\n(1) 리스료 & 선급리스료");
+  });
+
+  test("searches Q&A documents from the qnas fixture", async () => {
+    const result = await defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5 });
+
+    expect(result.result.returnedCount).toBe(5);
+    expect(result.result.totalCount).toBe(149);
+    expect(result.result.totalPages).toBe(30);
+    expect(result.result.hasNextPage).toBe(true);
+    expect(result.result.paginationStatus).toBe("known");
+    expect(result.result.items[0]?.docNumber).toBe("IFRSIC2207E");
+    expect(result.result.items[0]?.typeLabel).toBe("K-IFRS · IFRS 해석위원회 논의결과");
+    expect(result.result.countByType["15"]).toBe(73);
+    expect(result.result.typeLabels["15"]).toBe("K-IFRS · 신속처리질의");
+    expect(result.result.suggestedKeywords).toEqual([]);
+  });
+
+  test("sorts and filters Q&A search results by source publishDate", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(qnaSearchPath("정렬", 1, 50), {
+      facilityQnas: [
+        { docNumber: "OLD", type: 15, title: "old", fullContent_snippet: "old", publishDate: "2019-01-01T15:00:00.000Z", deprecatedYn: 0 },
+        { docNumber: "NEW", type: 15, title: "new", fullContent_snippet: "new", publishDate: "2024-05-01T15:00:00.000Z", deprecatedYn: 0 },
+        { docNumber: "MID", type: 24, title: "mid", fullContent_snippet: "mid", publishDate: "2023-03-01T15:00:00.000Z", deprecatedYn: 0 },
+        { docNumber: "NODATE", type: 15, title: "nodate", fullContent_snippet: "nodate", deprecatedYn: 0 },
+      ],
+      facilityQnaCountData: { "15": 3, "24": 1 },
+    });
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchQnaOperation.execute({ keyword: "정렬", rows: 2, sortDate: "desc", from: "2023-03-01", to: "2024-05-01" });
+
+    expect(result.result.items.map((item) => item.docNumber)).toEqual(["NEW", "MID"]);
+    expect(result.result.totalCount).toBe(2);
+    expect(result.result.totalPages).toBe(1);
+    expect(result.result.countByType).toEqual({ "15": 1, "24": 1 });
+    expect(result.result.paginationStatus).toBe("known");
+    expect(result.references.searchUrl).toContain("rows=50");
+    expect(result.metadata.content?.notes?.join(" ")).toContain("client-side");
+  });
+
+  test("warns when Q&A recency controls scan a bounded source window", async () => {
+    const fixtures = makeFixtureMap();
+    for (let page = 1; page <= 10; page += 1) {
+      fixtures.set(qnaSearchPath("대량", page, 50), {
+        facilityQnas: page === 1
+          ? [{ docNumber: "FIRST", type: 15, title: "first", fullContent_snippet: "first", publishDate: "2024-01-01T15:00:00.000Z", deprecatedYn: 0 }]
+          : [],
+        facilityQnaCountData: { "15": 501 },
+      });
+    }
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchQnaOperation.execute({ keyword: "대량", sortDate: "desc" });
+
+    expect(result.result.paginationStatus).toBe("estimated");
+    expect(result.metadata.completeness).toBe("partial");
+    expect(result.warnings.map((warning) => warning.message).join("\n")).toContain("first 500 rows");
+  });
+
+  test("suggests broader Q&A keywords when an exact search has no results", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(`/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=${encodeURIComponent("장기종업원급여")}&page=1&rows=10`, {
+      facilityQnas: [],
+      facilityQnaCountData: { "11": 0, "12": 0, "13": 0, "14": 0, "15": 0, "24": 0, "25": 0 },
+    });
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchQnaOperation.execute({ keyword: "장기종업원급여" });
+
+    expect(result.result.returnedCount).toBe(0);
+    expect(result.result.totalCount).toBe(0);
+    expect(result.result.suggestedKeywords).toEqual(["장기 종업원 급여", "종업원급여"]);
+  });
+
+  test("keeps Q&A search snippets short for scanning", async () => {
+    const result = await defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5 });
+
+    expect(result.result.items[0]?.snippet.length).toBeLessThanOrEqual(281);
+    expect(result.result.items[0]?.snippet.endsWith("…")).toBe(true);
+  });
+
+  test("removes repeated source undefined placeholders from Q&A search snippets", async () => {
+    const fixtures = makeFixtureMap();
+    const qnaSearch = clone(readFixture("fixtures/kasb/search-qna-lease.json")) as {
+      facilityQnas: Array<Record<string, unknown>>;
+    };
+    qnaSearch.facilityQnas[0] = {
+      ...qnaSearch.facilityQnas[0],
+      fullContent_snippet: "본문 마지막 문장입니다.<em>undefined</em> <em>undefined</em> undefined",
+    };
+    fixtures.set(
+      "/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=5",
+      qnaSearch,
+    );
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5 });
+
+    expect(result.result.items[0]?.snippet).toBe("본문 마지막 문장입니다.");
+    expect(result.result.items[0]?.snippet).not.toContain("undefined");
+  });
+
+  test("derives Q&A pagination totals from requested type buckets", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set(
+      "/api/qnas/v2?types=24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=5",
+      readFixture("fixtures/kasb/search-qna-lease.json"),
+    );
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5, types: "24,25" });
+
+    expect(result.result.returnedCount).toBe(5);
+    expect(result.result.totalCount).toBe(33);
+    expect(result.result.totalPages).toBe(7);
+    expect(result.result.hasNextPage).toBe(true);
+    expect(result.result.paginationStatus).toBe("known");
+  });
+
+  test("marks Q&A pagination metadata partial when source counts are missing", async () => {
+    const fixtures = makeFixtureMap();
+    const qnaSearch = clone(readFixture("fixtures/kasb/search-qna-lease.json")) as Record<string, unknown>;
+    delete qnaSearch.facilityQnaCountData;
+    fixtures.set("/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=5", qnaSearch);
+    useFixtureMap(fixtures);
+
+    const result = await defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5 });
+
+    expect(result.result.totalCount).toBe(5);
+    expect(result.result.totalPages).toBe(1);
+    expect(result.result.hasNextPage).toBe(false);
+    expect(result.result.paginationStatus).toBe("estimated");
+    expect(result.metadata.completeness).toBe("partial");
+    expect(result.warnings.map((warning) => warning.code)).toContain("source_metadata_incomplete");
+  });
+
+  test("fetches a Q&A document by docNumber", async () => {
+    const result = await defaultGetQnaOperation.execute({ docNumber: "SSI-35629" });
+
+    expect(result.result.qna.docNumber).toBe("SSI-35629");
+    expect(result.result.qna.tags).toEqual(["리스부채", "리스개시일", "계약일"]);
+    expect(result.result.qna.typeLabel).toBe("K-IFRS · 신속처리질의");
+    expect(result.result.qna.title).toBe("리스 개시일과 계약일");
+  });
+
+  test("removes repeated source undefined placeholders from Q&A fullContent", async () => {
+    const fixtures = makeFixtureMap();
+    const qna = clone(readFixture("fixtures/kasb/qna-SSI-35629.json")) as {
+      facilityQna: Record<string, unknown>;
+    };
+    qna.facilityQna = {
+      ...qna.facilityQna,
+      docNumber: "2024-I-KQA007",
+      fullContent: "본문 마지막 문장입니다.undefined undefined undefined",
+    };
+    fixtures.set("/api/qnas/v2/2024-I-KQA007", qna);
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetQnaOperation.execute({ docNumber: "2024-I-KQA007" });
+
+    expect(result.result.qna.fullContent).toBe("본문 마지막 문장입니다.");
+    expect(result.result.qna.fullContent).not.toContain("undefined");
+  });
+
+  test("classifies 200 OK non-JSON source responses as source_changed", async () => {
+    globalThis.fetch = (async () => ({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new SyntaxError("Unexpected token <");
+      },
+    }) as unknown as Response) as unknown as typeof fetch;
+
+    await expect(defaultSearchStandardsOperation.execute({ keyword: "리스" })).rejects.toMatchObject({
+      code: "source_changed",
+      retryable: false,
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("classifies body-read failures as source_unavailable", async () => {
+    globalThis.fetch = (async () => ({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new Error("Body stream interrupted");
+      },
+    }) as unknown as Response) as unknown as typeof fetch;
+
+    await expect(defaultSearchStandardsOperation.execute({ keyword: "리스" })).rejects.toMatchObject({
+      code: "source_unavailable",
+      retryable: true,
+      sourceUrl: "https://db.kasb.or.kr/api/standard?searchWord=%EB%A6%AC%EC%8A%A4",
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("classifies rate limiting as retryable source_unavailable", async () => {
+    globalThis.fetch = (async () => ({
+      ok: false,
+      status: 429,
+      json: async () => ({}),
+    }) as unknown as Response) as unknown as typeof fetch;
+
+    await expect(defaultSearchStandardsOperation.execute({ keyword: "리스" })).rejects.toMatchObject({
+      code: "source_unavailable",
+      retryable: true,
+      sourceUrl: "https://db.kasb.or.kr/api/standard?searchWord=%EB%A6%AC%EC%8A%A4",
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("passes execution AbortSignal into source fetch", async () => {
+    let fetchSignal: AbortSignal | undefined;
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      fetchSignal = init?.signal ?? undefined;
+      return await new Promise<Response>((_resolve, reject) => {
+        fetchSignal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
+    }) as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    const promise = defaultSearchStandardsOperation.execute({ keyword: "리스" }, { signal: controller.signal });
+    await Promise.resolve();
+
+    expect(fetchSignal).toBeDefined();
+    expect(fetchSignal?.aborted).toBe(false);
+    controller.abort();
+
+    expect(fetchSignal?.aborted).toBe(true);
+    await expect(promise).rejects.toMatchObject({
+      code: "source_unavailable",
+      retryable: true,
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("passes execution AbortSignal into default Q&A search fetch", async () => {
+    let fetchSignal: AbortSignal | undefined;
+    let rejectFetch!: (reason?: unknown) => void;
+    let resolveSearchStarted!: () => void;
+    const searchStarted = new Promise<void>((resolve) => {
+      resolveSearchStarted = resolve;
+    });
+    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      fetchSignal = init?.signal ?? undefined;
+      resolveSearchStarted();
+      return await new Promise<Response>((_resolve, reject) => {
+        rejectFetch = reject;
+        fetchSignal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
+    }) as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    const promise = defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5 }, { signal: controller.signal });
+    await searchStarted;
+
+    expect(fetchSignal).toBeDefined();
+    expect(fetchSignal?.aborted).toBe(false);
+    controller.abort();
+    if (fetchSignal?.aborted !== true) rejectFetch(new Error("cleanup"));
+
+    expect(fetchSignal?.aborted).toBe(true);
+    await expect(promise).rejects.toMatchObject({
+      code: "source_unavailable",
+      retryable: true,
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("does not swallow cancellation during standard title enrichment", async () => {
+    let enrichmentSignal: AbortSignal | undefined;
+    let resolveEnrichmentStarted!: () => void;
+    const enrichmentStarted = new Promise<void>((resolve) => {
+      resolveEnrichmentStarted = resolve;
+    });
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      const key = `${url.pathname}${url.search}`;
+      if (key === standardSearchPath("정렬")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ standards: { totalCount: 1, stdCountArr: [{ key: "1116", doc_count: 1 }] } }),
+        } as Response;
+      }
+      if (key === "/api/standard-indexes/1116") {
+        enrichmentSignal = init?.signal ?? undefined;
+        resolveEnrichmentStarted();
+        return await new Promise<Response>((_resolve, reject) => {
+          enrichmentSignal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+        });
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    }) as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    const promise = defaultSearchStandardsOperation.execute(
+      { keyword: "정렬", limit: 1, sort: "title" },
+      { signal: controller.signal },
+    );
+    await enrichmentStarted;
+
+    expect(enrichmentSignal).toBeDefined();
+    expect(enrichmentSignal?.aborted).toBe(false);
+    controller.abort();
+
+    expect(enrichmentSignal?.aborted).toBe(true);
+    await expect(promise).rejects.toMatchObject({
+      code: "source_unavailable",
+      retryable: true,
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("does not swallow cancellation during paragraph section enrichment", async () => {
+    let enrichmentSignal: AbortSignal | undefined;
+    let resolveEnrichmentStarted!: () => void;
+    const enrichmentStarted = new Promise<void>((resolve) => {
+      resolveEnrichmentStarted = resolve;
+    });
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      const key = `${url.pathname}${url.search}`;
+      if (key === "/api/paragraphs/content/1116/23") {
+        return { ok: true, status: 200, json: async () => readFixture("fixtures/kasb/paragraph-1116-23.json") } as Response;
+      }
+      if (key === "/api/standard-indexes/1116") {
+        enrichmentSignal = init?.signal ?? undefined;
+        resolveEnrichmentStarted();
+        return await new Promise<Response>((_resolve, reject) => {
+          enrichmentSignal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+        });
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as Response;
+    }) as unknown as typeof fetch;
+    const controller = new AbortController();
+
+    const promise = defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" }, { signal: controller.signal });
+    await enrichmentStarted;
+
+    expect(enrichmentSignal).toBeDefined();
+    expect(enrichmentSignal?.aborted).toBe(false);
+    controller.abort();
+
+    expect(enrichmentSignal?.aborted).toBe(true);
+    await expect(promise).rejects.toMatchObject({
+      code: "source_unavailable",
+      retryable: true,
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("rejects all-malformed standards search rows as source_changed", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set("/api/standard?searchWord=%EB%A6%AC%EC%8A%A4", {
+      standards: { totalCount: 1, stdCountArr: [{ bad: true }] },
+    });
+    useFixtureMap(fixtures);
+
+    await expect(defaultSearchStandardsOperation.execute({ keyword: "리스" })).rejects.toMatchObject({
+      code: "source_changed",
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("rejects all-malformed standard structure rows as source_changed", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set("/api/standard-indexes/1116", {
+      standardIndexes: [{ documentId: "ZB2hJW", stdNum: "1116" }],
+    });
+    useFixtureMap(fixtures);
+
+    await expect(defaultGetStandardStructureOperation.execute({ stdNum: "1116" })).rejects.toMatchObject({
+      code: "source_changed",
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("marks partially malformed structure rows as partial with a warning", async () => {
+    const fixtures = makeFixtureMap();
+    const structure = clone(readFixture("fixtures/kasb/standard-indexes-1116.json")) as {
+      standardIndexes: unknown[];
+    };
+    structure.standardIndexes = [structure.standardIndexes[0], { documentId: "bad", stdNum: "1116" }];
+    fixtures.set("/api/standard-indexes/1116", structure);
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetStandardStructureOperation.execute({ stdNum: "1116" });
+
+    expect(result.metadata.completeness).toBe("partial");
+    expect(result.warnings.map((warning) => warning.code)).toContain("source_metadata_incomplete");
+  });
+
+  test("allows parent section responses to include child clause document ids and titles", async () => {
+    const fixtures = makeFixtureMap();
+    const section = clone(readFixture("fixtures/kasb/section-1116-ZB2hJW.json")) as {
+      clauses: Array<Record<string, unknown>>;
+      mainTitle?: string;
+    };
+    section.mainTitle = "기업회계기준서 제1116호 리스";
+    section.clauses = [
+      {
+        documentId: "ZB2hJW",
+        stdNum: 1116,
+        level: 2,
+        title: "목적",
+        ref: "1~2",
+        sort: 40,
+        type: "title",
+      },
+      ...section.clauses,
+    ];
+    fixtures.set("/api/paragraphs/1116/2MIunt", section);
+    useFixtureMap(fixtures);
+
+    const result = await defaultGetSectionOperation.execute({ stdNum: "1116", indexDocumentId: "2MIunt" });
+
+    expect(result.result.section.indexDocumentId).toBe("2MIunt");
+    expect(result.result.clauses[0]).toMatchObject({
+      kind: "title",
+      indexDocumentId: "ZB2hJW",
+      title: "목적",
+    });
+  });
+
+  test.each([
+    ["null rows", [null]],
+    ["shapeless object rows", [{ bad: true }]],
+  ] as const)("rejects all-malformed section clause %s as source_changed", (_label, clauses) => {
+    const fixtures = makeFixtureMap();
+    fixtures.set("/api/paragraphs/1116/ZB2hJW", {
+      clauses,
+      mainTitle: "목적",
+      mainTitleLevel: 2,
+    });
+    useFixtureMap(fixtures);
+
+    return expect(
+      defaultGetSectionOperation.execute({ stdNum: "1116", indexDocumentId: "ZB2hJW" }),
+    ).rejects.toMatchObject({ code: "source_changed" } satisfies Partial<KasbFailure>);
+  });
+
+  test("rejects mismatched paragraph identity as source_changed", async () => {
+    const fixtures = makeFixtureMap();
+    const paragraph = clone(readFixture("fixtures/kasb/paragraph-1116-23.json")) as {
+      paraContents: Array<Record<string, unknown>>;
+    };
+    paragraph.paraContents[0] = { ...paragraph.paraContents[0], paraNum: "24", uniqueKey: "1116-24" };
+    fixtures.set("/api/paragraphs/content/1116/23", paragraph);
+    useFixtureMap(fixtures);
+
+    await expect(defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" })).rejects.toMatchObject({
+      code: "source_changed",
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("rejects multiple exact paragraph rows as source_changed", async () => {
+    const fixtures = makeFixtureMap();
+    const paragraph = clone(readFixture("fixtures/kasb/paragraph-1116-23.json")) as {
+      paraContents: Array<Record<string, unknown>>;
+    };
+    paragraph.paraContents.push({ ...paragraph.paraContents[0] });
+    fixtures.set("/api/paragraphs/content/1116/23", paragraph);
+    useFixtureMap(fixtures);
+
+    await expect(defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" })).rejects.toMatchObject({
+      code: "source_changed",
+      retryable: false,
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("rejects all-malformed Q&A search rows as source_changed", async () => {
+    const fixtures = makeFixtureMap();
+    fixtures.set("/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=5", {
+      facilityQnas: [{ docNumber: "SSI-1" }],
+      facilityQnaCountData: {},
+    });
+    useFixtureMap(fixtures);
+
+    await expect(defaultSearchQnaOperation.execute({ keyword: "리스", rows: 5 })).rejects.toMatchObject({
+      code: "source_changed",
+    } satisfies Partial<KasbFailure>);
+  });
+
+  test("rejects mismatched Q&A detail identity as source_changed", async () => {
+    const fixtures = makeFixtureMap();
+    const qna = clone(readFixture("fixtures/kasb/qna-SSI-35629.json")) as {
+      facilityQna: Record<string, unknown>;
+    };
+    qna.facilityQna = { ...qna.facilityQna, docNumber: "SSI-OTHER" };
+    fixtures.set("/api/qnas/v2/SSI-35629", qna);
+    useFixtureMap(fixtures);
+
+    await expect(defaultGetQnaOperation.execute({ docNumber: "SSI-35629" })).rejects.toMatchObject({
+      code: "source_changed",
+    } satisfies Partial<KasbFailure>);
+  });
+});

@@ -6,13 +6,13 @@ import {
   type KasbTypedEvalTool,
   type KasbTypedEvalToolName,
 } from "./typed-tools.ts";
-import type { GetParagraphResult } from "../src/capabilities/get-paragraph/contract.ts";
-import type { GetQnaResult } from "../src/capabilities/get-qna/contract.ts";
-import type { GetSectionResult } from "../src/capabilities/get-section/contract.ts";
-import type { GetStandardStructureResult } from "../src/capabilities/get-standard-structure/contract.ts";
-import type { SearchQnaResult } from "../src/capabilities/search-qna/contract.ts";
-import type { SearchStandardsResult } from "../src/capabilities/search-standards/contract.ts";
-import type { KasbFailureCode } from "../src/capabilities/types.ts";
+import type { GetParagraphResult } from "../packages/kasb-ts/src/capabilities/get-paragraph/contract.ts";
+import type { GetQnaResult } from "../packages/kasb-ts/src/capabilities/get-qna/contract.ts";
+import type { GetSectionResult } from "../packages/kasb-ts/src/capabilities/get-section/contract.ts";
+import type { GetStandardStructureResult } from "../packages/kasb-ts/src/capabilities/get-standard-structure/contract.ts";
+import type { SearchQnaResult } from "../packages/kasb-ts/src/capabilities/search-qna/contract.ts";
+import type { SearchStandardsResult } from "../packages/kasb-ts/src/capabilities/search-standards/contract.ts";
+import type { KasbFailureCode } from "../packages/kasb-ts/src/capabilities/types.ts";
 
 export type KasbScenarioCategory = "tuning" | "held-out";
 export type KasbScenarioDiagnosticArea = "naming" | "schema" | "output_shape" | "source_behavior" | "fixture_or_runner";

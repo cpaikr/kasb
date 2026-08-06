@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "invalid_input",
+    "message": "Parameter \"stdNum\" cannot be blank.",
+    "parameter": "stdNum",
+    "retryable": false
+  },
+  "ok": false
+}
