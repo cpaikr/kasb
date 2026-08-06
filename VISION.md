@@ -3,7 +3,7 @@
 ## Product
 
 - `name`: `kasb-standards`
-- `status`: TypeScript package implemented; additive Rust SDK migration phases 1–4 in progress
+- `status`: TypeScript package implemented; Rust `get-paragraph` pilot implemented and in delivery
 - `domain`: Korean accounting standards and related interpretation material exposed through KASB public read surfaces
 - `users`: LLM agents, agent developers, researchers, and humans who need reliable SDK or CLI access to standards content
 

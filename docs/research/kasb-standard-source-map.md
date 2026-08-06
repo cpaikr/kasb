@@ -241,6 +241,25 @@ Observed implication:
 - `stdNum + paraNum` behaves as an exact paragraph reference across numeric, Korean-prefixed, appendix, and basis-for-conclusions paragraph forms in tested cases
 - direct paragraph lookup also returns the parent retrieval `documentId`, so callers do not need to supply a section id to fetch one exact paragraph
 
+## Rust Pilot Validation Evidence
+
+Validated locally from the captured observations above:
+
+- the native adapter resolves all four captured exact paragraph forms through
+  independently encoded path segments and preserves their source identifiers;
+- fixture normalization matches the shared serialized `get-paragraph` success
+  baseline, including parent section and standard enrichment;
+- empty, multiple, malformed, and identity-mismatched source responses map to
+  the rulebook's typed outcomes without arbitrary row selection or synthesis;
+- structure enrichment remains best-effort, while caller cancellation during
+  either the primary or enrichment request stops the whole Rust operation; and
+- the pinned `wreq` persona completed local HTTP exchanges with the intended
+  JSON/Korean request headers and reused an in-memory cookie on the same client.
+
+This is implementation validation against captured fixtures and a local test
+server, not a new live-source observation. The public source assumptions remain
+the observed evidence recorded elsewhere in this document.
+
 ## Promoted v1 Decisions
 
 Promoted to [../specs/kasb-standards-v1.md](../specs/kasb-standards-v1.md):

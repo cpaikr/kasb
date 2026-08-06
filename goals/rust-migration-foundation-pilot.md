@@ -37,13 +37,14 @@ _None._
 
 ### Current in-scope result
 
-Migration phase 4: contract-compatible Rust `get-paragraph` vertical pilot.
+Migration phase 4 delivery: contract-compatible Rust `get-paragraph` vertical
+pilot implementation, local exit gate, and independent review are complete;
+the PR lifecycle remains.
 
 ### Next in-scope action
 
-Implement the pinned `wreq` persona client and complete Rust paragraph path,
-then validate success, typed failures, timeout, cancellation, enrichment, and
-serialized parity before PR delivery.
+Deliver the implementation PR through feedback resolution, then finish the
+integration-to-main promotion PR.
 
 ### Evidence and blockers
 
@@ -63,4 +64,16 @@ serialized parity before PR delivery.
   passes 178 tests with one opt-in live skip from the root and 170 tests with
   one skip package-locally; its packed exports and built Node CLI smoke tests
   remain green.
+- Phase 4 now implements the public Rust request/result types, exact validation,
+  typed failures, injected clock and async transport, pinned `wreq` persona,
+  KASB URL/source normalization, best-effort enrichment, and distinct
+  cancellation. Thirteen unit tests and eleven integration tests pass, including
+  the two shared serialized paragraph cases and a local persona header/cookie
+  exchange; clippy passes with warnings denied. The full suite also passes on
+  the corrected Rust 1.88 minimum after exact 1.85 validation exposed an
+  upstream transitive syntax incompatibility.
+- Independent phase-4 review has no remaining actionable blocker after fixes
+  for request-construction validation, automatic transport retries, empty
+  parent identifiers, Unicode-digit normalization, and ECMAScript trimming.
+  Root validation and packaged-crate verification pass after those fixes.
 - Migration phase 5 and later release/performance work remain outside this goal.

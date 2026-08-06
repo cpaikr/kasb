@@ -2,9 +2,9 @@
 
 This repo tracks `../darty`'s app design while applying it to KASB standards access.
 
-The system is becoming a read-only dual-SDK workspace. The implemented
-TypeScript package remains supported while a native Rust SDK is added behind the
-same semantic contract:
+The system is a read-only dual-SDK workspace. The implemented TypeScript
+package remains supported while the native Rust SDK implements the first
+vertical capability behind the same semantic contract:
 
 - `packages/kasb-ts/`: published npm SDK, CLI, Pi adapter, and TypeScript tests
 - `crates/kasb/`: independently buildable native Rust SDK
@@ -172,6 +172,18 @@ Runtime Pi flow for the retained product-specific adapter:
 Pi tool params -> Pi adapter -> neutral toolset -> app operation -> capability execution -> KASB source adapter
 ```
 
+Runtime Rust pilot flow:
+
+```text
+Rust caller -> KasbClient -> get-paragraph capability -> KASB source adapter -> injectable HTTP transport -> wreq persona
+```
+
+`KasbClient` owns orchestration and clock injection. Public capability types and
+validation remain above the private KASB response mapping; the reusable
+`PersonaClient` owns browser emulation, pooling, cookies, proxy affinity,
+timeouts, and concurrency. The transport trait permits fixture and cancellation
+tests without live source access.
+
 ## Public Contract vs Source Contract
 
 Keep two schema families separate:
@@ -236,8 +248,9 @@ Keep two schema families separate:
 ## Current Status
 
 The repo currently has docs, source evidence, a v1 spec, a Darty-shaped
-Bun/TypeScript package, a native Rust crate scaffold, and shared phase-1
-conformance evidence. The Rust pilot lands only after the workspace gate passes.
+Bun/TypeScript package, an independently buildable native Rust crate, and shared
+conformance evidence. The Rust crate implements the complete `get-paragraph`
+path; the other five Rust capabilities remain outside the phase-4 pilot.
 
 Implemented roots:
 

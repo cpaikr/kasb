@@ -1,13 +1,14 @@
 # Rust migration execution progress
 
-Current gate: phases 1–3 delivered; phase 4 Rust `get-paragraph` pilot in progress.
+Current gate: phases 1–3 delivered; phase 4 implementation and independent
+review complete, with PR delivery in progress.
 
 | Phase | Exit evidence | State |
 | --- | --- | --- |
 | 1. Freeze compatibility evidence | multi-language docs; 12-case serialized TypeScript baseline; 3 path-pinned known-bad controls rejected; counts in `parity.md` | delivered in PR #12 |
 | 2. Translation rulebook | complete v1 request/result/failure/fixture/cancellation inventory and resolved pilot mappings in `rulebook.md` | delivered in PR #12 |
 | 3. Workspace layout | independent npm and Cargo builds/tests with shared root evidence | completed at the phase-3 commit gate |
-| 4. Rust `get-paragraph` pilot | complete `wreq` path and success/failure/timeout/cancellation conformance | not started |
+| 4. Rust `get-paragraph` pilot | complete `wreq` path and success/failure/timeout/cancellation conformance | local exit gate and independent review passing; PR delivery pending |
 
 ## Durable decisions
 
@@ -31,9 +32,24 @@ Current gate: phases 1–3 delivered; phase 4 Rust `get-paragraph` pilot in prog
 - Phase 3 package roots: `bun run typecheck && bun test && bun run build` plus
   the built Node CLI smoke pass from `packages/kasb-ts`; `cargo build --locked`
   and `cargo test --locked` pass from `crates/kasb`.
+- Phase 4 Rust suite: 13 unit tests and 11 integration tests pass. Evidence
+  includes four captured paragraph forms, both shared serialized paragraph
+  cases, exact invalid/not-found/source-drift failures, HTTP retryability,
+  zero retry, timeout, primary/enrichment cancellation, enrichment warnings,
+  URL encoding, narrow HTML normalization, and a local `wreq` exchange proving
+  API headers plus in-memory cookie reuse.
+- Independent review found and verified fixes for typed-request validation
+  bypass, `wreq`'s default automatic retry policy, empty parent identifiers,
+  Unicode digit normalization, and ECMAScript whitespace trimming. The actual
+  persona replay test passed five repeated runs with exactly one connection.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings` passes.
+- `cargo +1.88.0 test --workspace --locked` passes all 24 Rust tests, validating
+  the corrected minimum toolchain after an exact 1.85 run exposed upstream
+  `typed-builder-macro` syntax incompatibility.
+- `cargo +1.88.0 package --locked --allow-dirty` builds and verifies the
+  packaged Rust crate from its package root.
 
 ## Next action
 
-Implement the native Rust `get-paragraph` path with the pinned `wreq` persona
-client, typed validation/failures, normalization, cancellation, and shared
-serialized conformance evidence.
+Complete the phase-4 PR lifecycle and integration-to-main promotion. Do not
+begin phase 5.

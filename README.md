@@ -5,10 +5,10 @@ standards and Q&A material.
 
 - [`packages/kasb-ts`](packages/kasb-ts/README.md) contains the published npm
   SDK, the sole `kasb` CLI, and the Pi adapter.
-- [`crates/kasb`](crates/kasb) contains the independently buildable Rust crate
-  scaffold for the phase-4 native SDK pilot.
-- `fixtures/` and `conformance/` are shared evidence; TypeScript consumes them
-  now and the Rust pilot will consume them independently in phase 4.
+- [`crates/kasb`](crates/kasb/README.md) contains the independently buildable
+  Rust SDK and its contract-compatible `get-paragraph` pilot.
+- `fixtures/` and `conformance/` are shared evidence consumed independently by
+  both implementations.
 
 The implementations share the v1 serialized contract, not runtime code or FFI. See
 [MIGRATION.md](MIGRATION.md) for the active gates and
@@ -40,7 +40,7 @@ Use `bun packages/kasb-ts/src/cli.ts --help` for the source CLI and
 `node packages/kasb-ts/dist/cli.js --help` after building.
 
 npm/npx usage requires Node.js 20.18.1 or newer; TypeScript source development
-and tests use Bun. Rust 1.85 or newer is required. Both implementations read
+and tests use Bun. Rust 1.88 or newer is required. Both implementations read
 observed public KASB web/API behavior in read-only mode, so upstream KASB
 changes can affect results.
 
