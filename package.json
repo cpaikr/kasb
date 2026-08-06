@@ -1,54 +1,22 @@
 {
-  "name": "@sjunepark/kasb",
-  "version": "0.2.1",
-  "description": "Read-only CLI and TypeScript toolset for KASB standards and Q&A material.",
-  "license": "Elastic-2.0",
-  "type": "module",
+  "name": "kasb-workspace",
+  "private": true,
   "packageManager": "bun@1.3.13",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/sjunepark/kasb.git"
-  },
-  "bin": {
-    "kasb": "dist/cli.js"
-  },
-  "exports": {
-    "./toolset": {
-      "types": "./dist/toolset.d.ts",
-      "import": "./dist/toolset.js"
-    },
-    "./pi": {
-      "types": "./dist/pi.d.ts",
-      "import": "./dist/pi.js"
-    }
-  },
-  "pi": {
-    "extensions": [
-      "./dist/pi-extension.js"
-    ]
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE.md"
+  "workspaces": [
+    "packages/*"
   ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "engines": {
-    "node": ">=20.18.1"
-  },
   "scripts": {
-    "build": "bun run scripts/build-cli.ts",
-    "prepack": "bun run build",
-    "prepublishOnly": "bun run typecheck && bun test",
-    "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "test:live": "LIVE_KASB_TESTS=1 bun test"
-  },
-  "dependencies": {
-    "commander": "^14.0.3",
-    "effect": "^3.17.0"
+    "build": "bun run build:ts && bun run build:rust",
+    "build:ts": "bun run --cwd packages/kasb-ts build",
+    "build:rust": "cargo build --workspace --locked",
+    "typecheck": "bun run typecheck:ts && bun run typecheck:evals",
+    "typecheck:ts": "bun run --cwd packages/kasb-ts typecheck",
+    "typecheck:evals": "tsc --noEmit -p tsconfig.json",
+    "test": "bun run test:ts && bun run test:rust",
+    "test:ts": "bun test packages/kasb-ts evals",
+    "test:rust": "cargo test --workspace --locked",
+    "test:live": "bun run --cwd packages/kasb-ts test:live",
+    "conformance:capture": "bun run --cwd packages/kasb-ts conformance:capture"
   },
   "devDependencies": {
     "@types/bun": "^1.3.1",

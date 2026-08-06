@@ -10,7 +10,7 @@ import { defaultSearchQnaOperation } from "../src/app/search-qna.ts";
 import { defaultSearchStandardsOperation } from "../src/app/search-standards.ts";
 import { KasbFailure } from "../src/capabilities/types.ts";
 
-const repoRoot = join(import.meta.dir, "..");
+const repoRoot = join(import.meta.dir, "../../..");
 const originalFetch = globalThis.fetch;
 
 const readFixture = (path: string): unknown =>

@@ -3,7 +3,7 @@
   "include-component-in-tag": false,
   "include-v-in-tag": true,
   "packages": {
-    ".": {
+    "packages/kasb-ts": {
       "release-type": "node",
       "package-name": "@sjunepark/kasb",
       "changelog-path": "CHANGELOG.md",

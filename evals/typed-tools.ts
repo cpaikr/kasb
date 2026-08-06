@@ -6,7 +6,7 @@ import {
   type KasbAgentTool,
   type KasbAgentToolName,
   type KasbAppOperations,
-} from "../src/app/agent-tools.ts";
+} from "../packages/kasb-ts/src/app/agent-tools.ts";
 
 export type TypedEvalTool = KasbAgentTool;
 export type KasbTypedEvalTool = KasbAgentTool;

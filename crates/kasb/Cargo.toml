@@ -1,0 +1,11 @@
+[package]
+name = "kasb"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Read-only Rust SDK for KASB standards and Q&A material"
+
+[lib]
+path = "src/lib.rs"

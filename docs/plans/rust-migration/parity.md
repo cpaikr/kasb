@@ -39,7 +39,8 @@ Negative controls in [`conformance/v1/known-bad.json`](../../../conformance/v1/k
 | wrong typed failure code | value mismatch at `$.error.code` | rejected at the declared path |
 | numeric request `stdNum` replacing a string | type mismatch at `$.value.result.request.stdNum` | rejected at the declared path |
 
-Validation command: `bun test test/conformance/conformance.test.ts`.
+Validation command:
+`bun test packages/kasb-ts/test/conformance/conformance.test.ts`.
 
 ## Resolved baseline discrepancies
 

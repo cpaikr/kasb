@@ -18,7 +18,7 @@
 
 - Install deps: `bun install`
 - Typecheck: `bun run typecheck`
-- Test: `bun test`
+- Test: `bun run test`
 - Build npm CLI and package exports: `bun run build`
 - Live checks: `bun run test:live`
 
@@ -27,8 +27,8 @@ Do not add placeholder build, lint, format, or test commands to docs. Document o
 ## CLI Tryouts
 
 - Agents may run the local CLI from the repo root to inspect behavior and validate changes.
-- Treat the CLI help output as the guide: start with `bun src/cli.ts --help`, then use `bun src/cli.ts help <command>` for command-specific usage.
-- After `bun run build`, use `node dist/cli.js --help` to check the packaged entrypoint and import `dist/toolset.js`/`dist/pi.js` when package exports change.
+- Treat the CLI help output as the guide: start with `bun packages/kasb-ts/src/cli.ts --help`, then use `bun packages/kasb-ts/src/cli.ts help <command>` for command-specific usage.
+- After `bun run build`, use `node packages/kasb-ts/dist/cli.js --help` to check the packaged entrypoint and import `packages/kasb-ts/dist/toolset.js`/`packages/kasb-ts/dist/pi.js` when package exports change.
 
 Expected implementation stack, matching `../darty` unless a later decision changes it:
 

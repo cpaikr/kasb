@@ -6,16 +6,13 @@ The system is becoming a read-only dual-SDK workspace. The implemented
 TypeScript package remains supported while a native Rust SDK is added behind the
 same semantic contract:
 
-- `src/`: reusable capability core, source adapters, neutral toolset, CLI transport, product-specific Pi adapter, and app composition
+- `packages/kasb-ts/`: published npm SDK, CLI, Pi adapter, and TypeScript tests
+- `crates/kasb/`: independently buildable native Rust SDK
 - `fixtures/`: captured KASB API responses for deterministic tests
-- `test/`: CLI, package-surface, fixture-backed, contract, and opt-in live checks
 - `evals/`: later scenario evals after CLI behavior stabilizes
 - `conformance/`: language-neutral serialized request/outcome cases shared by both SDKs
-- `packages/kasb-ts/`: target home of the existing npm SDK, CLI, and Pi adapter
-- `crates/kasb/`: target home of the native Rust SDK
 
-The first CLI/toolset/Pi implementation exists at the repository root until the
-phase-3 workspace move. The reusable TypeScript contract remains centered on the
+The reusable TypeScript contract remains centered on the
 CLI plus `@sjunepark/kasb/toolset`; the retained Pi adapter is a product-specific
 host exception. Rust is an independently buildable native SDK, not a wrapper,
 FFI layer, or second CLI. [MIGRATION.md](MIGRATION.md) owns transition gates.
@@ -67,19 +64,19 @@ graph TD
         PI["Pi adapter · single-tool action envelope"]
     end
 
-    subgraph Toolset["Neutral Toolset · src/toolset.ts"]
+    subgraph Toolset["Neutral Toolset · packages/kasb-ts/src/toolset.ts"]
         TOOL["Operation discovery · help · validation · execution · error serialization"]
     end
 
-    subgraph App["App Composition · src/app/"]
+    subgraph App["App Composition · packages/kasb-ts/src/app/"]
         APP["Operation name · schemas · provider wiring"]
     end
 
-    subgraph Cap["Capability Contracts · src/capabilities/"]
+    subgraph Cap["Capability Contracts · packages/kasb-ts/src/capabilities/"]
         CAP["Request/result schemas · validation · execution"]
     end
 
-    subgraph Src["Source Adapters · src/sources/kasb/"]
+    subgraph Src["Source Adapters · packages/kasb-ts/src/sources/kasb/"]
         SRC["KASB API request builders · fetchers · source models · normalizers"]
     end
 
@@ -93,27 +90,27 @@ graph TD
 
 | Layer | Path | Owns |
 |---|---|---|
-| CLI transport | `src/cli.ts`, `src/cli/` | Parse CLI input, own help/examples/output flags, call shared operations, serialize JSON |
-| Neutral toolset | `src/toolset.ts` | Public operation discovery, command help, examples, validation, execution dispatch, reusable agent guidance, cancellation, and error serialization |
-| Pi adapter | `src/pi.ts`, `src/pi-extension.ts` | Product-specific Pi host wrapper with `help`, `command_help`, `validate`, and `run` actions over the neutral toolset |
-| App composition | `src/app/` | Operation names, JSON Schemas, and default provider wiring for public surfaces |
-| Capability | `src/capabilities/` | Public semantic request/result schemas, request resolution, typed failures, execution |
-| Source | `src/sources/kasb/` | KASB API URLs, source response schemas, fetchers, normalization, source error mapping |
+| CLI transport | `packages/kasb-ts/src/cli.ts`, `packages/kasb-ts/src/cli/` | Parse CLI input, own help/examples/output flags, call shared operations, serialize JSON |
+| Neutral toolset | `packages/kasb-ts/src/toolset.ts` | Public operation discovery, command help, examples, validation, execution dispatch, reusable agent guidance, cancellation, and error serialization |
+| Pi adapter | `packages/kasb-ts/src/pi.ts`, `packages/kasb-ts/src/pi-extension.ts` | Product-specific Pi host wrapper with `help`, `command_help`, `validate`, and `run` actions over the neutral toolset |
+| App composition | `packages/kasb-ts/src/app/` | Operation names, JSON Schemas, and default provider wiring for public surfaces |
+| Capability | `packages/kasb-ts/src/capabilities/` | Public semantic request/result schemas, request resolution, typed failures, execution |
+| Source | `packages/kasb-ts/src/sources/kasb/` | KASB API URLs, source response schemas, fetchers, normalization, source error mapping |
 
 ## Implementation Roots
 
-- `src/toolset.ts` for neutral operation discovery, validation, execution dispatch, cancellation, and error serialization
-- `src/pi.ts` and `src/pi-extension.ts` for the retained product-specific Pi host adapter
-- `src/app/` for operation composition and default wiring
-- `src/capabilities/` for public contracts and execution
-- `src/cli/` for Commander commands, flags, help, and JSON serialization
-- `src/sources/kasb/` for KASB endpoint access and source normalization
-- `fixtures/`, `test/`, and `evals/` for captured source responses, verification, and later task scenarios
+- `packages/kasb-ts/src/toolset.ts` for neutral operation discovery, validation, execution dispatch, cancellation, and error serialization
+- `packages/kasb-ts/src/pi.ts` and `packages/kasb-ts/src/pi-extension.ts` for the retained product-specific Pi host adapter
+- `packages/kasb-ts/src/app/` for operation composition and default wiring
+- `packages/kasb-ts/src/capabilities/` for public contracts and execution
+- `packages/kasb-ts/src/cli/` for Commander commands, flags, help, and JSON serialization
+- `packages/kasb-ts/src/sources/kasb/` for TypeScript KASB endpoint access and source normalization
+- `crates/kasb/src/` for native Rust contracts, source adaptation, and HTTP policy
+- `fixtures/`, `conformance/`, and `evals/` for shared evidence; package-local tests remain under each implementation root
 
-During phases 1–2 these TypeScript roots remain at the repository root. Phase 3
-moves them as one unit to `packages/kasb-ts/`, adds the single
-`crates/kasb/` crate, and keeps `fixtures/`, `conformance/`, `evals/`, and docs
-shared at the repository root.
+Phase 3 moved the TypeScript package as one unit to `packages/kasb-ts/`, added
+the single `crates/kasb/` crate, and kept `fixtures/`, `conformance/`, `evals/`,
+and docs shared at the repository root.
 
 The first implementation established the current per-capability file shape. Continue that pattern unless a concrete refactor improves the layer boundaries.
 
@@ -143,7 +140,7 @@ One source of truth should provide:
 - operation examples, limitations, result summaries, and reusable agent guidance
 - typed failure mapping and error serialization
 
-`src/app/agent-tools.ts` exposes internal `kasb_*` tool definitions over the same app operations for eval/tool-use experiments.
+`packages/kasb-ts/src/app/agent-tools.ts` exposes internal `kasb_*` tool definitions over the same app operations for eval/tool-use experiments.
 This is not a separate public host transport; CLI commands, neutral toolset operations, and Pi action commands share the stable operation ids.
 
 What stays CLI-local:
@@ -202,8 +199,10 @@ Keep two schema families separate:
   Historical phased direction and broad release sequencing.
 - [TODO.md](TODO.md)
   Ordered near-term queue.
-- `src/`
-  Implementation root for the KASB capability core, source adapters, app composition, and CLI.
+- `packages/kasb-ts/`
+  Published npm package and TypeScript implementation root.
+- `crates/kasb/`
+  Native Rust SDK implementation root.
 
 ## Contributor Flow
 
@@ -237,17 +236,19 @@ Keep two schema families separate:
 ## Current Status
 
 The repo currently has docs, source evidence, a v1 spec, a Darty-shaped
-Bun/TypeScript tool package, and shared phase-1 conformance evidence. The Rust
-workspace and pilot land only after their preceding migration gates pass.
+Bun/TypeScript package, a native Rust crate scaffold, and shared phase-1
+conformance evidence. The Rust pilot lands only after the workspace gate passes.
 
 Implemented roots:
 
-- `package.json`
-- `src/`
+- `packages/kasb-ts/package.json`
+- `packages/kasb-ts/src/`
 - `fixtures/`
-- `test/`
-- `scripts/build-cli.ts`
-- `tsconfig.build.json`
+- `packages/kasb-ts/test/`
+- `packages/kasb-ts/scripts/build-cli.ts`
+- `crates/kasb/src/`
+- `conformance/`
+- `evals/`
 
 The active migration milestone is phases 1–4 in [MIGRATION.md](MIGRATION.md):
 freeze compatibility evidence, write the translation rulebook, create the

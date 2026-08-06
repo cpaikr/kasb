@@ -199,7 +199,8 @@ Observed response shapes:
 
 Implementation implication:
 
-- source response schemas should live under `src/sources/kasb/`
+- source response schemas should live under each SDK's source-adapter root
+  (`packages/kasb-ts/src/sources/kasb/` and `crates/kasb/src/sources/kasb/`)
 - public capability result schemas should expose normalized standards, sections, paragraphs, references, metadata, and warnings
 - raw source payloads may be exposed only through explicit CLI debugging output, not the default public success result
 

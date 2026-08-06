@@ -1,6 +1,6 @@
 # Rust Migration
 
-Status: approved direction; phases 1–2 are in progress.
+Status: phases 1–3 complete; phase 4 Rust pilot in progress.
 
 Decision date: 2026-07-30.
 
@@ -24,10 +24,9 @@ The migration is additive:
 The existing TypeScript CLI remains the sole CLI during this migration. A Rust
 CLI is not part of the approved scope.
 
-This document records the approved transition direction. Before Rust code or
-the workspace reorganization lands, update `VISION.md`, `ARCHITECTURE.md`, and
-the repository command guidance so their TypeScript-only descriptions reflect
-the active phase of the migration.
+This document records the approved transition direction. The phase-3 workspace
+reorganization and command alignment are complete; phase 4 adds only the Rust
+`get-paragraph` pilot.
 
 ## Rationale
 

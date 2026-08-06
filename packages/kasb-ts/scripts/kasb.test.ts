@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { join } from "node:path";
 
 const runKasbScript = async (args: readonly string[]) => {
-  const subprocess = Bun.spawn(["./scripts/kasb.ts", ...args], {
+  const subprocess = Bun.spawn([join(import.meta.dir, "kasb.ts"), ...args], {
     stdout: "pipe",
     stderr: "pipe",
   });

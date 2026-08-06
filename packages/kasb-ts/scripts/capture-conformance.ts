@@ -7,7 +7,7 @@ import {
   readConformanceManifest,
 } from "../test/conformance/harness.ts";
 
-const repoRoot = join(import.meta.dir, "..");
+const repoRoot = join(import.meta.dir, "../../..");
 const manifest = readConformanceManifest(repoRoot);
 
 for (const testCase of manifest.cases) {

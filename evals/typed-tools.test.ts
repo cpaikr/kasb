@@ -7,9 +7,9 @@ import {
   defaultKasbTypedEvalTools,
   executeKasbTypedEvalTool,
 } from "./typed-tools.ts";
-import { defaultGetSectionOperation } from "../src/app/get-section.ts";
-import { defaultSearchStandardsOperation } from "../src/app/search-standards.ts";
-import type { KasbFailure } from "../src/capabilities/types.ts";
+import { defaultGetSectionOperation } from "../packages/kasb-ts/src/app/get-section.ts";
+import { defaultSearchStandardsOperation } from "../packages/kasb-ts/src/app/search-standards.ts";
+import type { KasbFailure } from "../packages/kasb-ts/src/capabilities/types.ts";
 
 const repoRoot = join(import.meta.dir, "..");
 const originalFetch = globalThis.fetch;

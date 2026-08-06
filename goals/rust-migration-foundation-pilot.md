@@ -32,17 +32,18 @@ _None._
   serialized, language-neutral parity judge with known-bad detection.
 - Migration phase 2: the complete v1 translation inventory and resolved Rust
   pilot rulebook.
+- Migration phase 3: the independently buildable TypeScript/Rust workspace with
+  shared root fixtures, conformance cases, evals, and documentation.
 
 ### Current in-scope result
 
-Migration phase 3: independently buildable TypeScript/Rust workspace with
-shared root evidence.
+Migration phase 4: contract-compatible Rust `get-paragraph` vertical pilot.
 
 ### Next in-scope action
 
-Move the existing TypeScript package without behavior or export drift, scaffold
-the Rust workspace/crate, and prove both package roots build and test
-independently before implementing the pilot.
+Implement the pinned `wreq` persona client and complete Rust paragraph path,
+then validate success, typed failures, timeout, cancellation, enrichment, and
+serialized parity before PR delivery.
 
 ### Evidence and blockers
 
@@ -56,4 +57,10 @@ independently before implementing the pilot.
   `ecf8da5` after all seven review threads were resolved. Its final validation
   passed 178 tests with one opt-in live test skipped, typecheck, build, and
   diff checks.
+- Phase 3 passes root aggregate, package-local TypeScript, and crate-local Cargo
+  build/test gates, and independent review found no remaining implementation
+  blocker after three findings were corrected. The TypeScript package still
+  passes 178 tests with one opt-in live skip from the root and 170 tests with
+  one skip package-locally; its packed exports and built Node CLI smoke tests
+  remain green.
 - Migration phase 5 and later release/performance work remain outside this goal.
