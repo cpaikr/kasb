@@ -67,7 +67,7 @@ integration-to-main promotion PR.
 - Phase 4 now implements the public Rust request/result types, exact validation,
   typed failures, injected clock and async transport, pinned `wreq` persona,
   KASB URL/source normalization, best-effort enrichment, and distinct
-  cancellation. Thirteen unit tests and eleven integration tests pass, including
+  cancellation. Fourteen unit tests and twelve integration tests pass, including
   the two shared serialized paragraph cases and a local persona header/cookie
   exchange; clippy passes with warnings denied. The full suite also passes on
   the corrected Rust 1.88 minimum after exact 1.85 validation exposed an
@@ -76,4 +76,6 @@ integration-to-main promotion PR.
   for request-construction validation, automatic transport retries, empty
   parent identifiers, Unicode-digit normalization, and ECMAScript trimming.
   Root validation and packaged-crate verification pass after those fixes.
+- Implementation PR #13 review feedback is applied and fully revalidated;
+  thread replies, resolution, and merge remain before promotion.
 - Migration phase 5 and later release/performance work remain outside this goal.

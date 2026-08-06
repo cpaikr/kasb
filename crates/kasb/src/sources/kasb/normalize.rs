@@ -2,10 +2,12 @@ use std::sync::LazyLock;
 
 use regex::{Captures, Regex};
 
+use crate::text::{ECMASCRIPT_WHITESPACE_PATTERN, trim_ecmascript_whitespace};
+
 static BLOCK_TAGS: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?i)<\s*/?\s*(?:br|div|p|li|ul|ol|table|thead|tbody|tr|td|th|h[1-6])(?:\s+[^>]*)?\s*/?>",
-    )
+    Regex::new(&format!(
+        r"(?i)<{ECMASCRIPT_WHITESPACE_PATTERN}*/?{ECMASCRIPT_WHITESPACE_PATTERN}*(?:br|div|p|li|ul|ol|table|thead|tbody|tr|td|th|h[1-6])(?:{ECMASCRIPT_WHITESPACE_PATTERN}+[^>]*)?{ECMASCRIPT_WHITESPACE_PATTERN}*/?>",
+    ))
     .expect("block tag regex is valid")
 });
 static ANY_TAG: LazyLock<Regex> =
@@ -33,9 +35,12 @@ static AROUND_NEWLINE: LazyLock<Regex> =
 static MANY_NEWLINES: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\n{3,}").expect("newline collapse regex is valid"));
 static LIST_MARKER_AFTER_SENTENCE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(concat!(
-        r"([.!?。．])\s*",
-        r"(\((?:[0-9]{1,3}|[가-힣ㄱ-ㅎA-Za-z]|[ivxlcdmIVXLCDM]{1,6})\)|[①-⑳㈀-㈞㉠-㉭])"
+    Regex::new(&format!(
+        concat!(
+            r"([.!?。．]){ecmascript_whitespace}*",
+            r"(\((?:[0-9]{{1,3}}|[가-힣ㄱ-ㅎA-Za-z]|[ivxlcdmIVXLCDM]{{1,6}})\)|[①-⑳㈀-㈞㉠-㉭])"
+        ),
+        ecmascript_whitespace = ECMASCRIPT_WHITESPACE_PATTERN,
     ))
     .expect("sentence list marker regex is valid")
 });
@@ -56,10 +61,8 @@ pub(crate) fn normalize_kasb_plain_text(value: &str) -> String {
     let separated = LIST_MARKER_AT_LINE_START.replace_all(&separated, "$1$2 $3");
     let inline_collapsed = INLINE_SPACE.replace_all(&separated, " ");
     let trimmed_lines = AROUND_NEWLINE.replace_all(&inline_collapsed, "\n");
-    MANY_NEWLINES
-        .replace_all(&trimmed_lines, "\n\n")
-        .trim()
-        .to_owned()
+    let collapsed = MANY_NEWLINES.replace_all(&trimmed_lines, "\n\n");
+    trim_ecmascript_whitespace(&collapsed).to_owned()
 }
 
 fn decode_html_entities(value: &str) -> String {
@@ -103,5 +106,17 @@ mod tests {
         );
         assert_eq!(normalize_kasb_plain_text("A&nBsP;B&aMp;C"), "A B&C");
         assert_eq!(normalize_kasb_plain_text("A. (١)B &#١٢;"), "A. (١)B &#١٢;");
+        assert_eq!(normalize_kasb_plain_text("&amp;lt;"), "<");
+        assert_eq!(normalize_kasb_plain_text("&#xD800;"), "");
+        assert_eq!(normalize_kasb_plain_text("\u{FEFF}A\u{FEFF}"), "A");
+        assert_eq!(
+            normalize_kasb_plain_text("\u{0085}A\u{0085}"),
+            "\u{0085}A\u{0085}"
+        );
+        assert_eq!(normalize_kasb_plain_text("A.\u{FEFF}(1)B"), "A.\n(1) B");
+        assert_eq!(
+            normalize_kasb_plain_text("A.\u{0085}(1)B"),
+            "A.\u{0085}(1)B"
+        );
     }
 }

@@ -4,6 +4,15 @@ The native `kasb` crate currently implements the phase-4 `get-paragraph`
 vertical pilot. It is read-only and has no dependency on the TypeScript package
 or Node.js runtime. Remaining v1 Rust capabilities belong to migration phase 5.
 
+The example uses Tokio's runtime macro. Add these direct dependencies to the
+consumer crate:
+
+```toml
+[dependencies]
+kasb = "0.1.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+```
+
 ```rust,no_run
 use kasb::capabilities::get_paragraph::GetParagraphRequest;
 use kasb::http::CancellationToken;

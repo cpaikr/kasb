@@ -28,7 +28,7 @@ Package-local gates are independently runnable:
 ```sh
 cd packages/kasb-ts
 bun run typecheck
-bun test
+bun run test
 bun run build
 
 cd ../../crates/kasb

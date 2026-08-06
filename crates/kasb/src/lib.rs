@@ -7,6 +7,7 @@ mod client;
 mod error;
 pub mod http;
 mod sources;
+mod text;
 
 pub use client::{Clock, FixedClock, KasbClient, SystemClock};
 pub use error::{KasbError, KasbFailure, KasbFailureCode};

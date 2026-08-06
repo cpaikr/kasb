@@ -69,12 +69,9 @@ where
         request: GetParagraphRequest,
         cancellation: &CancellationToken,
     ) -> Result<GetParagraphResult, KasbError> {
-        get_paragraph(
-            &self.transport,
-            &request,
-            cancellation,
-            self.clock.now_iso8601(),
-        )
+        get_paragraph(&self.transport, &request, cancellation, || {
+            self.clock.now_iso8601()
+        })
         .await
     }
 }

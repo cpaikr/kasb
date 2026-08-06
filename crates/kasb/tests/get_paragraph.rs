@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use kasb::capabilities::get_paragraph::{GetParagraphRequest, ParagraphWarningCode};
 use kasb::http::{CancellationToken, HttpResponse, HttpTransport, TransportError};
-use kasb::{FixedClock, KasbClient, KasbError, KasbFailureCode};
+use kasb::{Clock, FixedClock, KasbClient, KasbError, KasbFailureCode};
 use serde_json::{Value, json};
 
 const FIXED_TIME: &str = "2026-05-18T00:00:00.000Z";
@@ -22,6 +22,21 @@ enum Outcome {
 struct FixtureTransport {
     routes: Arc<HashMap<String, Outcome>>,
     calls: Arc<Mutex<Vec<String>>>,
+}
+
+#[derive(Clone, Debug)]
+struct CompletionClock {
+    calls: Arc<Mutex<Vec<String>>>,
+}
+
+impl Clock for CompletionClock {
+    fn now_iso8601(&self) -> String {
+        if self.calls.lock().expect("call log lock should work").len() == 2 {
+            "2026-05-18T00:00:02.000Z".to_owned()
+        } else {
+            "2026-05-18T00:00:00.000Z".to_owned()
+        }
+    }
 }
 
 impl FixtureTransport {
@@ -161,6 +176,37 @@ async fn retrieves_all_approved_paragraph_number_forms_from_shared_fixtures() {
         assert!(result.warnings.is_empty());
         assert_eq!(transport.calls().len(), 2);
     }
+}
+
+#[tokio::test]
+async fn timestamps_the_result_after_primary_and_enrichment_work_complete() {
+    let transport = FixtureTransport::new([
+        (
+            paragraph_url("23"),
+            fixture_response("fixtures/kasb/paragraph-1116-23.json"),
+        ),
+        (
+            structure_url(),
+            fixture_response("fixtures/kasb/standard-indexes-1116.json"),
+        ),
+    ]);
+    let client = KasbClient::from_parts(
+        transport.clone(),
+        CompletionClock {
+            calls: Arc::clone(&transport.calls),
+        },
+    );
+
+    let result = client
+        .execute_get_paragraph(
+            json!({"stdNum": "1116", "paraNum": "23"}),
+            &CancellationToken::new(),
+        )
+        .await
+        .expect("fixture paragraph should normalize");
+
+    assert_eq!(result.metadata.fetched_at, "2026-05-18T00:00:02.000Z");
+    assert_eq!(transport.calls().len(), 2);
 }
 
 #[tokio::test]

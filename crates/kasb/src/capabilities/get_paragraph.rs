@@ -2,6 +2,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Number, Value};
 
 use crate::KasbFailure;
+use crate::text::trim_ecmascript_whitespace;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,13 +16,7 @@ impl GetParagraphRequest {
         std_num: impl Into<String>,
         para_num: impl Into<String>,
     ) -> Result<Self, KasbFailure> {
-        let para_num = required_string_value("paraNum", para_num.into())?;
-        if para_num.contains('~') {
-            return Err(KasbFailure::invalid(
-                "paraNum",
-                "Parameter \"paraNum\" must be one exact paragraph number. Retrieve paragraph ranges with get-section ref.",
-            ));
-        }
+        let para_num = required_para_num_value(para_num.into())?;
         let std_num = required_string_value("stdNum", std_num.into())?;
         Ok(Self { std_num, para_num })
     }
@@ -45,17 +40,13 @@ impl GetParagraphRequest {
             }
         };
         reject_unknown_keys(&object)?;
-        // TypeScript validates paraNum first because its range recovery is the
-        // most specific invalid-input guidance at the serialized boundary.
-        let para_num = required_string_value("paraNum", required_json_string(&object, "paraNum")?)?;
-        if para_num.contains('~') {
-            return Err(KasbFailure::invalid(
-                "paraNum",
-                "Parameter \"paraNum\" must be one exact paragraph number. Retrieve paragraph ranges with get-section ref.",
-            ));
-        }
-        let std_num = required_string_value("stdNum", required_json_string(&object, "stdNum")?)?;
-        Ok(Self { std_num, para_num })
+        // Validate paraNum before reading stdNum to preserve the TypeScript
+        // boundary's failure precedence for mixed-invalid inputs. Self::new
+        // remains the final construction boundary.
+        let para_num = required_json_string(&object, "paraNum")?;
+        required_para_num_value(para_num.clone())?;
+        let std_num = required_json_string(&object, "stdNum")?;
+        Self::new(std_num, para_num)
     }
 }
 
@@ -73,10 +64,11 @@ fn reject_unknown_keys(object: &Map<String, Value>) -> Result<(), KasbFailure> {
         .keys()
         .find(|key| !matches!(key.as_str(), "stdNum" | "paraNum"))
     {
-        return Err(KasbFailure::invalid(
-            key,
-            format!("Unknown parameter: \"{key}\"."),
-        ));
+        let base = format!("Unknown parameter: \"{key}\".");
+        let message = suggest_allowed_key(key)
+            .map(|allowed| format!("{base} This typed API uses the JSON field \"{allowed}\"."))
+            .unwrap_or(base);
+        return Err(KasbFailure::invalid(key, message));
     }
     Ok(())
 }
@@ -98,7 +90,7 @@ fn required_json_string(object: &Map<String, Value>, key: &str) -> Result<String
 }
 
 fn required_string_value(key: &str, value: String) -> Result<String, KasbFailure> {
-    let value = value.trim_matches(is_ecmascript_whitespace).to_owned();
+    let value = trim_ecmascript_whitespace(&value).to_owned();
     if value.is_empty() {
         return Err(KasbFailure::invalid(
             key,
@@ -108,21 +100,47 @@ fn required_string_value(key: &str, value: String) -> Result<String, KasbFailure
     Ok(value)
 }
 
-fn is_ecmascript_whitespace(value: char) -> bool {
-    matches!(
-        value,
-        '\u{0009}'..='\u{000D}'
-            | '\u{0020}'
-            | '\u{00A0}'
-            | '\u{1680}'
-            | '\u{2000}'..='\u{200A}'
-            | '\u{2028}'
-            | '\u{2029}'
-            | '\u{202F}'
-            | '\u{205F}'
-            | '\u{3000}'
-            | '\u{FEFF}'
-    )
+fn required_para_num_value(value: String) -> Result<String, KasbFailure> {
+    let value = required_string_value("paraNum", value)?;
+    if value.contains('~') {
+        return Err(KasbFailure::invalid(
+            "paraNum",
+            "Parameter \"paraNum\" must be one exact paragraph number. Retrieve paragraph ranges with get-section ref.",
+        ));
+    }
+    Ok(value)
+}
+
+fn suggest_allowed_key(key: &str) -> Option<&'static str> {
+    ["stdNum", "paraNum"]
+        .into_iter()
+        .find(|allowed| allowed.eq_ignore_ascii_case(key) || to_camel_case(key) == *allowed)
+}
+
+fn to_camel_case(key: &str) -> String {
+    let mut result = String::with_capacity(key.len());
+    let mut values = key.chars().peekable();
+    while let Some(value) = values.next() {
+        if matches!(value, '-' | '_') {
+            let mut separators = String::from(value);
+            while values.peek().is_some_and(|next| matches!(next, '-' | '_')) {
+                separators.push(values.next().expect("peeked separator should exist"));
+            }
+            if values.peek().is_some_and(char::is_ascii_alphanumeric) {
+                result.push(
+                    values
+                        .next()
+                        .expect("peeked alphanumeric should exist")
+                        .to_ascii_uppercase(),
+                );
+            } else {
+                result.push_str(&separators);
+            }
+            continue;
+        }
+        result.push(value);
+    }
+    result
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -263,6 +281,8 @@ mod tests {
             (json!({"stdNum": "1116", "paraNum": "22~30"}), "paraNum"),
             (json!({}), "paraNum"),
             (json!({"stdNum": " ", "paraNum": " "}), "paraNum"),
+            (json!({"paraNum": " "}), "paraNum"),
+            (json!({"paraNum": "22~30"}), "paraNum"),
         ];
         for (input, parameter) in cases {
             let failure = GetParagraphRequest::from_json(input).expect_err("input should fail");
@@ -270,6 +290,30 @@ mod tests {
             assert_eq!(failure.code, crate::KasbFailureCode::InvalidInput);
             assert!(!failure.retryable);
         }
+
+        let failure = GetParagraphRequest::from_json(json!({"paraNum": "22~30"}))
+            .expect_err("range recovery should precede a missing standard number");
+        assert_eq!(
+            failure.message,
+            "Parameter \"paraNum\" must be one exact paragraph number. Retrieve paragraph ranges with get-section ref."
+        );
+
+        let failure = GetParagraphRequest::from_json(json!({
+            "std-num": "1116",
+            "paraNum": "23"
+        }))
+        .expect_err("CLI-style fields should fail with a typed-field hint");
+        assert_eq!(
+            failure.message,
+            "Unknown parameter: \"std-num\". This typed API uses the JSON field \"stdNum\"."
+        );
+
+        let failure = GetParagraphRequest::from_json(json!({
+            "std-num-": "1116",
+            "paraNum": "23"
+        }))
+        .expect_err("non-alias fields should not receive a typed-field hint");
+        assert_eq!(failure.message, "Unknown parameter: \"std-num-\".");
     }
 
     #[test]

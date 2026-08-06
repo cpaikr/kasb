@@ -32,7 +32,7 @@ review complete, with PR delivery in progress.
 - Phase 3 package roots: `bun run typecheck && bun test && bun run build` plus
   the built Node CLI smoke pass from `packages/kasb-ts`; `cargo build --locked`
   and `cargo test --locked` pass from `crates/kasb`.
-- Phase 4 Rust suite: 13 unit tests and 11 integration tests pass. Evidence
+- Phase 4 Rust suite: 14 unit tests and 12 integration tests pass. Evidence
   includes four captured paragraph forms, both shared serialized paragraph
   cases, exact invalid/not-found/source-drift failures, HTTP retryability,
   zero retry, timeout, primary/enrichment cancellation, enrichment warnings,
@@ -42,8 +42,13 @@ review complete, with PR delivery in progress.
   bypass, `wreq`'s default automatic retry policy, empty parent identifiers,
   Unicode digit normalization, and ECMAScript whitespace trimming. The actual
   persona replay test passed five repeated runs with exactly one connection.
+- PR #13 review feedback is applied locally: completion-time metadata,
+  camelCase recovery hints, content trimming, status-first error handling,
+  exact-paragraph schema parity, surrogate rejection, dependency floors, and
+  consumer setup documentation now match their contracts. Broader suggestions
+  on unchanged TypeScript capabilities remain outside this phase-4 pilot.
 - `cargo clippy --workspace --all-targets --locked -- -D warnings` passes.
-- `cargo +1.88.0 test --workspace --locked` passes all 24 Rust tests, validating
+- `cargo +1.88.0 test --workspace --locked` passes all 26 Rust tests, validating
   the corrected minimum toolchain after an exact 1.85 run exposed upstream
   `typed-builder-macro` syntax incompatibility.
 - `cargo +1.88.0 package --locked --allow-dirty` builds and verifies the

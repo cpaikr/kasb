@@ -135,6 +135,13 @@ impl HttpTransport for PersonaClient {
             };
 
             let status = response.status().as_u16();
+            if !(200..300).contains(&status) {
+                drop(permit);
+                return Ok(HttpResponse {
+                    status,
+                    body: Vec::new(),
+                });
+            }
             let body = tokio::select! {
                 biased;
                 _ = cancellation.cancelled() => return Err(TransportError::Cancelled),
@@ -160,6 +167,7 @@ mod tests {
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::mpsc;
     use std::thread;
     use std::time::Instant;
 
@@ -252,6 +260,57 @@ mod tests {
         )));
         assert!(!first.contains("cookie: kasb_session=pilot"));
         assert!(second.contains("cookie: kasb_session=pilot"));
+    }
+
+    #[tokio::test]
+    async fn returns_error_status_without_waiting_for_its_body() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("test listener should bind");
+        let address = listener
+            .local_addr()
+            .expect("listener should have an address");
+        let (release_sender, release_receiver) = mpsc::channel();
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("test request should connect");
+            let mut request = Vec::new();
+            let mut buffer = [0_u8; 4096];
+            while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+                let count = stream
+                    .read(&mut buffer)
+                    .expect("request should be readable");
+                assert!(count > 0, "request ended before headers completed");
+                request.extend_from_slice(&buffer[..count]);
+            }
+            write!(
+                stream,
+                "HTTP/1.1 404 Not Found\r\nContent-Length: 100\r\nConnection: close\r\n\r\n"
+            )
+            .expect("response headers should be writable");
+            stream.flush().expect("response headers should flush");
+            release_receiver
+                .recv_timeout(Duration::from_secs(2))
+                .expect("client should return before the error body finishes");
+        });
+
+        let client = PersonaClient::new(PersonaConfig {
+            request_timeout: Duration::from_millis(500),
+            connect_timeout: Duration::from_millis(500),
+            ..PersonaConfig::default()
+        })
+        .expect("persona should build");
+        let response = client
+            .get(
+                &format!("http://{address}/missing"),
+                &CancellationToken::new(),
+            )
+            .await
+            .expect("the known HTTP status should be preserved");
+        release_sender
+            .send(())
+            .expect("test server should still be waiting");
+        server.join().expect("test server should finish");
+
+        assert_eq!(response.status, 404);
+        assert!(response.body.is_empty());
     }
 
     #[tokio::test]

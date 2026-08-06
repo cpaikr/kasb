@@ -9,6 +9,7 @@ import { defaultGetStandardStructureOperation } from "../src/app/get-standard-st
 import { defaultSearchQnaOperation } from "../src/app/search-qna.ts";
 import { defaultSearchStandardsOperation } from "../src/app/search-standards.ts";
 import { KasbFailure } from "../src/capabilities/types.ts";
+import { normalizeKasbPlainText } from "../src/sources/kasb/source-helpers.ts";
 
 const repoRoot = join(import.meta.dir, "../../..");
 const originalFetch = globalThis.fetch;
@@ -363,6 +364,8 @@ describe("KASB provider operations", () => {
     const result = await defaultGetParagraphOperation.execute({ stdNum: "1116", paraNum: "23" });
 
     expect(result.result.paragraph.fullContent).toBe("리스이용자는 다음 금액을 인식한다.\n(1) 리스료 & 선급리스료이다.\n(2) 복구원가");
+    expect(normalizeKasbPlainText("&amp;lt;")).toBe("<");
+    expect(normalizeKasbPlainText("&#xD800;")).toBe("");
   });
 
   test("does not split parenthetical paragraph references as list markers", async () => {

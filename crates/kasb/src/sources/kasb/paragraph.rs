@@ -22,11 +22,11 @@ const CONTENT_NOTE: &str =
 static GENERAL_CHAPTER_TITLE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^제[0-9]+장(?:\s|$)").expect("standard kind regex is valid"));
 
-pub(crate) async fn get_paragraph<T: HttpTransport>(
+pub(crate) async fn get_paragraph<T: HttpTransport, F: FnOnce() -> String>(
     transport: &T,
     request: &GetParagraphRequest,
     cancellation: &CancellationToken,
-    fetched_at: String,
+    fetched_at: F,
 ) -> Result<GetParagraphResult, KasbError> {
     let source_url = paragraph_content_url(request.std_num(), request.para_num());
     let payload = fetch_json(transport, &source_url, cancellation).await?;
@@ -111,7 +111,7 @@ pub(crate) async fn get_paragraph<T: HttpTransport>(
             paragraph,
         },
         metadata: ResultMetadata {
-            fetched_at,
+            fetched_at: fetched_at(),
             source: SourceMetadata {
                 system: "kasb".to_owned(),
                 endpoint: source_url,
@@ -335,10 +335,11 @@ async fn section_enrichment<T: HttpTransport>(
     let mut index_document_ids = HashSet::new();
     let mut sections = Vec::new();
     for item in source_items {
-        if let Some(document_id) = raw_structure_document_id(item, &source_url, std_num)? {
-            index_document_ids.insert(document_id);
+        let document_id = raw_structure_document_id(item, &source_url, std_num)?;
+        if let Some(document_id) = document_id.as_ref() {
+            index_document_ids.insert(document_id.clone());
         }
-        if let Some(section) = normalize_section(item, &source_url, std_num)? {
+        if let Some(section) = normalize_section(item, document_id) {
             sections.push(section);
         }
     }
@@ -395,25 +396,12 @@ fn raw_structure_document_id(
     Ok(Some(document_id))
 }
 
-fn normalize_section(
-    value: &Value,
-    source_url: &str,
-    expected_std_num: &str,
-) -> Result<Option<Section>, KasbError> {
-    let Some(item) = value.as_object() else {
-        return Ok(None);
-    };
-    let Some(index_document_id) = raw_structure_document_id(value, source_url, expected_std_num)?
-    else {
-        return Ok(None);
-    };
-    let Some(title) = item.get("title").and_then(Value::as_str) else {
-        return Ok(None);
-    };
-    let Some(level) = item.get("level").and_then(Value::as_f64) else {
-        return Ok(None);
-    };
-    Ok(Some(Section {
+fn normalize_section(value: &Value, index_document_id: Option<String>) -> Option<Section> {
+    let item = value.as_object()?;
+    let index_document_id = index_document_id?;
+    let title = item.get("title").and_then(Value::as_str)?;
+    let level = item.get("level").and_then(Value::as_f64)?;
+    Some(Section {
         index_document_id,
         title: title.to_owned(),
         reference: item
@@ -422,7 +410,7 @@ fn normalize_section(
             .unwrap_or_default()
             .to_owned(),
         level,
-    }))
+    })
 }
 
 fn infer_standard_kind(standard_title: &str) -> String {
