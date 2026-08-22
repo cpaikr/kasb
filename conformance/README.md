@@ -15,7 +15,8 @@ produce the same process contract.
 Each conforming public-surface runner must:
 
 1. execute the named operation with the JSON input;
-2. serve only the declared fixture routes and fail closed on any undeclared request;
+2. match each absolute `requestUrl` as an exact string, serve only those
+   declared fixture routes, and fail closed on any undeclared request;
 3. wrap success as `{ "ok": true, "value": <success envelope> }` and a typed
    capability failure as `{ "ok": false, "error": <failure fields> }`.
 
@@ -52,8 +53,8 @@ review.
 `known-bad.json` points at deliberately corrupted outcomes. A conforming judge
 must reject all of them and report the declared first-difference class. The
 controls cover a wrong success value, wrong failure category, serialization
-type drift, and corrupted source metadata. The shared malformed-source case
-also proves that an upstream paragraph envelope without `paraContents` becomes
-the committed `source_changed` failure; Q&A controls prove that an absent or
-null `facilityQna` member is `not_found`. These controls prevent a runner that
-merely accepts both implementations.
+type drift, and corrupted source metadata. The shared malformed-source cases
+prove that an upstream paragraph envelope without `paraContents` or with two
+exact rows becomes the committed `source_changed` failure; Q&A controls prove
+that an absent or null `facilityQna` member is `not_found`. These controls
+prevent a runner that merely accepts both implementations.

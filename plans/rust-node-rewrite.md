@@ -162,6 +162,10 @@ native-target, and live verification.
 - Detect unsupported platforms, omitted optional dependencies, version skew,
   missing executable permissions, and spawn failures with concise actionable
   installation diagnostics.
+- Before production cutover, add a sanitized operator-side signal for contained
+  binding panics through an approved observability channel. It must not expose
+  source payloads or panic details to JavaScript and must not write unsolicited
+  diagnostics to a consumer's stderr.
 - Build every claimed target natively and clean-install the packed root and
   platform packages under each supported Node major.
 - **Exit gate:** the packed Node SDK/toolset and npm CLI launcher pass their

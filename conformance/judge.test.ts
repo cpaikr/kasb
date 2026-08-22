@@ -37,4 +37,19 @@ describe("conformer-neutral conformance judge", () => {
       cwd: repoRoot,
     }, manifest.cases[0]!)).rejects.toThrow("wrote unexpected stderr");
   });
+
+  test("force-kills a runner that ignores graceful timeout termination", async () => {
+    const script = [
+      "process.on('SIGTERM', () => {})",
+      "setInterval(() => {}, 1_000)",
+    ].join(";");
+    const startedAt = performance.now();
+    await expect(executeConformanceRunner(repoRoot, {
+      name: "timeout-control",
+      command: [process.execPath, "-e", script],
+      cwd: repoRoot,
+      timeoutMs: 200,
+    }, manifest.cases[0]!)).rejects.toThrow("timed out after 200ms");
+    expect(performance.now() - startedAt).toBeLessThan(1_500);
+  });
 });

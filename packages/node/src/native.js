@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 
+import { capabilityError } from "./error.js";
 import { KasbNativeInstallError, resolveNativeTarget } from "./target.js";
 
 const require = createRequire(import.meta.url);
@@ -59,11 +60,5 @@ function cancellationError(operationName) {
   error.recoverable = false;
   error.retryable = true;
   error.operationName = operationName;
-  return error;
-}
-
-function capabilityError(details) {
-  const error = new Error(details?.message || "The native KASB operation failed.");
-  if (details && typeof details === "object") Object.assign(error, details);
   return error;
 }

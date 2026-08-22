@@ -13,8 +13,9 @@ semantics remain in
 - Encode every path identifier as one independent UTF-8 percent-encoded path
   segment. Embedded `/`, query delimiters, spaces, and control characters must
   never change the route shape.
-- Encode query values with URLSearchParams-compatible form encoding. Preserve
-  the operation's parameter order because source URLs are public metadata:
+- Encode query values as UTF-8 with the WHATWG
+  `application/x-www-form-urlencoded` serializer, including `+` for spaces.
+  Preserve the operation's parameter order because source URLs are public metadata:
   `types`, `searchWord`, `page`, `rows` for Q&A search; otherwise the order in
   OpenAPI.
 - Omit optional query parameters rather than serializing empty or undefined
@@ -26,9 +27,12 @@ semantics remain in
 
 ## Identifier and identity rules
 
-- Normalize source identifier scalars from finite JSON numbers or strings to
-  the same JavaScript-compatible string representation. Do not promote source
-  ordering fields or browser-facing title ids into public identifiers.
+- Normalize source identifier scalars from strings or finite IEEE-754 binary64
+  JSON numbers. Strings remain unchanged. Render numbers as the shortest
+  round-trippable decimal; render negative zero as `0`; use fixed notation for
+  absolute values in `[1e-6, 1e21)` and lowercase scientific notation outside
+  that interval, with an explicit `+` for nonnegative exponents. Do not promote
+  source ordering fields or browser-facing title ids into public identifiers.
 - A paragraph response must match the requested `stdNum` and `paraNum`, and its
   `uniqueKey` must equal `{stdNum}-{paraNum}`.
 - A Q&A detail response must match the requested `docNumber`.

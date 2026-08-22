@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createRequire } from "node:module";
 
+import { runtimeTarget, selectNativeTarget } from "./runtime-target.js";
+
 const require = createRequire(import.meta.url);
 const rootPackage = require("../package.json");
 
@@ -19,11 +21,7 @@ export class KasbNativeInstallError extends Error {
 
 export function resolveNativeTarget(requiredArtifact) {
   const runtime = runtimeTarget();
-  const target = manifest.targets.find((candidate) =>
-    candidate.npmPlatform === runtime.platform &&
-    candidate.npmArch === runtime.arch &&
-    (candidate.npmPlatform !== "linux" || candidate.libc === runtime.libc)
-  );
+  const target = selectNativeTarget(manifest.targets, runtime);
   if (!target) {
     throw new KasbNativeInstallError(
       "unsupported_platform",
@@ -62,16 +60,4 @@ export function resolveNativeTarget(requiredArtifact) {
   }
 
   return { ...target, key: target.packageDirectory, addonPath, cliPath };
-}
-
-function runtimeTarget() {
-  const libc = process.platform === "linux"
-    ? process.report?.getReport()?.header?.glibcVersionRuntime ? "glibc" : "musl"
-    : undefined;
-  return {
-    platform: process.platform,
-    arch: process.arch,
-    libc,
-    key: [process.platform, process.arch, libc].filter(Boolean).join("-")
-  };
 }

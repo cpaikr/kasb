@@ -60,15 +60,17 @@ _None._
 
 Phase 1: freeze the compatibility baseline, establish the OpenAPI wire
 authority, strengthen the adversarial public-surface judge, and prove Node-API
-and native-launcher feasibility. Implementation, validation, and independent
-code review are complete on `codex/rust-node-rewrite-phase-1`; integration is
-pending the required PR lifecycle.
+and native-launcher feasibility. PR feedback fixes, validation, and the
+repository-required independent review are complete on
+`codex/rust-node-rewrite-phase-1`; integration is pending the remainder of the
+required PR lifecycle.
 
 ### Next in-scope action
 
-Commit and push the reviewed phase-1 slice, then open, review, and merge its PR
-into `codex/rust-node-rewrite-integration` before beginning the dependent Rust
-SDK implementation.
+Commit and push the cohesive PR-feedback fix, reply to and resolve every review
+thread, refresh checks and feedback, then merge PR #15 into
+`codex/rust-node-rewrite-integration` before beginning the dependent Rust SDK
+implementation.
 
 ### Evidence and blockers
 
@@ -83,14 +85,19 @@ SDK implementation.
   profile, fixture/contract/declaration freshness checks, process-isolated
   adversarial judge, and private Node-API/native-launcher feasibility proof are
   implemented on the phase-1 branch.
-- Full deterministic validation passes: frozen install, contract and
-  declaration checks, 31 adversarial/conformance tests, macOS ARM64 native
-  feasibility, typecheck, 191 Bun tests with one live test skipped, 28 Rust
-  tests, build, formatting, clippy with warnings denied, Rust 1.88 workspace
-  check, and diff hygiene.
-- The opt-in live suite passes 184 tests, including the bounded KASB traversal.
-- Independent repository-required review reports no Bucket I or Bucket II
-  findings and gives the phase-1 exit gate a PASS verdict.
+- PR #15 is open against the integration branch. Its initial CodeRabbit and
+  Codex reviews completed with 20 threads; every item was independently audited
+  and the accepted findings are implemented locally without expanding the
+  frozen public API or changing cancellation ownership.
+- Full deterministic validation passes after the feedback fixes: frozen
+  install, contract and declaration checks, 36 adversarial/conformance tests,
+  macOS ARM64 native feasibility, typecheck, 195 Bun tests with one live test
+  skipped, 29 Rust tests, build, formatting, clippy with warnings denied, Rust
+  1.88 workspace check, and diff hygiene.
+- The opt-in live suite passes 188 tests, including the bounded KASB traversal.
+- Independent repository-required review of the feedback cluster reports no
+  remaining correctness, security, contract-drift, regression, or
+  overengineering findings and gives an explicit PASS verdict.
 - Native feasibility is evidenced only for macOS ARM64. Linux GNU x64/ARM64
   and Windows x64 remain planned and unclaimed until their later native gates.
 - No blocker is currently known. Registry publication, version selection,

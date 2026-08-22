@@ -84,6 +84,15 @@
       "expected": "conformance/v1/expected/get-paragraph-source-changed.json"
     },
     {
+      "id": "get-paragraph-multiple-rows",
+      "operation": "get-paragraph",
+      "input": { "stdNum": "1116", "paraNum": "23" },
+      "routes": [
+        { "requestUrl": "https://db.kasb.or.kr/api/paragraphs/content/1116/23", "fixture": "conformance/v1/source-controls/paragraph-multiple-rows.json", "responseSchemaValidity": "invalid" }
+      ],
+      "expected": "conformance/v1/expected/get-paragraph-multiple-rows.json"
+    },
+    {
       "id": "search-qna-success",
       "operation": "search-qna",
       "input": { "keyword": "리스", "page": 1, "rows": 5 },

@@ -45,11 +45,11 @@ const run = async (): Promise<void> => {
   const originalFetch = globalThis.fetch;
   const undeclaredRequests: string[] = [];
   const fixtureByUrl = new Map(
-    request.routes.map((route) => [new URL(route.requestUrl).href, route.payload]),
+    request.routes.map((route) => [route.requestUrl, route.payload]),
   );
 
   globalThis.fetch = (async (input: RequestInfo | URL) => {
-    const requestUrl = new URL(input instanceof Request ? input.url : String(input)).href;
+    const requestUrl = input instanceof Request ? input.url : String(input);
     if (!fixtureByUrl.has(requestUrl)) {
       undeclaredRequests.push(requestUrl);
       throw new Error(`Conformance case made an undeclared source request: ${requestUrl}`);
@@ -65,9 +65,15 @@ const run = async (): Promise<void> => {
   try {
     let outcome: unknown;
     try {
+      const operation = operations[request.operation];
+      if (operation === undefined) {
+        throw new Error(
+          `TypeScript conformance runner does not support operation ${String(request.operation)} for ${request.caseId}`,
+        );
+      }
       outcome = {
         ok: true,
-        value: await operations[request.operation].execute(request.input),
+        value: await operation.execute(request.input),
       };
     } catch (error) {
       if (!(error instanceof KasbFailure)) throw error;

@@ -1,0 +1,9 @@
+{
+  "error": {
+    "code": "source_changed",
+    "message": "Exact paragraph lookup returned multiple rows.",
+    "retryable": false,
+    "sourceUrl": "https://db.kasb.or.kr/api/paragraphs/content/1116/23"
+  },
+  "ok": false
+}

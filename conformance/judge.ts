@@ -12,6 +12,7 @@ export type ConformanceOperationName =
 export type ConformanceRoute = {
   readonly requestUrl: string;
   readonly fixture: string;
+  readonly responseSchemaValidity?: "valid" | "invalid";
 };
 
 export type ConformanceCase = {
@@ -221,22 +222,21 @@ export const executeConformanceRunner = async (
 
   const timeoutMs = runner.timeoutMs ?? 30_000;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const timedOut = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => {
-      subprocess.kill();
-      reject(new Error(`${runner.name} timed out after ${timeoutMs}ms for ${testCase.id}`));
-    }, timeoutMs);
-  });
+  let timeoutError: Error | undefined;
+  let termination: Promise<void> | undefined;
+  timer = setTimeout(() => {
+    timeoutError = new Error(`${runner.name} timed out after ${timeoutMs}ms for ${testCase.id}`);
+    termination = terminateRunner(subprocess);
+  }, timeoutMs);
 
   try {
-    const [stdout, stderr, exitCode] = await Promise.race([
-      Promise.all([
-        new Response(subprocess.stdout).text(),
-        new Response(subprocess.stderr).text(),
-        subprocess.exited,
-      ]),
-      timedOut,
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(subprocess.stdout).text(),
+      new Response(subprocess.stderr).text(),
+      subprocess.exited,
     ]);
+    if (termination !== undefined) await termination;
+    if (timeoutError !== undefined) throw timeoutError;
     if (exitCode !== 0) {
       throw new Error(
         `${runner.name} exited ${exitCode} for ${testCase.id}${stderr.length === 0 ? "" : `: ${stderr.trim()}`}`,
@@ -256,6 +256,18 @@ export const executeConformanceRunner = async (
     return outcome;
   } finally {
     if (timer !== undefined) clearTimeout(timer);
+  }
+};
+
+const terminateRunner = async (subprocess: Bun.Subprocess): Promise<void> => {
+  subprocess.kill();
+  const exitedGracefully = await Promise.race([
+    subprocess.exited.then(() => true),
+    new Promise<false>((resolve) => setTimeout(() => resolve(false), 100)),
+  ]);
+  if (!exitedGracefully) {
+    subprocess.kill(9);
+    await subprocess.exited;
   }
 };
 

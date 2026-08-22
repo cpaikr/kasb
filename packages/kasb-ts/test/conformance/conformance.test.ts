@@ -97,6 +97,35 @@ describe("language-neutral KASB v1 conformance cases", () => {
       "made undeclared source requests",
     );
   });
+
+  test("the runner requires exact request URL text instead of URL equivalence", async () => {
+    const testCase: ConformanceCase = {
+      id: "textually-different-route-control",
+      operation: "get-paragraph",
+      input: { stdNum: "1116", paraNum: "23" },
+      routes: [{
+        requestUrl: "https://db.kasb.or.kr:443/api/paragraphs/content/1116/23",
+        fixture: "fixtures/kasb/paragraph-1116-23.json",
+      }],
+      expected: "conformance/v1/expected/get-paragraph-success.json",
+    };
+    await expect(executeConformanceCase(repoRoot, testCase)).rejects.toThrow(
+      "made undeclared source requests",
+    );
+  });
+
+  test("the runner rejects an unknown operation as a protocol error", async () => {
+    const testCase = {
+      id: "unknown-operation-control",
+      operation: "not-a-kasb-operation",
+      input: {},
+      routes: [],
+      expected: "conformance/v1/expected/get-paragraph-success.json",
+    } as unknown as ConformanceCase;
+    await expect(executeConformanceCase(repoRoot, testCase)).rejects.toThrow(
+      "does not support operation not-a-kasb-operation for unknown-operation-control",
+    );
+  });
 });
 
 describe("public Rust SDK conformance runner", () => {

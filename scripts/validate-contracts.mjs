@@ -84,7 +84,7 @@ const responseSchemaFor = (operationId) => {
   const path = entry?.[0];
   return path === undefined
     ? undefined
-    : contract.paths[path].get.responses["2XX"].content["application/json"].schema;
+    : contract?.paths?.[path]?.get?.responses?.["2XX"]?.content?.["application/json"]?.schema;
 };
 const replaceComponentRefs = (value) => {
   if (Array.isArray(value)) return value.map(replaceComponentRefs);
@@ -104,9 +104,15 @@ const responseValidatorFor = (operationId) => {
   const schema = replaceComponentRefs({
     $schema: "https://json-schema.org/draft/2020-12/schema",
     ...responseSchema,
-    $defs: contract.components.schemas,
+    $defs: contract?.components?.schemas ?? {},
   });
-  const validator = ajv.compile(schema);
+  let validator;
+  try {
+    validator = ajv.compile(schema);
+  } catch (error) {
+    failures.push(`${operationId} response schema could not be compiled: ${error.message}`);
+    return undefined;
+  }
   responseValidatorByOperation.set(operationId, validator);
   return validator;
 };
@@ -122,12 +128,19 @@ const templateForUrl = (rawUrl) => {
 };
 const validateFixtureRequest = (template, rawUrl, fixture) => {
   if (template === undefined) return;
-  const operation = contract.paths[template].get;
-  const parameters = operation.parameters.map(({ $ref }) => {
-    const name = $ref?.replace("#/components/parameters/", "");
-    return contract.components.parameters[name];
-  });
-  const queryParameters = parameters.filter((parameter) => parameter.in === "query");
+  const operation = contract?.paths?.[template]?.get;
+  if (operation === undefined) {
+    check(false, `${fixture} route is missing its GET operation`);
+    return;
+  }
+  const parameters = (operation.parameters ?? []).map((parameter) => {
+    if (parameter?.$ref === undefined) return parameter;
+    const name = parameter.$ref.replace("#/components/parameters/", "");
+    const resolved = contract?.components?.parameters?.[name];
+    check(resolved !== undefined, `${fixture} contains an unresolved parameter reference ${parameter.$ref}`);
+    return resolved;
+  }).filter(Boolean);
+  const queryParameters = parameters.filter((parameter) => parameter?.in === "query");
   const url = new URL(rawUrl);
   const actualNames = [...url.searchParams.keys()];
   check(new Set(actualNames).size === actualNames.length, `${fixture} must not repeat query parameters`);
@@ -139,14 +152,15 @@ const validateFixtureRequest = (template, rawUrl, fixture) => {
     const value = url.searchParams.get(parameter.name);
     if (parameter.required) check(value !== null, `${fixture} is missing required query parameter ${parameter.name}`);
     if (value === null) continue;
-    if (parameter.schema.type === "integer") {
-      check(/^\d+$/.test(value) && Number(value) >= parameter.schema.minimum, `${fixture} query parameter ${parameter.name} violates its integer schema`);
+    const schema = parameter.schema ?? {};
+    if (schema.type === "integer") {
+      check(/^\d+$/.test(value) && Number(value) >= schema.minimum, `${fixture} query parameter ${parameter.name} violates its integer schema`);
     }
-    if (parameter.schema.minLength !== undefined) {
-      check(value.length >= parameter.schema.minLength, `${fixture} query parameter ${parameter.name} is too short`);
+    if (schema.minLength !== undefined) {
+      check(value.length >= schema.minLength, `${fixture} query parameter ${parameter.name} is too short`);
     }
-    if (parameter.schema.pattern !== undefined) {
-      check(new RegExp(parameter.schema.pattern).test(value), `${fixture} query parameter ${parameter.name} violates its pattern`);
+    if (schema.pattern !== undefined) {
+      check(new RegExp(schema.pattern).test(value), `${fixture} query parameter ${parameter.name} violates its pattern`);
     }
   }
 };
@@ -174,7 +188,7 @@ const fixtureFiles = (await readdir(new URL("../fixtures/kasb/", import.meta.url
   .map((name) => `fixtures/kasb/${name}`)
   .sort();
 equal([...seenFixtures].sort(), fixtureFiles, "fixture manifest must list every captured KASB fixture exactly once");
-equal([...coveredOperations], [...new Set(operationByPath.values())], "fixture evidence must cover every OpenAPI operation");
+equal([...coveredOperations].sort(), [...new Set(operationByPath.values())].sort(), "fixture evidence must cover every OpenAPI operation");
 for (const testCase of evidence.cases || []) {
   for (const route of testCase.routes || []) {
     if (route.fixture.startsWith("conformance/v1/source-controls/")) {

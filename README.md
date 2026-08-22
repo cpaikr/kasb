@@ -20,8 +20,9 @@ adapter will be removed at cutover.
 - `fixtures/` and `conformance/` contain shared source evidence and serialized
   compatibility cases. The process-isolated judge verifies the public surfaces
   and rejects deliberate behavioral corruption.
-- `contracts/kasb/openapi.yaml` and its source-adapter profile now own the
-  supported provider wire contract. The Node-API and native-launcher code in
+- `contracts/kasb/openapi.yaml` owns the supported provider wire facts; its
+  source-adapter profile records only cross-response and decoding rules that
+  OpenAPI cannot express. The Node-API and native-launcher code in
   this phase remains a private feasibility proof, not the cutover product.
 
 The current implementations remain intact until the replacement passes the
@@ -42,6 +43,10 @@ bun run build
 cargo fmt --all --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 ```
+
+`bun run native:feasibility` probes the current host. Phase 1 evidence covers
+macOS ARM64 only; the remaining planned targets stay unclaimed until their
+native build and packed-consumer gates pass.
 
 Use `bun packages/kasb-ts/src/cli.ts --help` for the current source CLI and
 `node packages/kasb-ts/dist/cli.js --help` after building. Live KASB checks are

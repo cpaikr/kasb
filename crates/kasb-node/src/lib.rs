@@ -251,11 +251,14 @@ impl HttpTransport for FixtureTransport {
 }
 
 fn shared_client() -> Result<&'static SharedClient, BindingError> {
-    static CLIENT: OnceLock<Result<SharedClient, ()>> = OnceLock::new();
-    CLIENT
-        .get_or_init(|| KasbClient::new(PersonaConfig::default()).map_err(|_| ()))
-        .as_ref()
-        .map_err(|_| BindingError::Internal)
+    static CLIENT: OnceLock<SharedClient> = OnceLock::new();
+    if let Some(client) = CLIENT.get() {
+        return Ok(client);
+    }
+
+    let client = KasbClient::new(PersonaConfig::default()).map_err(|_| BindingError::Internal)?;
+    let _ = CLIENT.set(client);
+    CLIENT.get().ok_or(BindingError::Internal)
 }
 
 impl From<KasbError> for BindingError {
@@ -269,7 +272,7 @@ impl From<KasbError> for BindingError {
 
 fn error_envelope(error: BindingError) -> Value {
     match error {
-        BindingError::Capability(failure) => json!({ "ok": false, "error": failure }),
+        BindingError::Capability(failure) => capability_error_envelope(failure),
         BindingError::Cancelled => json!({
             "ok": false,
             "cancelled": true,
@@ -295,5 +298,41 @@ fn error_envelope(error: BindingError) -> Value {
                 "parameter": "input"
             }
         }),
+    }
+}
+
+fn capability_error_envelope(failure: KasbFailure) -> Value {
+    let mut details = serde_json::Map::new();
+    details.insert("code".into(), json!(failure.code));
+    details.insert("message".into(), json!(failure.message));
+    details.insert("retryable".into(), json!(failure.retryable));
+    if let Some(parameter) = failure.parameter {
+        details.insert("parameter".into(), json!(parameter));
+    }
+    if let Some(source_url) = failure.source_url {
+        details.insert("sourceUrl".into(), json!(source_url));
+    }
+    json!({ "ok": false, "error": details })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kasb::KasbFailureCode;
+
+    #[test]
+    fn capability_projection_has_an_explicit_wire_allowlist() {
+        let envelope = capability_error_envelope(KasbFailure {
+            code: KasbFailureCode::SourceChanged,
+            message: "provider changed".to_owned(),
+            retryable: false,
+            parameter: Some("stdNum".to_owned()),
+            source_url: Some("https://db.kasb.or.kr/api/standard".to_owned()),
+        });
+        let details = envelope["error"].as_object().expect("error object");
+        assert_eq!(
+            details.keys().map(String::as_str).collect::<Vec<_>>(),
+            ["code", "message", "retryable", "parameter", "sourceUrl"]
+        );
     }
 }

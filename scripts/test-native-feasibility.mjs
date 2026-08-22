@@ -16,18 +16,38 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { assertTargetAlignment } from "../packages/node/scripts/target-alignment.mjs";
+import { capabilityError } from "../packages/node/src/error.js";
+import { runtimeTarget, selectNativeTarget } from "../packages/node/src/runtime-target.js";
+
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageRoot = join(repositoryRoot, "packages/node");
 const manifest = JSON.parse(await readFile(join(repositoryRoot, "native-targets.json"), "utf8"));
 const packageJson = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
 const npmCommand = process.platform === "win32" ? await resolveWindowsCommand("npm.cmd") : "npm";
-const host = hostTarget();
-const target = manifest.targets.find((candidate) =>
-  candidate.npmPlatform === host.platform &&
-  candidate.npmArch === host.arch &&
-  (candidate.npmPlatform !== "linux" || candidate.libc === host.libc)
-);
+const host = runtimeTarget();
+const target = selectNativeTarget(manifest.targets, host);
 assert(target, `no feasibility target for ${host.key}`);
+assert.throws(
+  () => assertTargetAlignment(manifest, {
+    ...packageJson,
+    optionalDependencies: { [target.packageName]: "9.9.9" }
+  }),
+  /optionalDependencies disagree|exact root package version/,
+  "packed-manifest alignment must reject missing, extra, or version-skewed targets"
+);
+const projectedFailure = capabilityError({
+  code: "source_changed",
+  message: "provider changed",
+  retryable: false,
+  sourceUrl: "https://db.kasb.or.kr/api/standard",
+  name: "InjectedName",
+  stack: "injected stack",
+  unknown: "must not cross"
+});
+assert.equal(projectedFailure.name, "KasbFailure");
+assert.notEqual(projectedFailure.stack, "injected stack");
+assert(!Object.hasOwn(projectedFailure, "unknown"));
 
 const scratch = await mkdtemp(join(tmpdir(), "kasb-native-feasibility-"));
 try {
@@ -78,18 +98,6 @@ try {
   process.stdout.write(`native feasibility passed ${target.rustTarget} with Node ${process.version}\n`);
 } finally {
   await rm(scratch, { recursive: true, force: true });
-}
-
-function hostTarget() {
-  const libc = process.platform === "linux"
-    ? process.report?.getReport()?.header?.glibcVersionRuntime ? "glibc" : "musl"
-    : undefined;
-  return {
-    platform: process.platform,
-    arch: process.arch,
-    libc,
-    key: [process.platform, process.arch, libc].filter(Boolean).join("-")
-  };
 }
 
 function nativeLibrary(targetDirectory, profile) {
@@ -159,17 +167,19 @@ async function assembleNativePackage(directory, targetDirectory) {
 async function assembleLauncherPackage(directory) {
   await mkdir(directory, { recursive: true });
   await mkdir(join(directory, "dist"));
-  for (const file of ["cli.js", "native.js", "native-targets.json", "target.js"]) {
+  for (const file of ["cli.js", "error.js", "native.js", "native-targets.json", "runtime-target.js", "target.js"]) {
     await copyFile(join(packageRoot, "dist", file), join(directory, "dist", file));
   }
   await copyFile(join(packageRoot, "README.md"), join(directory, "README.md"));
   const optionalDependencies = Object.fromEntries(
     manifest.targets.map((candidate) => [candidate.packageName, packageJson.version])
   );
-  await writeFile(join(directory, "package.json"), `${JSON.stringify({
+  const packedPackageJson = {
     ...packageJson,
     optionalDependencies
-  }, null, 2)}\n`);
+  };
+  assertTargetAlignment(manifest, packedPackageJson);
+  await writeFile(join(directory, "package.json"), `${JSON.stringify(packedPackageJson, null, 2)}\n`);
 }
 
 function pack(directory, destination) {
@@ -186,6 +196,7 @@ function assertPackContents(nativePack, rootPack) {
 
   const rootFiles = new Set(rootPack.files.map((file) => file.path));
   assert(rootFiles.has("dist/native-targets.json"), "launcher package must contain the target authority");
+  assert(rootFiles.has("dist/runtime-target.js"), "launcher package must contain shared target selection");
   assert([...rootFiles].every((file) => !file.endsWith(".node")), "launcher package must not contain an addon");
   assert(!rootFiles.has(target.cliFile), "launcher package must not contain the Rust binary");
 }
@@ -213,7 +224,12 @@ async function testPackedAddon(consumer) {
   const source = String.raw`
     import assert from "node:assert/strict";
     import { getParagraph } from "@sjunepark/kasb-native-feasibility/native";
-    await assert.rejects(getParagraph({}), (error) => error.code === "invalid_input" && error.parameter === "paraNum");
+    await assert.rejects(
+      getParagraph({}),
+      (error) => error.name === "KasbFailure" &&
+        error.code === "invalid_input" &&
+        error.parameter === "paraNum"
+    );
     const controller = new AbortController();
     controller.abort();
     await assert.rejects(

@@ -68,6 +68,7 @@ function cleanup(handlers) {
 
 function mirrorSignal(signal) {
   if (process.platform === "win32") {
+    // Inferred pending the later Windows native and packed-consumer gates.
     process.exitCode = signal === "SIGINT" ? 130 : 143;
     return;
   }

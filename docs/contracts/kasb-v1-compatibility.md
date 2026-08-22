@@ -114,8 +114,8 @@ The exact command/flag matrix is:
 
 The npm executable becomes a shell-free resolver/launcher only. It forwards
 arguments, environment, working directory, standard streams, signals, and the
-child exit status without parsing commands or rendering output. Each exact-
-version native package contains the Node addon and same-revision Rust CLI
+child exit status without parsing commands or rendering output. Each
+exact-version native package contains the Node addon and same-revision Rust CLI
 binary. `native-targets.json` is only a planned matrix until native build and
 clean-consumer checks pass on every target.
 

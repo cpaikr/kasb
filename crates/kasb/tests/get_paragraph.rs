@@ -237,7 +237,7 @@ async fn shared_get_paragraph_conformance_cases_match_committed_expectations() {
         .iter()
         .filter(|case| case["operation"] == "get-paragraph")
         .collect();
-    assert_eq!(paragraph_cases.len(), 3);
+    assert_eq!(paragraph_cases.len(), 4);
 
     for case in paragraph_cases {
         let routes = case["routes"]

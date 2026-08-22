@@ -16,4 +16,5 @@ napi-build = "=2.4.1"
 napi-derive = "=3.6.3"
 
 [profile.release]
+# The Node binding contains panics with catch_unwind; abort would bypass that boundary.
 panic = "unwind"
