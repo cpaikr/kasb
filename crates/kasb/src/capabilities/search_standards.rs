@@ -8,6 +8,10 @@ use super::validation::{
 use crate::KasbFailure;
 use crate::text::trim_ecmascript_whitespace;
 
+const LIMIT_DEFAULT: u64 = 20;
+const LIMIT_MIN: u64 = 1;
+const LIMIT_MAX: u64 = 100;
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum SearchStandardsSort {
@@ -30,16 +34,16 @@ impl SearchStandardsRequest {
     pub fn new(keyword: impl Into<String>) -> Result<Self, KasbFailure> {
         Ok(Self {
             keyword: non_blank_string("keyword", keyword.into())?,
-            limit: 20,
+            limit: LIMIT_DEFAULT,
             sort: SearchStandardsSort::Relevance,
         })
     }
 
     pub fn with_limit(mut self, limit: u64) -> Result<Self, KasbFailure> {
-        if !(1..=100).contains(&limit) {
+        if !(LIMIT_MIN..=LIMIT_MAX).contains(&limit) {
             return Err(KasbFailure::invalid(
                 "limit",
-                "Parameter \"limit\" must be between 1 and 100.",
+                format!("Parameter \"limit\" must be between {LIMIT_MIN} and {LIMIT_MAX}."),
             ));
         }
         self.limit = limit;
@@ -87,7 +91,7 @@ impl SearchStandardsRequest {
         };
         Ok(Self {
             keyword: required_string(&object, "keyword")?,
-            limit: optional_integer(&object, "limit", 20, 1, 100)?,
+            limit: optional_integer(&object, "limit", LIMIT_DEFAULT, LIMIT_MIN, LIMIT_MAX)?,
             sort,
         })
     }

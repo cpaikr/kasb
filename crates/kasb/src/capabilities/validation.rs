@@ -122,13 +122,17 @@ pub(crate) fn optional_integer(
 }
 
 pub(crate) fn reject_url_dot_segment(key: &str, value: &str) -> Result<(), KasbFailure> {
-    if matches!(value, "." | "..") {
+    if is_url_dot_segment(value) {
         return Err(KasbFailure::invalid(
             key,
             format!("Parameter \"{key}\" cannot be a URL dot segment (\".\" or \"..\")."),
         ));
     }
     Ok(())
+}
+
+pub(crate) fn is_url_dot_segment(value: &str) -> bool {
+    matches!(value, "." | "..")
 }
 
 fn javascript_property_index(key: &str) -> Option<u32> {

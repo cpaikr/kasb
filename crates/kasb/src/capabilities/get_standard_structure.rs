@@ -68,10 +68,10 @@ pub struct StandardSectionNode {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GetStandardStructurePayload {
     pub request: GetStandardStructureRequest,
     pub sections: Vec<StandardSectionNode>,
-    #[serde(rename = "returnedCount")]
     pub returned_count: usize,
 }
 

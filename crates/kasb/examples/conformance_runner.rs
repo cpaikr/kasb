@@ -103,30 +103,32 @@ async fn run() -> Result<(), Box<dyn Error>> {
     );
     let cancellation = CancellationToken::new();
     let result = match request.operation.as_str() {
-        "search-standards" => client
-            .execute_search_standards(request.input, &cancellation)
-            .await
-            .and_then(to_value),
-        "get-standard-structure" => client
-            .execute_get_standard_structure(request.input, &cancellation)
-            .await
-            .and_then(to_value),
-        "get-section" => client
-            .execute_get_section(request.input, &cancellation)
-            .await
-            .and_then(to_value),
-        "get-paragraph" => client
-            .execute_get_paragraph(request.input, &cancellation)
-            .await
-            .and_then(to_value),
-        "search-qna" => client
-            .execute_search_qna(request.input, &cancellation)
-            .await
-            .and_then(to_value),
-        "get-qna" => client
-            .execute_get_qna(request.input, &cancellation)
-            .await
-            .and_then(to_value),
+        "search-standards" => to_value(
+            client
+                .execute_search_standards(request.input, &cancellation)
+                .await,
+        )?,
+        "get-standard-structure" => to_value(
+            client
+                .execute_get_standard_structure(request.input, &cancellation)
+                .await,
+        )?,
+        "get-section" => to_value(
+            client
+                .execute_get_section(request.input, &cancellation)
+                .await,
+        )?,
+        "get-paragraph" => to_value(
+            client
+                .execute_get_paragraph(request.input, &cancellation)
+                .await,
+        )?,
+        "search-qna" => to_value(
+            client
+                .execute_search_qna(request.input, &cancellation)
+                .await,
+        )?,
+        "get-qna" => to_value(client.execute_get_qna(request.input, &cancellation).await)?,
         _ => {
             return Err(format!(
                 "Rust SDK conformance runner does not support operation {} for {}",
@@ -156,14 +158,11 @@ async fn run() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn to_value<T: serde::Serialize>(value: T) -> Result<Value, KasbError> {
-    serde_json::to_value(value).map_err(|_| {
-        KasbError::Failure(kasb::KasbFailure {
-            code: kasb::KasbFailureCode::InternalFailure,
-            message: "Could not serialize the KASB result.".to_owned(),
-            retryable: false,
-            parameter: None,
-            source_url: None,
-        })
-    })
+fn to_value<T: serde::Serialize>(
+    result: Result<T, KasbError>,
+) -> Result<Result<Value, KasbError>, serde_json::Error> {
+    match result {
+        Ok(value) => Ok(Ok(serde_json::to_value(value)?)),
+        Err(error) => Ok(Err(error)),
+    }
 }

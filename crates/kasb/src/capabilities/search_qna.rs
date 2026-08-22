@@ -12,7 +12,7 @@ use super::validation::{
 use crate::KasbFailure;
 use crate::text::trim_ecmascript_whitespace;
 
-pub const DEFAULT_QNA_TYPES: &str = "11,12,13,14,15,24,25";
+pub(crate) const DEFAULT_QNA_TYPES: &str = "11,12,13,14,15,24,25";
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]

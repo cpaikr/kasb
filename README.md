@@ -3,12 +3,9 @@
 Read-only access to KASB standards and Q&A material through a public Rust SDK,
 Rust-backed Node SDK, and Rust CLI.
 
-The repository is executing a `../ytm`-shaped rewrite: `crates/kasb` is now the
-complete replacement KASB HTTP and domain implementation. A Node SDK will call it through a
-narrow asynchronous Node-API binding, and a separate `clap` CLI will call the
-same Rust SDK directly. The npm package retains `kasb` as a transparent launcher
-for the packaged Rust binary and retains `@sjunepark/kasb/toolset`. The Pi
-adapter will be removed at cutover.
+The repository is executing a `../ytm`-shaped Rust/Node rewrite. See
+[MIGRATION.md](MIGRATION.md) for authoritative transition status and
+[ARCHITECTURE.md](ARCHITECTURE.md) for the target boundaries.
 
 ## Current checkout
 
@@ -28,8 +25,8 @@ adapter will be removed at cutover.
   this phase remains a private feasibility proof, not the cutover product.
 
 The current implementations remain intact until the replacement passes the
-approved cutover gates. See [ARCHITECTURE.md](ARCHITECTURE.md) for current and
-target boundaries, [VISION.md](VISION.md) for product scope, and
+approved cutover gates. See [MIGRATION.md](MIGRATION.md) for current status,
+[VISION.md](VISION.md) for product scope, and
 [plans/rust-node-rewrite.md](plans/rust-node-rewrite.md) for the scheduled work.
 
 ## Development commands

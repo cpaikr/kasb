@@ -307,6 +307,13 @@ async fn shared_transport_policy_applies_without_retries() {
             KasbFailureCode::SourceUnavailable,
             true,
         ),
+        (
+            Outcome::Error(TransportError::ResponseTooLarge {
+                limit: kasb::http::MAX_RESPONSE_BYTES,
+            }),
+            KasbFailureCode::SourceChanged,
+            false,
+        ),
     ] {
         let (client, transport) = client([(url.to_owned(), outcome)]);
         let value = failure(
@@ -321,6 +328,23 @@ async fn shared_transport_policy_applies_without_retries() {
         );
         assert_eq!(transport.calls(), [url]);
     }
+
+    let oversized = Outcome::Response(HttpResponse {
+        status: 200,
+        body: vec![b' '; kasb::http::MAX_RESPONSE_BYTES + 1],
+    });
+    let (client, transport) = client([(url.to_owned(), oversized)]);
+    let value = failure(
+        client
+            .execute_get_qna(json!({"docNumber": "SSI-x"}), &CancellationToken::new())
+            .await
+            .expect_err("custom transports must share the response bound"),
+    );
+    assert_eq!(
+        (value.code, value.retryable, value.source_url.as_deref()),
+        (KasbFailureCode::SourceChanged, false, Some(url))
+    );
+    assert_eq!(transport.calls(), [url]);
 }
 
 #[tokio::test]
@@ -555,6 +579,78 @@ async fn required_envelopes_rows_and_identities_fail_closed() {
     assert_eq!(value.message, "Required Q&A response fields changed.");
 }
 
+#[tokio::test]
+async fn source_derived_url_dot_segments_fail_closed_before_follow_up_requests() {
+    let cancellation = CancellationToken::new();
+
+    let standard_search_url = "https://db.kasb.or.kr/api/standard?searchWord=x";
+    let (sdk, transport) = client([(
+        standard_search_url.to_owned(),
+        response(
+            200,
+            json!({"standards": {"stdCountArr": [{"key": "..", "doc_count": 1}]}}),
+        ),
+    )]);
+    let value = failure(
+        sdk.execute_search_standards(json!({"keyword": "x"}), &cancellation)
+            .await
+            .expect_err("dot-segment standard id should fail closed"),
+    );
+    assert_eq!(value.code, KasbFailureCode::SourceChanged);
+    assert_eq!(transport.calls(), [standard_search_url]);
+
+    let structure_url = "https://db.kasb.or.kr/api/standard-indexes/1116";
+    let (sdk, transport) = client([(
+        structure_url.to_owned(),
+        response(
+            200,
+            json!({"standardIndexes": [{"documentId": ".", "stdNum": "1116", "title": "bad", "level": 1}]}),
+        ),
+    )]);
+    let value = failure(
+        sdk.execute_get_standard_structure(json!({"stdNum": "1116"}), &cancellation)
+            .await
+            .expect_err("dot-segment structure id should fail closed"),
+    );
+    assert_eq!(value.code, KasbFailureCode::SourceChanged);
+    assert_eq!(transport.calls(), [structure_url]);
+
+    let section_url = "https://db.kasb.or.kr/api/paragraphs/1116/x";
+    let (sdk, transport) = client([(
+        section_url.to_owned(),
+        response(
+            200,
+            json!({"clauses": [{"stdNum": "1116", "documentId": "..", "paraNum": "1"}]}),
+        ),
+    )]);
+    let value = failure(
+        sdk.execute_get_section(
+            json!({"stdNum": "1116", "indexDocumentId": "x"}),
+            &cancellation,
+        )
+        .await
+        .expect_err("dot-segment clause id should fail closed"),
+    );
+    assert_eq!(value.code, KasbFailureCode::SourceChanged);
+    assert_eq!(transport.calls(), [section_url]);
+
+    let qna_search_url = "https://db.kasb.or.kr/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=x&page=1&rows=10";
+    let (sdk, transport) = client([(
+        qna_search_url.to_owned(),
+        response(
+            200,
+            json!({"facilityQnas": [{"docNumber": "..", "type": 15}]}),
+        ),
+    )]);
+    let value = failure(
+        sdk.execute_search_qna(json!({"keyword": "x"}), &cancellation)
+            .await
+            .expect_err("dot-segment Q&A id should fail closed"),
+    );
+    assert_eq!(value.code, KasbFailureCode::SourceChanged);
+    assert_eq!(transport.calls(), [qna_search_url]);
+}
+
 #[test]
 fn request_validation_matches_json_integer_and_ecmascript_trim_semantics() {
     let standards = SearchStandardsRequest::from_json(json!({
@@ -628,6 +724,44 @@ async fn relevance_ranking_uses_nfkc_compatible_title_matching() {
             .map(|item| item.std_num.as_str())
             .collect::<Vec<_>>(),
         ["1", "2"]
+    );
+}
+
+#[tokio::test]
+async fn standard_kind_uses_ecmascript_whitespace_semantics() {
+    let search_url = "https://db.kasb.or.kr/api/standard?searchWord=x";
+    let structure_url = "https://db.kasb.or.kr/api/standard-indexes/2";
+    let (sdk, _) = client([
+        (
+            search_url.to_owned(),
+            response(
+                200,
+                json!({"standards": {"stdCountArr": [{"key": "2", "doc_count": 1}]}}),
+            ),
+        ),
+        (
+            structure_url.to_owned(),
+            response(
+                200,
+                json!({"standardIndexes": [{
+                    "documentId": "chapter",
+                    "stdNum": "2",
+                    "title": "제2장\u{0085}재무제표",
+                    "level": 1
+                }]}),
+            ),
+        ),
+    ]);
+    let result = sdk
+        .execute_search_standards(
+            json!({"keyword": "x", "sort": "match-count"}),
+            &CancellationToken::new(),
+        )
+        .await
+        .expect("standard search should succeed");
+    assert_eq!(
+        result.result.standards[0].standard_kind.as_deref(),
+        Some("standard")
     );
 }
 
@@ -807,6 +941,35 @@ async fn standard_ranking_enrichment_fails_closed_above_its_request_bound() {
     assert_eq!(value.code, KasbFailureCode::SourceChanged);
     assert!(value.message.contains("more than 512 rows"));
     assert_eq!(transport.calls(), [url]);
+}
+
+#[tokio::test]
+async fn standard_ranking_enrichment_accepts_its_exact_request_bound() {
+    let search_url = "https://db.kasb.or.kr/api/standard?searchWord=x";
+    let rows = (0..512)
+        .map(|index| json!({"key": index.to_string(), "doc_count": 1}))
+        .collect::<Vec<_>>();
+    let mut routes = vec![(
+        search_url.to_owned(),
+        response(200, json!({"standards": {"stdCountArr": rows}})),
+    )];
+    routes.extend((0..512).map(|index| {
+        (
+            format!("https://db.kasb.or.kr/api/standard-indexes/{index}"),
+            response(200, json!({"standardIndexes": []})),
+        )
+    }));
+    let (sdk, transport) = client(routes);
+    let result = sdk
+        .execute_search_standards(
+            json!({"keyword": "x", "limit": 1}),
+            &CancellationToken::new(),
+        )
+        .await
+        .expect("the exact enrichment bound should remain supported");
+    assert_eq!(result.result.returned_count, 1);
+    assert_eq!(result.result.total_standard_count, 512);
+    assert_eq!(transport.calls().len(), 513);
 }
 
 #[tokio::test]

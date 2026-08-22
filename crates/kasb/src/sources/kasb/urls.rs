@@ -1,5 +1,7 @@
 use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
 
+use crate::capabilities::search_qna::DEFAULT_QNA_TYPES;
+
 pub(crate) const KASB_API_BASE_URL: &str = "https://db.kasb.or.kr/api";
 
 const URI_COMPONENT_ENCODE_SET: &AsciiSet = &CONTROLS
@@ -83,7 +85,7 @@ pub(crate) fn paragraphs_url(
 pub(crate) fn qnas_search_url(keyword: &str, page: u64, rows: u64, types: Option<&str>) -> String {
     format!(
         "{KASB_API_BASE_URL}/qnas/v2?types={}&searchWord={}&page={page}&rows={rows}",
-        encode_query_value(types.unwrap_or("11,12,13,14,15,24,25")),
+        encode_query_value(types.unwrap_or(DEFAULT_QNA_TYPES)),
         encode_query_value(keyword),
     )
 }

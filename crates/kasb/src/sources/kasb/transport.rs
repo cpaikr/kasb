@@ -1,6 +1,8 @@
 use serde_json::Value;
 
-use crate::http::{CancellationToken, HttpResponse, HttpTransport, TransportError};
+use crate::http::{
+    CancellationToken, HttpResponse, HttpTransport, MAX_RESPONSE_BYTES, TransportError,
+};
 use crate::{KasbError, KasbFailure, KasbFailureCode};
 
 pub(crate) async fn fetch_json<T: HttpTransport>(
@@ -20,6 +22,9 @@ pub(crate) async fn fetch_json<T: HttpTransport>(
     let response = match response {
         Ok(response) => response,
         Err(TransportError::Cancelled) => return Err(KasbError::Cancelled),
+        Err(TransportError::ResponseTooLarge { limit }) => {
+            return Err(response_too_large_failure(source_url, limit).into());
+        }
         Err(TransportError::Timeout | TransportError::Unavailable(_)) => {
             return Err(KasbFailure::source_failure(
                 KasbFailureCode::SourceUnavailable,
@@ -48,6 +53,9 @@ fn ensure_success(response: HttpResponse, source_url: &str) -> Result<Value, Kas
         )
         .into());
     }
+    if response.body.len() > MAX_RESPONSE_BYTES {
+        return Err(response_too_large_failure(source_url, MAX_RESPONSE_BYTES).into());
+    }
 
     serde_json::from_slice(&response.body).map_err(|_| {
         KasbError::from(KasbFailure::source_failure(
@@ -57,4 +65,13 @@ fn ensure_success(response: HttpResponse, source_url: &str) -> Result<Value, Kas
             source_url,
         ))
     })
+}
+
+fn response_too_large_failure(source_url: &str, limit: usize) -> KasbFailure {
+    KasbFailure::source_failure(
+        KasbFailureCode::SourceChanged,
+        format!("KASB API response exceeded the {limit}-byte limit."),
+        false,
+        source_url,
+    )
 }

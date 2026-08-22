@@ -7,7 +7,7 @@ use futures_util::{StreamExt, TryStreamExt, stream};
 use icu_collator::{Collator, CollatorBorrowed};
 use icu_locale::locale;
 use regex::Regex;
-use serde_json::{Map, Number, Value};
+use serde_json::{Number, Value};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::capabilities::get_qna::{
@@ -19,12 +19,12 @@ use crate::capabilities::get_section::{
 };
 use crate::capabilities::get_standard_structure::{
     GetStandardStructurePayload, GetStandardStructureRequest, GetStandardStructureResult,
-    StandardSectionNode, StandardStructureReferences, StandardStructureWarning,
-    StandardStructureWarningCode,
+    StandardStructureReferences, StandardStructureWarning, StandardStructureWarningCode,
 };
 use crate::capabilities::search_qna::{
-    PaginationStatus, QnaDateSort, QnaSearchItem, QnaSearchItemReferences, SearchQnaPayload,
-    SearchQnaReferences, SearchQnaRequest, SearchQnaResult, SearchQnaWarning, SearchQnaWarningCode,
+    DEFAULT_QNA_TYPES, PaginationStatus, QnaDateSort, QnaSearchItem, QnaSearchItemReferences,
+    SearchQnaPayload, SearchQnaReferences, SearchQnaRequest, SearchQnaResult, SearchQnaWarning,
+    SearchQnaWarningCode,
 };
 use crate::capabilities::search_standards::{
     SearchStandardItem, SearchStandardNextActions, SearchStandardReferences,
@@ -32,6 +32,7 @@ use crate::capabilities::search_standards::{
     SearchStandardsResult, SearchStandardsSort, SearchStandardsWarning, SearchStandardsWarningCode,
     StructureNextAction, StructureNextInput,
 };
+use crate::capabilities::validation::is_url_dot_segment;
 use crate::capabilities::{
     Completeness, ContentMetadata, ResultMetadata, SourceBehavior, SourceMetadata,
 };
@@ -42,7 +43,15 @@ use crate::text::{
 };
 use crate::{KasbError, KasbFailure, KasbFailureCode};
 
+use super::decode::{
+    assert_any_normalized, number_f64, number_string, optional_number, optional_string,
+    required_array, required_object, required_object_ref, source_changed, to_string_value,
+};
 use super::normalize::{normalize_kasb_plain_text, strip_html};
+use super::structure::{
+    SectionEnrichment, enrichment_from_snapshot, fetch_structure_snapshot, infer_standard_kind,
+    section_enrichment,
+};
 use super::transport::fetch_json;
 use super::urls::{
     KASB_API_BASE_URL, paragraphs_url, qna_content_url, qnas_search_url,
@@ -51,11 +60,9 @@ use super::urls::{
 
 static HTML_TAG: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"<[^>]+>").expect("HTML regex is valid"));
-static GENERAL_CHAPTER_TITLE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^제[0-9]+장(?:\s|$)").expect("kind regex is valid"));
 static TRAILING_UNDEFINED: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(&format!(
-        r"(?:\bundefined\b[{ECMASCRIPT_WHITESPACE_CLASS}]*){{2,}}$"
+        r"(?:(?-u:\bundefined\b)[{ECMASCRIPT_WHITESPACE_CLASS}]*){{2,}}$"
     ))
     .expect("cleanup regex is valid")
 });
@@ -99,6 +106,7 @@ pub(crate) async fn search_standards<T: HttpTransport, F: FnOnce() -> String>(
         "Standard search result fields changed.",
     )?;
     let incomplete = items.len() != source_items.len();
+    let total_standard_count = items.len();
 
     match request.sort() {
         SearchStandardsSort::Relevance | SearchStandardsSort::Title => {
@@ -122,10 +130,6 @@ pub(crate) async fn search_standards<T: HttpTransport, F: FnOnce() -> String>(
         }
     }
     let returned_count = items.len();
-    let total_standard_count = source_items
-        .iter()
-        .filter(|value| normalize_standard_search_item(value).is_some())
-        .count();
     let mut warnings = Vec::new();
     if returned_count < total_standard_count {
         warnings.push(SearchStandardsWarning {
@@ -567,142 +571,6 @@ async fn search_qna_recency<T: HttpTransport, F: FnOnce() -> String>(
     })
 }
 
-#[derive(Clone)]
-struct StructureSnapshot {
-    source_url: String,
-    sections: Vec<StandardSectionNode>,
-    raw_ids: HashSet<String>,
-    incomplete: bool,
-}
-
-async fn fetch_structure_snapshot<T: HttpTransport>(
-    transport: &T,
-    std_num: &str,
-    cancellation: &CancellationToken,
-) -> Result<StructureSnapshot, KasbError> {
-    let source_url = standard_indexes_url(std_num);
-    let payload = required_object(
-        fetch_json(transport, &source_url, cancellation).await?,
-        &source_url,
-        "standard indexes",
-    )?;
-    let source_items = required_array(
-        payload.get("standardIndexes"),
-        &source_url,
-        "standardIndexes",
-    )?;
-    let mut sections = Vec::new();
-    let mut raw_ids = HashSet::new();
-    for item in source_items {
-        let raw = raw_structure_id(item, &source_url, std_num)?;
-        if let Some(value) = raw.as_ref() {
-            raw_ids.insert(value.clone());
-        }
-        if let Some(value) = normalize_structure_node(item, raw, std_num) {
-            sections.push(value);
-        }
-    }
-    assert_any_normalized(
-        source_items,
-        &sections,
-        &source_url,
-        "Standard structure row fields changed.",
-    )?;
-    Ok(StructureSnapshot {
-        source_url,
-        incomplete: sections.len() != source_items.len(),
-        sections,
-        raw_ids,
-    })
-}
-
-fn raw_structure_id(
-    value: &Value,
-    source_url: &str,
-    expected_std_num: &str,
-) -> Result<Option<String>, KasbError> {
-    let Some(item) = value.as_object() else {
-        return Ok(None);
-    };
-    let document_id = item.get("documentId").and_then(to_string_value);
-    let std_num = item.get("stdNum").and_then(to_string_value);
-    let (Some(document_id), Some(std_num)) = (document_id, std_num) else {
-        return Ok(None);
-    };
-    if std_num != expected_std_num {
-        return Err(source_changed(
-            source_url,
-            "Standard structure row stdNum does not match the request.",
-        )
-        .into());
-    }
-    Ok(Some(document_id))
-}
-
-fn normalize_structure_node(
-    value: &Value,
-    document_id: Option<String>,
-    std_num: &str,
-) -> Option<StandardSectionNode> {
-    let item = value.as_object()?;
-    Some(StandardSectionNode {
-        index_document_id: document_id?,
-        std_num: std_num.to_owned(),
-        title: optional_string(item.get("title"))?,
-        r#ref: optional_string(item.get("ref")).unwrap_or_default(),
-        level: optional_number(item.get("level"))?,
-        document_type: optional_string(item.get("documentType")),
-        parent_document_ids: item
-            .get("parentDocumentIds")
-            .and_then(Value::as_array)
-            .map(|values| values.iter().filter_map(to_string_value).collect())
-            .unwrap_or_default(),
-        sort: optional_number(item.get("sort")),
-    })
-}
-
-#[derive(Clone)]
-struct SectionEnrichment {
-    standard_title: Option<String>,
-    standard_kind: Option<String>,
-    exists: bool,
-    title: Option<String>,
-    reference: Option<String>,
-    level: Option<Number>,
-    sort: Option<Number>,
-}
-
-fn enrichment_from_snapshot(snapshot: &StructureSnapshot, document_id: &str) -> SectionEnrichment {
-    let standard_title = snapshot
-        .sections
-        .iter()
-        .find(|value| number_f64(&value.level) == 1.0)
-        .map(|value| value.title.clone());
-    let section = snapshot
-        .sections
-        .iter()
-        .find(|value| value.index_document_id == document_id);
-    SectionEnrichment {
-        standard_kind: standard_title.as_deref().map(infer_standard_kind),
-        standard_title,
-        exists: section.is_some() || snapshot.raw_ids.contains(document_id),
-        title: section.map(|value| value.title.clone()),
-        reference: section.map(|value| value.r#ref.clone()),
-        level: section.map(|value| value.level.clone()),
-        sort: section.and_then(|value| value.sort.clone()),
-    }
-}
-
-async fn section_enrichment<T: HttpTransport>(
-    transport: &T,
-    std_num: &str,
-    document_id: &str,
-    cancellation: &CancellationToken,
-) -> Result<SectionEnrichment, KasbError> {
-    let snapshot = fetch_structure_snapshot(transport, std_num, cancellation).await?;
-    Ok(enrichment_from_snapshot(&snapshot, document_id))
-}
-
 struct SectionLookup {
     index_document_id: String,
     enrichment: Option<SectionEnrichment>,
@@ -777,6 +645,16 @@ fn normalize_section_clause(
         .into());
     }
     let explicit_document_id = item.get("documentId").and_then(to_string_value);
+    if explicit_document_id
+        .as_deref()
+        .is_some_and(is_url_dot_segment)
+    {
+        return Err(source_changed(
+            source_url,
+            "Section paragraph row documentId is a URL dot segment.",
+        )
+        .into());
+    }
     let para_num = item.get("paraNum").and_then(to_string_value);
     let title = optional_string(item.get("title"));
     let para_content = optional_string(item.get("paraContent"));
@@ -823,6 +701,9 @@ fn normalize_section_clause(
 fn normalize_standard_search_item(value: &Value) -> Option<SearchStandardItem> {
     let item = value.as_object()?;
     let std_num = item.get("key").and_then(to_string_value)?;
+    if is_url_dot_segment(&std_num) {
+        return None;
+    }
     let match_count = optional_number(item.get("doc_count"))?;
     Some(SearchStandardItem {
         references: SearchStandardReferences {
@@ -922,10 +803,29 @@ fn title_score(keyword: &str, title: Option<&str>) -> u8 {
 }
 
 fn strip_standard_prefix(value: &str) -> String {
-    static PREFIX: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(&format!(r"^(?:기업회계기준(?:해석)?서[{ECMASCRIPT_WHITESPACE_CLASS}]*제?[{ECMASCRIPT_WHITESPACE_CLASS}]*[0-9]+[A-Za-z]?[{ECMASCRIPT_WHITESPACE_CLASS}]*호?[{ECMASCRIPT_WHITESPACE_CLASS}]*|한국채택국제회계기준[{ECMASCRIPT_WHITESPACE_CLASS}]*제?[{ECMASCRIPT_WHITESPACE_CLASS}]*[0-9]+[A-Za-z]?[{ECMASCRIPT_WHITESPACE_CLASS}]*호?[{ECMASCRIPT_WHITESPACE_CLASS}]*|일반기업회계기준[{ECMASCRIPT_WHITESPACE_CLASS}]*|제[{ECMASCRIPT_WHITESPACE_CLASS}]*[0-9]+[{ECMASCRIPT_WHITESPACE_CLASS}]*장[{ECMASCRIPT_WHITESPACE_CLASS}]*)")).expect("prefix regex is valid")
+    static KAS_PREFIX: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(&format!(r"^기업회계기준(?:해석)?서[{ECMASCRIPT_WHITESPACE_CLASS}]*제?[{ECMASCRIPT_WHITESPACE_CLASS}]*[0-9]+[A-Za-z]?[{ECMASCRIPT_WHITESPACE_CLASS}]*호?[{ECMASCRIPT_WHITESPACE_CLASS}]*")).expect("KAS prefix regex is valid")
     });
-    trim_ecmascript_whitespace(&PREFIX.replace(&strip_html(value), "")).to_owned()
+    static K_IFRS_PREFIX: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(&format!(r"^한국채택국제회계기준[{ECMASCRIPT_WHITESPACE_CLASS}]*제?[{ECMASCRIPT_WHITESPACE_CLASS}]*[0-9]+[A-Za-z]?[{ECMASCRIPT_WHITESPACE_CLASS}]*호?[{ECMASCRIPT_WHITESPACE_CLASS}]*")).expect("K-IFRS prefix regex is valid")
+    });
+    static GENERAL_GAAP_PREFIX: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(&format!(
+            r"^일반기업회계기준[{ECMASCRIPT_WHITESPACE_CLASS}]*"
+        ))
+        .expect("general GAAP prefix regex is valid")
+    });
+    static CHAPTER_PREFIX: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(&format!(r"^제[{ECMASCRIPT_WHITESPACE_CLASS}]*[0-9]+[{ECMASCRIPT_WHITESPACE_CLASS}]*장[{ECMASCRIPT_WHITESPACE_CLASS}]*"))
+            .expect("chapter prefix regex is valid")
+    });
+
+    let value = strip_html(value);
+    let value = KAS_PREFIX.replace(&value, "").into_owned();
+    let value = K_IFRS_PREFIX.replace(&value, "").into_owned();
+    let value = GENERAL_GAAP_PREFIX.replace(&value, "").into_owned();
+    let value = CHAPTER_PREFIX.replace(&value, "").into_owned();
+    trim_ecmascript_whitespace(&value).to_owned()
 }
 
 fn normalize_search_text(value: &str) -> String {
@@ -1016,6 +916,9 @@ async fn fetch_qna_page<T: HttpTransport>(
 fn normalize_qna_search_item(value: &Value) -> Option<QnaSearchItem> {
     let item = value.as_object()?;
     let doc_number = item.get("docNumber").and_then(to_string_value)?;
+    if is_url_dot_segment(&doc_number) {
+        return None;
+    }
     let item_type = optional_number(item.get("type"))?;
     let title = array_text(item.get("title"))
         .filter(|value| !value.is_empty())
@@ -1160,7 +1063,7 @@ fn type_ids_for_page(
 ) -> HashSet<String> {
     let mut result = request
         .types()
-        .unwrap_or("11,12,13,14,15,24,25")
+        .unwrap_or(DEFAULT_QNA_TYPES)
         .split(',')
         .map(str::to_owned)
         .collect::<HashSet<_>>();
@@ -1315,63 +1218,6 @@ fn metadata(
         content,
     }
 }
-fn required_object(
-    value: Value,
-    source_url: &str,
-    context: &str,
-) -> Result<Map<String, Value>, KasbError> {
-    match value {
-        Value::Object(value) => Ok(value),
-        _ => Err(source_changed(
-            source_url,
-            format!("Could not find {context} response object."),
-        )
-        .into()),
-    }
-}
-fn required_object_ref<'a>(
-    value: Option<&'a Value>,
-    source_url: &str,
-    context: &str,
-) -> Result<&'a Map<String, Value>, KasbError> {
-    value.and_then(Value::as_object).ok_or_else(|| {
-        source_changed(
-            source_url,
-            format!("Could not find {context} response object."),
-        )
-        .into()
-    })
-}
-fn required_array<'a>(
-    value: Option<&'a Value>,
-    source_url: &str,
-    context: &str,
-) -> Result<&'a Vec<Value>, KasbError> {
-    value.and_then(Value::as_array).ok_or_else(|| {
-        source_changed(source_url, format!("Could not find {context} array.")).into()
-    })
-}
-fn optional_string(value: Option<&Value>) -> Option<String> {
-    value.and_then(Value::as_str).map(str::to_owned)
-}
-fn optional_number(value: Option<&Value>) -> Option<Number> {
-    value.and_then(Value::as_number).cloned()
-}
-fn to_string_value(value: &Value) -> Option<String> {
-    match value {
-        Value::String(value) => Some(value.clone()),
-        Value::Number(value) => Some(number_string(value)),
-        _ => None,
-    }
-}
-fn number_string(value: &Number) -> String {
-    ryu_js::Buffer::new()
-        .format_finite(number_f64(value))
-        .to_owned()
-}
-fn number_f64(value: &Number) -> f64 {
-    value.as_f64().expect("JSON number is finite")
-}
 fn array_text(value: Option<&Value>) -> Option<String> {
     value.and_then(Value::as_array).map(|values| {
         values
@@ -1393,21 +1239,6 @@ fn qna_tags(value: Option<&Value>) -> Vec<String> {
         _ => Vec::new(),
     }
 }
-fn assert_any_normalized<T, U>(
-    source: &[T],
-    normalized: &[U],
-    source_url: &str,
-    message: &str,
-) -> Result<(), KasbError> {
-    if !source.is_empty() && normalized.is_empty() {
-        Err(source_changed(source_url, message).into())
-    } else {
-        Ok(())
-    }
-}
-fn source_changed(source_url: &str, message: impl Into<String>) -> KasbFailure {
-    KasbFailure::source_failure(KasbFailureCode::SourceChanged, message, false, source_url)
-}
 fn section_not_found(source_url: &str) -> KasbFailure {
     KasbFailure::source_failure(
         KasbFailureCode::NotFound,
@@ -1415,18 +1246,6 @@ fn section_not_found(source_url: &str) -> KasbFailure {
         false,
         source_url,
     )
-}
-fn infer_standard_kind(title: &str) -> String {
-    if title.contains("기업회계기준해석서") {
-        "k-ifrs-interpretation"
-    } else if title.contains("기업회계기준서") {
-        "k-ifrs-standard"
-    } else if GENERAL_CHAPTER_TITLE.is_match(title) {
-        "general-gaap-chapter"
-    } else {
-        "standard"
-    }
-    .to_owned()
 }
 fn remove_whitespace(value: &str) -> String {
     value
@@ -1450,6 +1269,24 @@ mod tests {
             [
                 "10장", "2장", "ㄱ", "가", "각", "기준", "리스", "abc", "Abc", "ＡBC"
             ]
+        );
+    }
+
+    #[test]
+    fn strips_each_javascript_prefix_stage_once() {
+        assert_eq!(
+            strip_standard_prefix("일반기업회계기준 제2장 재무제표"),
+            "재무제표"
+        );
+        assert_eq!(strip_standard_prefix("제1장 제2장 제목"), "제2장 제목");
+    }
+
+    #[test]
+    fn qna_cleanup_uses_javascript_ascii_word_boundaries() {
+        assert_eq!(normalize_qna_text("본문undefined undefined"), "본문");
+        assert_eq!(
+            normalize_qna_text("본문_undefined undefined"),
+            "본문_undefined undefined"
         );
     }
 }

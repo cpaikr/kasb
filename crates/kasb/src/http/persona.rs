@@ -57,6 +57,8 @@ pub enum TransportError {
     Timeout,
     #[error("request failed: {0}")]
     Unavailable(String),
+    #[error("successful response body exceeded the {limit}-byte limit")]
+    ResponseTooLarge { limit: usize },
 }
 
 pub trait HttpTransport: Send + Sync {
@@ -186,9 +188,9 @@ impl HttpTransport for PersonaClient {
 }
 
 fn response_too_large() -> TransportError {
-    TransportError::Unavailable(format!(
-        "response body exceeded the {MAX_RESPONSE_BYTES}-byte limit"
-    ))
+    TransportError::ResponseTooLarge {
+        limit: MAX_RESPONSE_BYTES,
+    }
 }
 
 fn map_wreq_error(error: wreq::Error) -> TransportError {
