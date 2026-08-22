@@ -2,11 +2,11 @@
 
 ## Current
 
-_None._
+[Rewrite KASB around a public Rust SDK, Node SDK, and Rust CLI](plans/rust-node-rewrite.md)
 
 ## Plans
 
-1. [Rewrite KASB around a public Rust SDK, Node SDK, and Rust CLI](plans/rust-node-rewrite.md)
+_None._
 
 ## Tasks
 

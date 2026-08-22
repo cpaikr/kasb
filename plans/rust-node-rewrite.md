@@ -222,5 +222,8 @@ native-target, and live verification.
 
 ## Next action
 
-Select and authorize an execution goal from this plan. Do not start the rewrite
-or move this item into `ROADMAP.md` `Current` until that goal is initialized.
+Execute delivery phase 1 on a review branch from
+`codex/rust-node-rewrite-integration`: freeze the compatibility inventory and
+baseline, add the OpenAPI wire authority and freshness checks, strengthen the
+adversarial public-surface judge, and prove the Node-API and native-launcher
+feasibility gates before beginning the full Rust implementation.
