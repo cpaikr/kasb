@@ -3,7 +3,7 @@
 Captured on 2026-03-31. Q&A endpoint notes refreshed on 2026-05-21.
 
 Status: observed provider evidence, not a wire, public, or architecture
-contract. Promote supported HTTP wire facts into the planned
+contract. Supported HTTP wire facts are promoted into
 `contracts/kasb/openapi.yaml`, public semantic decisions into
 [../specs/kasb-standards-v1.md](../specs/kasb-standards-v1.md), and component
 boundaries into [../../ARCHITECTURE.md](../../ARCHITECTURE.md).
@@ -203,10 +203,11 @@ Observed response shapes:
 
 Implementation implication:
 
-- source response schemas should live under each SDK's source-adapter root
-  (`packages/kasb-ts/src/sources/kasb/` and `crates/kasb/src/sources/kasb/`)
+- supported source response shapes live only in
+  `contracts/kasb/openapi.yaml`; source adapters keep private decoding models
+  that implement that authority
 - public capability result schemas should expose normalized standards, sections, paragraphs, references, metadata, and warnings
-- raw source payloads may be exposed only through explicit CLI debugging output, not the default public success result
+- raw source payloads are not exposed through public SDK or CLI results
 
 ## Browser Independence
 

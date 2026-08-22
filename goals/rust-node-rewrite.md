@@ -60,13 +60,17 @@ _None._
 
 Phase 1: freeze the compatibility baseline, establish the OpenAPI wire
 authority, strengthen the adversarial public-surface judge, and prove Node-API
-and native-launcher feasibility.
+and native-launcher feasibility. PR feedback fixes, validation, and the
+repository-required independent review are complete on
+`codex/rust-node-rewrite-phase-1`; integration is pending the remainder of the
+required PR lifecycle.
 
 ### Next in-scope action
 
-Inventory the existing public surfaces and validation baseline, then implement
-the phase-1 authorities, judge, and disposable feasibility slices on a review
-branch from the integration base.
+Commit and push the cohesive PR-feedback fix, reply to and resolve every review
+thread, refresh checks and feedback, then merge PR #15 into
+`codex/rust-node-rewrite-integration` before beginning the dependent Rust SDK
+implementation.
 
 ### Evidence and blockers
 
@@ -77,5 +81,24 @@ branch from the integration base.
   implementation remains reviewable.
 - `main` starts one local planning commit (`31ef0ec`) ahead of `origin/main`;
   that approved rewrite plan is retained as the integration base.
+- The frozen compatibility inventory, OpenAPI wire authority and source
+  profile, fixture/contract/declaration freshness checks, process-isolated
+  adversarial judge, and private Node-API/native-launcher feasibility proof are
+  implemented on the phase-1 branch.
+- PR #15 is open against the integration branch. Its initial CodeRabbit and
+  Codex reviews completed with 20 threads; every item was independently audited
+  and the accepted findings are implemented locally without expanding the
+  frozen public API or changing cancellation ownership.
+- Full deterministic validation passes after the feedback fixes: frozen
+  install, contract and declaration checks, 36 adversarial/conformance tests,
+  macOS ARM64 native feasibility, typecheck, 195 Bun tests with one live test
+  skipped, 29 Rust tests, build, formatting, clippy with warnings denied, Rust
+  1.88 workspace check, and diff hygiene.
+- The opt-in live suite passes 188 tests, including the bounded KASB traversal.
+- Independent repository-required review of the feedback cluster reports no
+  remaining correctness, security, contract-drift, regression, or
+  overengineering findings and gives an explicit PASS verdict.
+- Native feasibility is evidenced only for macOS ARM64. Linux GNU x64/ARM64
+  and Windows x64 remain planned and unclaimed until their later native gates.
 - No blocker is currently known. Registry publication, version selection,
   release tags, and external KASB mutation remain unauthorized.

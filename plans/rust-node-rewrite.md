@@ -27,6 +27,11 @@ native-target, and live verification.
 - The former additive dual-SDK direction is superseded. The target is one Rust
   conformer with three supported public projections: the Rust SDK, Rust CLI,
   and Rust-backed Node SDK.
+- Delivery phase 1 is implemented, validated, and independently reviewed on
+  `codex/rust-node-rewrite-phase-1`. It establishes the frozen compatibility
+  inventory, OpenAPI authority and freshness checks, adversarial process judge,
+  and private Node-API/native-launcher feasibility proof. It does not yet claim
+  a cutover or native support beyond the proven macOS ARM64 host check.
 
 ## Decisions
 
@@ -157,6 +162,10 @@ native-target, and live verification.
 - Detect unsupported platforms, omitted optional dependencies, version skew,
   missing executable permissions, and spawn failures with concise actionable
   installation diagnostics.
+- Before production cutover, add a sanitized operator-side signal for contained
+  binding panics through an approved observability channel. It must not expose
+  source payloads or panic details to JavaScript and must not write unsolicited
+  diagnostics to a consumer's stderr.
 - Build every claimed target natively and clean-install the packed root and
   platform packages under each supported Node major.
 - **Exit gate:** the packed Node SDK/toolset and npm CLI launcher pass their
@@ -222,8 +231,7 @@ native-target, and live verification.
 
 ## Next action
 
-Execute delivery phase 1 on a review branch from
-`codex/rust-node-rewrite-integration`: freeze the compatibility inventory and
-baseline, add the OpenAPI wire authority and freshness checks, strengthen the
-adversarial public-surface judge, and prove the Node-API and native-launcher
-feasibility gates before beginning the full Rust implementation.
+Complete the required PR review lifecycle for delivery phase 1 into
+`codex/rust-node-rewrite-integration`, then begin delivery phase 2 on a fresh
+review branch by implementing the five remaining operations in the public Rust
+SDK and extending the independent judge to every Rust operation.

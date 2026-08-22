@@ -1,0 +1,9 @@
+{
+  "ok": false,
+  "error": {
+    "code": "not_found",
+    "message": "Could not find Q&A document SSI-35629.",
+    "retryable": false,
+    "sourceUrl": "https://db.kasb.or.kr/api/qnas/v2/SSI-35629"
+  }
+}

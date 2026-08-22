@@ -16,10 +16,15 @@
     "test:ts": "bun test packages/kasb-ts evals",
     "test:rust": "cargo test --workspace --locked",
     "test:live": "bun run --cwd packages/kasb-ts test:live",
-    "conformance:capture": "bun run --cwd packages/kasb-ts conformance:capture"
+    "contracts:check": "node scripts/validate-contracts.mjs && node scripts/check-public-declarations.mjs",
+    "conformance:judge": "bun test conformance/judge.test.ts packages/kasb-ts/test/conformance/conformance.test.ts",
+    "native:feasibility": "node scripts/test-native-feasibility.mjs"
   },
   "devDependencies": {
+    "@seriousme/openapi-schema-validator": "2.9.1",
     "@types/bun": "^1.3.1",
-    "typescript": "^5.9.0"
+    "ajv": "8.20.0",
+    "typescript": "^5.9.0",
+    "yaml": "^2.9.0"
   }
 }

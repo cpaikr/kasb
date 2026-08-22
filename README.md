@@ -18,7 +18,12 @@ adapter will be removed at cutover.
 - [`crates/kasb`](crates/kasb/README.md) is an independently buildable public
   Rust SDK with the validated `get-paragraph` vertical pilot.
 - `fixtures/` and `conformance/` contain shared source evidence and serialized
-  compatibility cases.
+  compatibility cases. The process-isolated judge verifies the public surfaces
+  and rejects deliberate behavioral corruption.
+- `contracts/kasb/openapi.yaml` owns the supported provider wire facts; its
+  source-adapter profile records only cross-response and decoding rules that
+  OpenAPI cannot express. The Node-API and native-launcher code in
+  this phase remains a private feasibility proof, not the cutover product.
 
 The current implementations remain intact until the replacement passes the
 approved cutover gates. See [ARCHITECTURE.md](ARCHITECTURE.md) for current and
@@ -29,12 +34,19 @@ target boundaries, [VISION.md](VISION.md) for product scope, and
 
 ```sh
 bun install --frozen-lockfile
+bun run contracts:check
+bun run conformance:judge
+bun run native:feasibility
 bun run typecheck
 bun run test
 bun run build
 cargo fmt --all --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 ```
+
+`bun run native:feasibility` probes the current host. Phase 1 evidence covers
+macOS ARM64 only; the remaining planned targets stay unclaimed until their
+native build and packed-consumer gates pass.
 
 Use `bun packages/kasb-ts/src/cli.ts --help` for the current source CLI and
 `node packages/kasb-ts/dist/cli.js --help` after building. Live KASB checks are

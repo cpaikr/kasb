@@ -29,6 +29,9 @@
 ## Current Commands
 
 - Install dependencies: `bun install --frozen-lockfile`
+- Validate contract authorities and fixture freshness: `bun run contracts:check`
+- Run the adversarial public-surface judge: `bun run conformance:judge`
+- Run the native binding and launcher feasibility proof: `bun run native:feasibility`
 - Typecheck: `bun run typecheck`
 - Test both implementations: `bun run test`
 - Build both implementations: `bun run build`

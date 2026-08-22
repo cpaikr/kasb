@@ -51,22 +51,25 @@ SDK, and JavaScript never owns KASB wire or source behavior.
   envelopes, warnings, and stable failures.
 - `docs/research/kasb-standard-source-map.md` — dated observations about KASB
   public read surfaces; evidence rather than contract authority.
-- `contracts/kasb/openapi.yaml` — planned sole authority for supported HTTP
-  paths, parameters, statuses, media types, and wire schemas. It is created in
-  rewrite phase 1.
+- `contracts/kasb/openapi.yaml` — validated sole authority for supported HTTP
+  paths, parameters, statuses, media types, and wire schemas, complemented by
+  the language-neutral source-adapter profile in the same directory.
 - `crates/kasb` — existing public Rust SDK and future sole conformer. Start at
   `src/lib.rs`, then follow capability, source, and HTTP modules.
 - `crates/kasb-cli` — planned first-class Rust `clap` CLI over `crates/kasb`.
   It owns command parsing, presentation, stdout/stderr, and exit status.
-- `crates/kasb-node` — planned asynchronous Node-API projection. It owns
-  cancellation and panic containment, not source rules.
-- `packages/node` — planned Node SDK, toolset, native loader, and transparent
-  npm CLI launcher. It replaces the active `packages/kasb-ts` path at cutover.
+- `crates/kasb-node` — currently a private asynchronous feasibility projection
+  over the paragraph pilot; the completed binding will own cancellation and
+  panic containment, not source rules.
+- `packages/node` — currently a private clean-consumer and launcher feasibility
+  package. It becomes the Node SDK, toolset, native loader, and transparent npm
+  CLI launcher only in the later product phase, replacing `packages/kasb-ts`
+  at cutover.
 - `packages/native` — planned generated platform packages containing the exact
   Node-API artifact and Rust CLI binary for each claimed target.
 - `fixtures` — captured provider responses used as independent deterministic
   evidence.
-- `conformance` and the planned process-isolated judge — public behavior cases,
+- `conformance` and its process-isolated judge — public behavior cases,
   expected outcomes, and deliberate known-bad controls.
 - `plans/rust-node-rewrite.md` — execution gates and cutover conditions; it does
   not define runtime architecture or public semantics.
@@ -121,7 +124,7 @@ signals, and exit status without parsing KASB commands.
 | Node cancellation and safe native projection | `crates/kasb-node` |
 | Node SDK/tool discovery and JavaScript ergonomics | `packages/node` |
 | npm target selection and transparent process launch | `packages/node` |
-| Native support matrix, package constraints, and platform selection | canonical target manifest introduced by the rewrite |
+| Native support matrix, package constraints, and platform selection | `native-targets.json` |
 | Deterministic provider and behavior evidence | `fixtures`, `conformance`, and judge expectations |
 
 OpenAPI is handwritten and validated; it does not generate the Rust conformer.

@@ -1,0 +1,24 @@
+{
+  "name": "@sjunepark/kasb-native-feasibility",
+  "version": "0.0.0-feasibility",
+  "description": "Private phase-1 probe for the KASB native Node and npm launcher boundaries.",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "kasb": "dist/cli.js"
+  },
+  "exports": {
+    "./native": "./dist/native.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20.18.1"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  }
+}

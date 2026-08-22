@@ -75,6 +75,24 @@
       "expected": "conformance/v1/expected/get-paragraph-invalid-input.json"
     },
     {
+      "id": "get-paragraph-source-changed",
+      "operation": "get-paragraph",
+      "input": { "stdNum": "1116", "paraNum": "23" },
+      "routes": [
+        { "requestUrl": "https://db.kasb.or.kr/api/paragraphs/content/1116/23", "fixture": "conformance/v1/source-controls/paragraph-missing-envelope.json", "responseSchemaValidity": "invalid" }
+      ],
+      "expected": "conformance/v1/expected/get-paragraph-source-changed.json"
+    },
+    {
+      "id": "get-paragraph-multiple-rows",
+      "operation": "get-paragraph",
+      "input": { "stdNum": "1116", "paraNum": "23" },
+      "routes": [
+        { "requestUrl": "https://db.kasb.or.kr/api/paragraphs/content/1116/23", "fixture": "conformance/v1/source-controls/paragraph-multiple-rows.json", "responseSchemaValidity": "invalid" }
+      ],
+      "expected": "conformance/v1/expected/get-paragraph-multiple-rows.json"
+    },
+    {
       "id": "search-qna-success",
       "operation": "search-qna",
       "input": { "keyword": "리스", "page": 1, "rows": 5 },
@@ -105,6 +123,24 @@
       "input": { "docNumber": "35629" },
       "routes": [],
       "expected": "conformance/v1/expected/get-qna-invalid-input.json"
+    },
+    {
+      "id": "get-qna-missing-detail",
+      "operation": "get-qna",
+      "input": { "docNumber": "SSI-35629" },
+      "routes": [
+        { "requestUrl": "https://db.kasb.or.kr/api/qnas/v2/SSI-35629", "fixture": "conformance/v1/source-controls/qna-missing-detail.json", "responseSchemaValidity": "valid" }
+      ],
+      "expected": "conformance/v1/expected/get-qna-not-found.json"
+    },
+    {
+      "id": "get-qna-null-detail",
+      "operation": "get-qna",
+      "input": { "docNumber": "SSI-35629" },
+      "routes": [
+        { "requestUrl": "https://db.kasb.or.kr/api/qnas/v2/SSI-35629", "fixture": "conformance/v1/source-controls/qna-null-detail.json", "responseSchemaValidity": "valid" }
+      ],
+      "expected": "conformance/v1/expected/get-qna-not-found.json"
     }
   ]
 }
