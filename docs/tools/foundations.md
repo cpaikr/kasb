@@ -1,8 +1,12 @@
 # Foundations
 
-This document defines the repo's baseline for single-tool design. `kasb-standards` should apply the same design stance as `../darty`.
+This document defines the repo's baseline for single-tool design. The target
+runtime ownership and transport shape are defined in the root architecture and
+follow the proven Rust/Node boundary in `../ytm`.
 
-This is design reference, not a product roadmap. The current product target is the CLI-only KASB standards tool described in the root docs and v1 spec.
+This is design reference, not a product roadmap. The public product is the Rust
+SDK, Rust CLI, and Rust-backed Node SDK/toolset described in the root docs and
+v1 spec. npm exposes the Rust CLI through a transparent launcher.
 
 ## What An Agent Tool Is
 

@@ -2,7 +2,11 @@
 
 Captured on 2026-03-31. Q&A endpoint notes refreshed on 2026-05-21.
 
-Status: observed source evidence, not the public contract or architecture guide. Promote stable contract decisions into [../specs/kasb-standards-v1.md](../specs/kasb-standards-v1.md) and implementation-shape decisions into [../../ARCHITECTURE.md](../../ARCHITECTURE.md).
+Status: observed provider evidence, not a wire, public, or architecture
+contract. Promote supported HTTP wire facts into the planned
+`contracts/kasb/openapi.yaml`, public semantic decisions into
+[../specs/kasb-standards-v1.md](../specs/kasb-standards-v1.md), and component
+boundaries into [../../ARCHITECTURE.md](../../ARCHITECTURE.md).
 
 Method:
 

@@ -3,126 +3,146 @@
 ## Product
 
 - `name`: `kasb-standards`
-- `status`: TypeScript package implemented; Rust `get-paragraph` pilot implemented and in delivery
-- `domain`: Korean accounting standards and related interpretation material exposed through KASB public read surfaces
-- `users`: LLM agents, agent developers, researchers, and humans who need reliable SDK or CLI access to standards content
+- `status`: Rust/Node rewrite planned; TypeScript product and Rust paragraph
+  pilot implemented
+- `domain`: Korean accounting standards and related interpretation material
+  exposed through KASB public read surfaces
+- `users`: LLM agents, agent developers, researchers, and humans who need
+  reliable SDK or CLI access to standards content
 
 ## Goal
 
-Build independently usable TypeScript and Rust SDKs, plus the existing Node.js
-CLI, that give agents and humans a stable, programmatic way to search and
-retrieve Korean accounting standards from `https://db.kasb.or.kr/`.
+Provide a public Rust SDK, Rust-backed Node SDK, and first-class Rust CLI for
+deterministic search and retrieval from `https://db.kasb.or.kr/` without
+browser automation.
 
-The target experience should be closer to `yfinance` than browser automation:
+The target experience is closer to `yfinance` than browsing:
 
-- small semantic operations
-- predictable structured results
-- stable identifiers and references
-- easy local scripting through a CLI
-- parseable JSON for both success and failure paths
-- independently usable TypeScript and Rust implementations sharing one serialized semantic contract
-- a reusable neutral TypeScript toolset behind CLI and Pi surfaces so behavior is testable and not tied to one transport
-
-## Why This Exists
-
-Generic browsing is a poor interface for standards research:
-
-- agents spend too many steps navigating UI flows
-- answers are harder to verify without stable standard, section, and paragraph references
-- repeated lookups are slow and brittle
-- the useful source surface is a JSON API, but the browser routes expose different identifiers
-- unstructured HTML fragments force the model to infer document structure
-
-This is worth standardizing because standards work is repetitive, citation-sensitive, and benefits from deterministic retrieval.
+- small semantic operations;
+- predictable structured results and typed failures;
+- stable identifiers, references, and source metadata;
+- a native Rust API for direct embedding;
+- a parseable Rust `clap` CLI, also installable through an npm launcher;
+- an asynchronous Node SDK and neutral npm toolset; and
+- one Rust implementation of provider and domain behavior behind every public
+  surface.
 
 ## Product Shape
 
-The TypeScript SDK, Node.js CLI, and retained Pi adapter expose the six v1
-read-only capabilities below. The native Rust SDK currently exposes the exact
-paragraph capability as a contract-compatible vertical pilot; the remaining
-Rust capabilities belong to migration phase 5.
+The approved v1 operations remain:
 
-- search standards by keyword
-- retrieve the structural index for a standard
-- fetch one section by KASB's retrieval-facing section id
-- fetch one exact paragraph by standard number and paragraph number
-- search KASB Q&A material by keyword
-- fetch one Q&A document by document number
-- return source URLs, stable references, and warnings for source drift or partial normalization
+- search standards by keyword;
+- retrieve the structural index for a standard;
+- fetch one section by KASB's retrieval-facing section id;
+- fetch one exact paragraph by standard and paragraph number;
+- search KASB Q&A material by keyword; and
+- fetch one Q&A document by document number.
+
+`crates/kasb` is both the supported public Rust SDK and the sole KASB conformer.
+The Node SDK delegates execution through a narrow asynchronous Node-API
+binding. Its JavaScript layer owns only public ergonomics, side-effect-free
+discovery and validation, target selection, and transparent CLI process launch.
+The Rust `clap` CLI depends on the public SDK and owns all command parsing,
+presentation, help, and process behavior.
+
+The npm package provides:
+
+- the Node SDK and `@sjunepark/kasb/toolset`;
+- a `kasb` JavaScript launcher for the packaged Rust CLI binary; and
+- machine-readable success and failure behavior.
+
+The Pi export and extension are removed at cutover and receive no replacement
+host adapter in this rewrite.
 
 ## Principles
 
-- `dual-sdk`: each implemented cross-language capability uses native language APIs and the same serialized semantics
-- `tool-package`: CLI, neutral TypeScript toolset, and Pi adapter share the TypeScript capability implementation
-- `reference first`: every returned item should be easy to cite and revisit
-- `discovery and retrieval`: search alone is not enough
-- `structured over prose`: return typed records, not generated explanations
-- `source-explicit`: state which KASB endpoint produced the result
-- `kasb-shaped first`: model KASB standards, sections, paragraphs, and identifiers before adding generic abstractions
-- `transport-light`: keep transport code below each capability boundary; let CLI and Pi stay thin
-- `public-read first`: v1 targets public read-only access only
+- `one conformer`: Rust alone owns KASB URLs, request preparation, transport
+  policy, source decoding, normalization, enrichment, and capability failures.
+- `public Rust`: the core remains an idiomatic, independently usable Rust SDK,
+  not an implementation detail of Node.
+- `thin Node boundary`: Node-API and JavaScript project stable Rust results into
+  the existing npm contracts without acquiring source rules.
+- `one CLI implementation`: the Rust `clap` binary owns command behavior;
+  npm only selects and launches the matching packaged binary.
+- `reference first`: every returned item is easy to cite and revisit.
+- `structured over prose`: operations return typed records, not generated
+  explanations.
+- `canonical authorities`: OpenAPI owns supported wire facts, the v1 spec owns
+  public semantics, and provider research and fixtures remain independent
+  evidence.
+- `boundary-owned errors`: dependency failures and unrestricted provider
+  payloads never cross public boundaries.
+- `bounded execution`: timeouts, response sizes, retries, concurrency,
+  cancellation, and persona lifetime are explicit.
+- `verified distribution`: support claims require real native artifacts and
+  clean packed-consumer evidence.
+- `public-read first`: v1 remains read-only and unauthenticated unless provider
+  evidence supports a later product decision.
 
 ## v1 Boundaries
 
-### In Scope
+### In scope
 
-- read-only access to public KASB standards content
-- stable references to standards, sections, and paragraphs where possible
-- source metadata that makes results verifiable
-- a supported Bun/TypeScript capability core following `../darty`
-- a native Rust `get-paragraph` pilot with the same result and typed-failure semantics as TypeScript
-- shared fixture and conformance evidence at the serialized contract boundary
-- a Commander CLI as the human/debuggable transport
-- a runtime-neutral `./toolset` export for operation discovery, validation, execution, and error serialization
-- a Pi adapter export and extension entrypoint wrapping the neutral toolset as one action-oriented tool
+- the six approved read-only KASB operations;
+- stable standard, section, paragraph, and Q&A references;
+- source metadata, warnings, and typed failures;
+- a public native Rust SDK;
+- a first-class Rust `clap` CLI over that SDK;
+- an asynchronous Node-API binding;
+- the existing npm identity, Node SDK, neutral toolset, and transparent Rust CLI
+  launcher;
+- a language-neutral KASB OpenAPI wire contract;
+- independent fixtures, conformance cases, and an adversarial public-surface
+  judge; and
+- claimed native npm packages only for verified targets.
 
-### Out Of Scope
+### Out of scope
 
-- legal, accounting, or investment advice
-- answer generation inside the tool
-- mutation, posting, login, or account workflows
-- browser automation as the primary access method
-- database persistence or background ingestion
-- MCP or other host adapters beyond Pi
-- a separate Rust CLI
-- FFI or a runtime dependency between the TypeScript and Rust SDKs
-- premature multi-source abstraction
-
-## Expected Output Shape
-
-Public operations should use a success envelope with:
-
-- `result`: operation payload
-- `metadata`: source endpoint, timing, source version or observed behavior notes, completeness flags
-- `references`: `stdNum`, `indexDocumentId`, `paraNum`, `uniqueKey`, section path, and source API URL where available
-- `warnings`: partial matches, normalization uncertainty, empty sections, source drift, fallback use
-
-Typed failures are separate from the success schema. In the CLI, failures should still be JSON: a failure envelope on `stdout` with a nonzero exit code.
+- legal, accounting, or investment advice;
+- answer generation inside the tool;
+- mutation, posting, login, or account workflows;
+- browser automation as the primary access method;
+- database persistence or background ingestion;
+- the Pi adapter, MCP, or another host-specific adapter;
+- a second CLI implementation in JavaScript;
+- a second TypeScript KASB conformer;
+- browser, edge, Deno, or Bun-runtime npm support;
+- premature multi-source abstraction; and
+- publication or external provider changes without explicit authorization.
 
 ## Success Criteria
 
-The product is successful when an agent or human can reliably:
+The product succeeds when an agent or human can reliably find, retrieve, and
+cite KASB material through the public Rust SDK, Rust CLI, or Rust-backed Node
+SDK, and when all projections agree on the approved serialized semantics.
 
-- find the standard most relevant to a concept
-- retrieve the exact paragraph discussing that concept
-- cite the standard and paragraph number in an answer
-- traverse from search result to structure to section to paragraph with low command overhead
-- compare related paragraphs without falling back to browser navigation
+The rewrite succeeds when:
+
+- Rust implements every v1 operation and no JavaScript module performs KASB
+  transport or source decoding;
+- the Rust CLI preserves approved automation behavior directly over the SDK;
+- the Node SDK and toolset preserve approved public behavior through Node-API;
+- the npm `kasb` launcher transparently preserves the Rust CLI process contract;
+- OpenAPI, semantic specs, provider evidence, and derived artifacts have clear
+  non-overlapping ownership;
+- the judge rejects controlled wrong behavior;
+- every claimed native target passes clean packed-consumer tests; and
+- the TypeScript conformer and Pi surface are absent after cutover.
 
 ## Current State
 
-- The KASB API source map is documented in [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md).
-- The v1 public contract is documented in [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md).
-- The implementation follows `../darty`'s layer split; see [ARCHITECTURE.md](ARCHITECTURE.md).
-- The first Bun/TypeScript package version exists with CLI, neutral toolset, Pi adapter, standards and Q&A operations, fixture-backed tests, and gated live checks.
-- The approved additive Rust direction and phase gates are recorded in
-  [MIGRATION.md](MIGRATION.md); shared conformance evidence is established
-  before the workspace move and Rust pilot.
+- The complete TypeScript npm product and all six v1 operations are implemented.
+- The public Rust SDK implements and validates the `get-paragraph` vertical
+  pilot with `wreq`, typed failures, cancellation, fixtures, and conformance.
+- The prior additive migration foundation is complete and retained as history.
+- [plans/rust-node-rewrite.md](plans/rust-node-rewrite.md) owns the approved
+  path to the single-conformer Rust SDK, Rust CLI, and Node SDK product.
 
-## Remaining Product Questions
+## Later Product Questions
 
-These are not blockers for the first implementation slice:
+These are not rewrite prerequisites:
 
-- how much paragraph HTML should be sanitized or converted beyond raw and plain text fields
-- whether interpretation materials belong in v1 or a later capability
-- whether user-facing route URLs are worth adding after API URLs are stable
+- how much paragraph HTML should be normalized beyond the existing contract;
+- whether interpretation materials need additional capabilities;
+- whether user-facing route URLs can be derived safely; and
+- whether framework-aware comparison belongs in a later public operation.

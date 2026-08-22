@@ -1,5 +1,9 @@
 # Rust migration execution progress
 
+Historical completion record. Its dual-SDK and Node-CLI decisions were
+superseded on 2026-08-22 by [`MIGRATION.md`](../../../MIGRATION.md) and are not
+current architecture or planning authority.
+
 Current gate: phases 1–4 complete and validated. The integration branch is
 ready for final promotion to `main`.
 
@@ -10,7 +14,7 @@ ready for final promotion to `main`.
 | 3. Workspace layout | independent npm and Cargo builds/tests with shared root evidence | completed at the phase-3 commit gate |
 | 4. Rust `get-paragraph` pilot | complete `wreq` path and success/failure/timeout/cancellation conformance | delivered in PR #13 after feedback resolution |
 
-## Durable decisions
+## Decisions recorded at completion
 
 - The existing Node.js CLI remains the sole CLI.
 - The SDKs share specs, fixtures, and serialized cases, not runtime code or FFI.

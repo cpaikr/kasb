@@ -23,5 +23,6 @@ Do not put product vision, stack discussion, or open-ended source investigation 
 - CLI commands and flags use kebab-case.
 - Success result schemas include `result`, `metadata`, `references`, and `warnings`.
 - Typed failures are separate from success result schemas.
-- CLI operation success and failure outputs are JSON: success on `stdout`, failure on `stderr`; help output may remain human-readable.
+- CLI operation success and failure outputs are JSON on `stdout`; failures exit
+  nonzero, while help output may remain human-readable.
 - Raw source fields stay internal unless the spec explicitly promotes them.

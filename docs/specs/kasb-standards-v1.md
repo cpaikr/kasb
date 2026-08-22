@@ -4,7 +4,7 @@
 
 - `name`: `kasb-standards`
 - `owner`: repo-local spec
-- `status`: implemented draft contract; hardening in progress
+- `status`: implemented semantic contract; Rust/Node rewrite planned
 - `domain`: Korean accounting standards access
 - `users`: LLM agents, agent developers, researchers, and humans using an SDK or the CLI
 
@@ -21,12 +21,16 @@ Generic browsing is insufficient because:
 
 ## 3. Capability Boundary
 
-This product provides a read-only TypeScript SDK, Node.js CLI, and Pi access to
-the six v1 operations over the current `https://db.kasb.or.kr/api/` surface.
-The native Rust SDK currently implements the contract-compatible
-`get-paragraph` vertical pilot; the other Rust operations remain migration
-phase 5 work. Both SDKs use native language types and transports while the
-implemented shared operation preserves the serialized semantics below.
+This product provides the six v1 operations through a public Rust SDK, a Rust
+`clap` CLI over that SDK, and a Rust-backed Node SDK/toolset. Rust owns the KASB
+transport and capability implementation; Node projects the same semantic
+results through an asynchronous Node-API boundary. The npm executable only
+launches the packaged Rust CLI. The current TypeScript implementation remains
+executable reference evidence until the approved rewrite cuts over.
+
+This document owns public semantic behavior. The planned
+`contracts/kasb/openapi.yaml` owns supported HTTP wire facts, while
+`docs/research/kasb-standard-source-map.md` records dated provider evidence.
 
 In scope:
 
@@ -37,12 +41,13 @@ In scope:
 - Q&A search
 - Q&A document retrieval
 - stable references and source metadata
-- JSON Schemas exported from the same contracts used at runtime
-- Commander CLI commands for the v1 operations
-- runtime-neutral TypeScript toolset export for operation discovery, validation, execution, and error serialization
-- Pi adapter export and extension entrypoint wrapping the neutral toolset as one action-oriented host tool
-- native Rust `get-paragraph` with the same request/result meaning, typed failures, and serialized success envelope
-- language-neutral fixtures and conformance cases shared by both SDKs
+- a public Rust SDK implementing the v1 operations
+- Rust CLI commands for the v1 operations
+- a narrow asynchronous Node-API binding over the Rust SDK
+- a Node SDK and npm toolset export for operation discovery, validation,
+  execution, and error serialization
+- an npm launcher for installing and running the Rust CLI
+- language-neutral fixtures and public-surface conformance cases
 
 Out of scope:
 
@@ -52,9 +57,9 @@ Out of scope:
 - route-id support via `titleDocumentId`
 - broad multi-source abstraction
 - database persistence or background ingestion
-- MCP or additional host adapters beyond Pi
-- a Rust CLI
-- FFI or runtime coupling between the TypeScript and Rust SDKs
+- Pi, MCP, or another host-specific adapter
+- a second CLI behavior implementation in JavaScript
+- a second TypeScript KASB transport or capability conformer after cutover
 
 ## 4. Domain Model
 
@@ -170,11 +175,11 @@ Allowed public failure codes:
 - `internal_failure`
 
 Caller cancellation is execution control, not a public capability failure code.
-Each SDK must expose it distinctly from timeout or source failure; transport
-adapters may serialize a transport-local `aborted` error. A request timeout is
+Each public projection must expose it distinctly from timeout or source failure;
+transport adapters may serialize a transport-local `aborted` error. A request timeout is
 `source_unavailable` with `retryable: true` and the attempted `sourceUrl`.
 
-### Cross-language conformance
+### Public-surface conformance
 
 Committed cases under `conformance/` compare the serialized capability
 boundary. The judge treats object key order as insignificant while preserving
@@ -342,13 +347,16 @@ Implementation notes:
 
 ## 7. CLI Transport
 
-The Commander CLI is the human/debuggable package surface. The neutral toolset and Pi adapter expose the same operation ids without CLI flags.
+The Rust `clap` CLI is the human/debuggable process surface. It depends on the
+public Rust SDK. The Node SDK/toolset exposes the same operation ids without CLI
+flags. The npm `kasb` JavaScript entrypoint only selects and launches the
+matching packaged Rust binary; it does not parse commands or render results.
 
 The CLI should:
 
 - expose one command per v1 operation
 - accept kebab-case flags
-- emit JSON for operation success and failure output; Commander help may remain human-readable
+- emit JSON for operation success and failure output; help may remain human-readable
 - write success envelopes to `stdout` with exit code `0`
 - write failure envelopes to `stdout` with a nonzero exit code
 - do not mix human-readable diagnostics into operation output; any diagnostic mode must stay parseable, such as JSON lines on `stderr` or a separate diagnostic file
@@ -392,7 +400,7 @@ Failure envelope shape:
 
 ## 8. Source Adapter Rules
 
-KASB source adapters should own:
+The Rust KASB source adapter owns:
 
 - source URL construction
 - source response schemas
@@ -400,7 +408,9 @@ KASB source adapters should own:
 - source-level error detection
 - normalization from KASB payloads into provider-facing results
 
-Public capability modules should not import raw KASB response types. The source adapter may know both public requests and internal source shapes at the mapping boundary.
+Public capability and Node modules must not expose raw KASB response types. The
+Rust source adapter may know both public requests and internal source shapes at
+the mapping boundary.
 
 ## 9. Safety Model
 
