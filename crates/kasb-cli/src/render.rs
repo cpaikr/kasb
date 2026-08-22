@@ -1,7 +1,7 @@
-use clap::error::ErrorKind;
+use clap::{CommandFactory, error::ErrorKind};
 use serde_json::{Map, Value, json};
 
-use crate::args::{Invocation, OutputMode, is_operation};
+use crate::args::{Cli, Invocation, OutputMode, is_operation};
 
 pub(crate) const CLI_TRANSPORT_VERSION: &str = "1";
 
@@ -75,7 +75,7 @@ pub(crate) fn render_typed_failure(
     let used_option = parameter.and_then(|key| invocation.used_options.get(key).copied());
     let mut message = localize_typed_message(
         &failure.message,
-        invocation.operation,
+        invocation.operation.as_str(),
         parameter,
         used_option,
     );
@@ -111,11 +111,11 @@ pub(crate) fn render_typed_failure(
             Value::String(match parameter {
                 Some(parameter) => format!(
                     "Run kasb help {} to inspect the {parameter} option requirements.",
-                    invocation.operation
+                    invocation.operation.as_str()
                 ),
                 None => format!(
                     "Run kasb help {} to inspect this command's options.",
-                    invocation.operation
+                    invocation.operation.as_str()
                 ),
             }),
         );
@@ -123,7 +123,7 @@ pub(crate) fn render_typed_failure(
             "recoveryAction".to_owned(),
             json!({
                 "kind": "inspect_command_help",
-                "operationName": invocation.operation,
+                "operationName": invocation.operation.as_str(),
             }),
         );
     }
@@ -137,7 +137,7 @@ pub(crate) fn render_typed_failure(
 
     let envelope = json!({
         "failure": public_failure,
-        "metadata": metadata(Some(invocation.operation)),
+        "metadata": metadata(Some(invocation.operation.as_str())),
         "warnings": [],
     });
     ProcessOutput::failure(render_json(&envelope, invocation.failure_pretty))
@@ -165,7 +165,7 @@ pub(crate) fn render_success(
     value: Value,
     invocation: &Invocation,
 ) -> Result<ProcessOutput, &'static str> {
-    let projected = project_success(value, invocation.operation, invocation.output)?;
+    let projected = project_success(value, invocation.operation.as_str(), invocation.output)?;
     Ok(ProcessOutput::success(render_json(
         &projected,
         invocation.pretty,
@@ -379,7 +379,7 @@ fn failure_next_action(failure: &kasb::KasbFailure, invocation: &Invocation) -> 
     if failure.code != kasb::KasbFailureCode::InvalidInput {
         return None;
     }
-    if invocation.operation == "get-section"
+    if invocation.operation.as_str() == "get-section"
         && failure.parameter.as_deref() == Some("indexDocumentId")
     {
         let std_num = raw_string(&invocation.input, "stdNum")?;
@@ -393,7 +393,8 @@ fn failure_next_action(failure: &kasb::KasbFailure, invocation: &Invocation) -> 
             "reason": "get-section requires indexDocumentId or ref. get-standard-structure returns candidate sections and indexDocumentId/ref values for the standard.",
         }));
     }
-    if invocation.operation == "search-qna" && failure.parameter.as_deref() == Some("rows") {
+    if invocation.operation.as_str() == "search-qna" && failure.parameter.as_deref() == Some("rows")
+    {
         let keyword = raw_string(&invocation.input, "keyword")?;
         let row_flag = invocation
             .used_options
@@ -540,7 +541,9 @@ impl<'a> ParseContext<'a> {
             let mut message = format!("Unknown option: \"{option}\".");
             if self.operation.is_some()
                 && matches!(option.as_str(), "--query" | "--search-word")
-                && operation_options(self.operation.unwrap_or_default()).contains(&"--keyword")
+                && operation_options(self.operation.unwrap_or_default())
+                    .iter()
+                    .any(|known| known == "--keyword")
             {
                 message.push_str(" Use --keyword instead.");
             }
@@ -573,7 +576,7 @@ impl<'a> ParseContext<'a> {
             let name = value.split('=').next().unwrap_or(value);
             if matches!(name, "-h" | "--help" | "--pretty") {
                 index += 1;
-            } else if known.contains(&name) {
+            } else if known.iter().any(|known| known == name) {
                 index += if value.contains('=') { 1 } else { 2 };
             } else if name.starts_with('-') {
                 return Some(name.to_owned());
@@ -604,34 +607,14 @@ impl<'a> ParseContext<'a> {
     }
 }
 
-fn operation_options(operation: &str) -> &'static [&'static str] {
-    match operation {
-        "search-standards" => &["--keyword", "--limit", "--sort", "--pretty"],
-        "get-standard-structure" => &["--std-num", "--keyword", "--output", "--pretty"],
-        "get-section" => &[
-            "--std-num",
-            "--index-document-id",
-            "--ref",
-            "--keyword",
-            "--output",
-            "--pretty",
-        ],
-        "get-paragraph" => &["--std-num", "--para-num", "--pretty"],
-        "search-qna" => &[
-            "--keyword",
-            "--page",
-            "--rows",
-            "--limit",
-            "--types",
-            "--sort-date",
-            "--from",
-            "--to",
-            "--output",
-            "--pretty",
-        ],
-        "get-qna" => &["--doc-number", "--keyword", "--output", "--pretty"],
-        _ => &[],
-    }
+fn operation_options(operation: &str) -> Vec<String> {
+    Cli::command()
+        .find_subcommand(operation)
+        .into_iter()
+        .flat_map(clap::Command::get_arguments)
+        .filter_map(clap::Arg::get_long)
+        .map(|name| format!("--{name}"))
+        .collect()
 }
 
 fn shell_quote_cli_arg(value: &str) -> String {

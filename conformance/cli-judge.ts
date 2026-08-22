@@ -242,7 +242,7 @@ const projectSummary = (envelope: Record<string, unknown>, operation: string): v
       suggestedKeywords: result.suggestedKeywords,
       items: (result.items as Array<Record<string, unknown>>).map((item) => ({
         ...select(item, ["docNumber", "type", "typeLabel", "title"]),
-        snippet: truncate(String(item.snippet), 160),
+        snippet: truncateUtf16Safely(String(item.snippet), 160),
         ...select(item, ["tags", "deprecated", "publishDate", "prefix"]),
       })),
     };
@@ -252,7 +252,7 @@ const projectSummary = (envelope: Record<string, unknown>, operation: string): v
       request: result.request,
       qna: {
         ...select(qna, ["docNumber", "type", "typeLabel", "title"]),
-        fullContentPreview: truncate(String(qna.fullContent), 1_000),
+        fullContentPreview: truncateUtf16Safely(String(qna.fullContent), 1_000),
         ...select(qna, [
           "tags",
           "deprecated",
@@ -273,8 +273,17 @@ const select = (
   keys.flatMap((key) => key in value ? [[key, value[key]]] : []),
 );
 
-const truncate = (value: string, maxLength: number): string =>
-  value.length <= maxLength ? value : `${value.slice(0, maxLength).trimEnd()}…`;
+export const truncateUtf16Safely = (value: string, maxLength: number): string => {
+  if (value.length <= maxLength) return value;
+  const previousUnit = value.charCodeAt(maxLength - 1);
+  const nextUnit = value.charCodeAt(maxLength);
+  const splitsSurrogatePair = previousUnit >= 0xd800
+    && previousUnit <= 0xdbff
+    && nextUnit >= 0xdc00
+    && nextUnit <= 0xdfff;
+  const end = splitsSurrogatePair ? maxLength - 1 : maxLength;
+  return `${value.slice(0, end).trimEnd()}…`;
+};
 
 const shellQuote = (value: string): string => /^[A-Za-z0-9._~:/@%+=,-]+$/u.test(value)
   ? value

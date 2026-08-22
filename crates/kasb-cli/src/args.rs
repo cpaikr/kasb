@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use serde_json::{Map, Number, Value};
 
 const ROOT_AFTER_HELP: &str = r#"Workflows:
@@ -86,7 +86,6 @@ Notes:
     after_help = ROOT_AFTER_HELP,
     arg_required_else_help = true,
     disable_version_flag = true,
-    disable_help_subcommand = false,
     args_override_self = true,
     color = clap::ColorChoice::Never
 )]
@@ -115,6 +114,29 @@ enum Operation {
     /// Retrieve a KASB Q&A document by docNumber.
     #[command(after_help = GET_QNA_AFTER_HELP)]
     GetQna(GetQnaArgs),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum OperationName {
+    SearchStandards,
+    GetStandardStructure,
+    GetSection,
+    GetParagraph,
+    SearchQna,
+    GetQna,
+}
+
+impl OperationName {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::SearchStandards => "search-standards",
+            Self::GetStandardStructure => "get-standard-structure",
+            Self::GetSection => "get-section",
+            Self::GetParagraph => "get-paragraph",
+            Self::SearchQna => "search-qna",
+            Self::GetQna => "get-qna",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
@@ -352,7 +374,7 @@ struct GetQnaArgs {
 
 #[derive(Debug)]
 pub(crate) struct Invocation {
-    pub operation: &'static str,
+    pub operation: OperationName,
     pub input: Value,
     pub output: OutputMode,
     pub pretty: bool,
@@ -369,7 +391,13 @@ impl Cli {
                 insert_string(&mut input, &mut used, "keyword", "--keyword", args.keyword);
                 insert_integer(&mut input, &mut used, "limit", "--limit", args.limit);
                 insert_string(&mut input, &mut used, "sort", "--sort", args.sort);
-                Invocation::new("search-standards", input, None, args.pretty, used)
+                Invocation::new(
+                    OperationName::SearchStandards,
+                    input,
+                    None,
+                    args.pretty,
+                    used,
+                )
             }
             Operation::GetStandardStructure(args) => {
                 let mut input = Map::new();
@@ -377,7 +405,7 @@ impl Cli {
                 insert_string(&mut input, &mut used, "stdNum", "--std-num", args.std_num);
                 insert_string(&mut input, &mut used, "keyword", "--keyword", args.keyword);
                 Invocation::new(
-                    "get-standard-structure",
+                    OperationName::GetStandardStructure,
                     input,
                     args.output,
                     args.pretty,
@@ -397,7 +425,13 @@ impl Cli {
                 );
                 insert_string(&mut input, &mut used, "ref", "--ref", args.r#ref);
                 insert_string(&mut input, &mut used, "keyword", "--keyword", args.keyword);
-                Invocation::new("get-section", input, args.output, args.pretty, used)
+                Invocation::new(
+                    OperationName::GetSection,
+                    input,
+                    args.output,
+                    args.pretty,
+                    used,
+                )
             }
             Operation::GetParagraph(args) => {
                 let mut input = Map::new();
@@ -410,7 +444,7 @@ impl Cli {
                     "--para-num",
                     args.para_num,
                 );
-                Invocation::new("get-paragraph", input, None, args.pretty, used)
+                Invocation::new(OperationName::GetParagraph, input, None, args.pretty, used)
             }
             Operation::SearchQna(args) => {
                 let args = *args;
@@ -433,7 +467,13 @@ impl Cli {
                 );
                 insert_string(&mut input, &mut used, "from", "--from", args.from);
                 insert_string(&mut input, &mut used, "to", "--to", args.to);
-                Invocation::new("search-qna", input, args.output, args.pretty, used)
+                Invocation::new(
+                    OperationName::SearchQna,
+                    input,
+                    args.output,
+                    args.pretty,
+                    used,
+                )
             }
             Operation::GetQna(args) => {
                 let mut input = Map::new();
@@ -446,7 +486,7 @@ impl Cli {
                     args.doc_number,
                 );
                 insert_string(&mut input, &mut used, "keyword", "--keyword", args.keyword);
-                Invocation::new("get-qna", input, args.output, args.pretty, used)
+                Invocation::new(OperationName::GetQna, input, args.output, args.pretty, used)
             }
         }
     }
@@ -454,7 +494,7 @@ impl Cli {
 
 impl Invocation {
     fn new(
-        operation: &'static str,
+        operation: OperationName,
         input: Map<String, Value>,
         output: Option<OutputMode>,
         pretty: bool,
@@ -523,13 +563,5 @@ const fn output_help() -> &'static str {
 }
 
 pub(crate) fn is_operation(value: &str) -> bool {
-    matches!(
-        value,
-        "search-standards"
-            | "get-standard-structure"
-            | "get-section"
-            | "get-paragraph"
-            | "search-qna"
-            | "get-qna"
-    )
+    Cli::command().find_subcommand(value).is_some()
 }

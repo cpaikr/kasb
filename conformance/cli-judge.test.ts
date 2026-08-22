@@ -20,6 +20,7 @@ import {
   loadManifest,
   readRecordedCalls,
   semanticCaseFor,
+  truncateUtf16Safely,
   type CliProcessObservation,
 } from "./cli-judge.ts";
 import { readConformanceJson } from "./judge.ts";
@@ -38,7 +39,7 @@ beforeAll(() => {
   judgeRoot = mkdtempSync(join(tmpdir(), "kasb-cli-process-"));
   fixtureBinary = buildBinary(join(repoRoot, "target", "cli-conformance-fixtures"), true);
   productionBinary = buildBinary(join(repoRoot, "target"), false);
-});
+}, buildTimeoutMs * 2 + 30_000);
 
 afterAll(() => {
   if (judgeRoot.length > 0 && judgeRoot.includes("kasb-cli-process-")) {
@@ -252,6 +253,12 @@ describe("Rust CLI process judge", () => {
     expect(value.result.qna.fullContentPreview).toBe(`${"a".repeat(999)}…`);
   });
 
+  test("keeps the expected-value oracle on UTF-16 limits without splitting scalars", () => {
+    expect(truncateUtf16Safely("a😀b", 2)).toBe("a…");
+    expect(truncateUtf16Safely("a😀b", 3)).toBe("a😀…");
+    expect(truncateUtf16Safely("a😀", 3)).toBe("a😀");
+  });
+
   test.each([
     [
       ["search-standards", "--keyword", "-foo", "--limit", "0"],
@@ -373,7 +380,9 @@ describe("Rust CLI process judge", () => {
   });
 
   test("rejects deliberate process and payload controls before the real binary", () => {
-    const cliCase = cliSuccessCases[3]!;
+    const cliCase = cliSuccessCases.find(
+      (candidate) => candidate.id === "get-paragraph-pretty",
+    )!;
     const expected = expectedCliValue(repoRoot, manifest, cliCase);
     const valid: CliProcessObservation = {
       exitCode: 0,

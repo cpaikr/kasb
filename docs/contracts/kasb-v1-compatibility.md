@@ -112,10 +112,10 @@ fixture path emits no warning.
   standard search results.
 - Intentional replacement difference: summary truncation still counts the
   frozen JavaScript UTF-16 unit limits, but if the boundary falls between an
-  astral scalar's surrogate pair, Rust backs up to the preceding complete
-  scalar before appending the ellipsis. The transition TypeScript CLI can emit
-  an escaped lone surrogate in this pathological case; replacement JSON stays
-  Unicode-scalar-valid instead.
+  astral scalar's surrogate pair, the Rust CLI must back up to the preceding
+  complete scalar before appending the ellipsis and must remain
+  Unicode-scalar-valid. Only the transition TypeScript CLI can emit an escaped
+  lone surrogate in this pathological case.
 
 The exact command/flag matrix is:
 

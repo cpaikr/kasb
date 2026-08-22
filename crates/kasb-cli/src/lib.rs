@@ -7,7 +7,7 @@ mod render;
 
 use std::ffi::OsString;
 
-use args::Cli;
+use args::{Cli, OperationName};
 use clap::Parser;
 use kasb::http::{CancellationToken, HttpTransport};
 use kasb::{Clock, KasbClient, KasbError};
@@ -57,7 +57,7 @@ where
         Ok(client) => client,
         Err(_) => {
             return render::render_internal_failure(
-                Some(invocation.operation),
+                Some(invocation.operation.as_str()),
                 invocation.failure_pretty,
                 "Could not initialize the KASB transport.",
             );
@@ -107,7 +107,7 @@ where
     match result {
         Ok(value) => render::render_success(value, invocation).unwrap_or_else(|_| {
             render::render_internal_failure(
-                Some(invocation.operation),
+                Some(invocation.operation.as_str()),
                 invocation.failure_pretty,
                 "Could not render the KASB operation result.",
             )
@@ -119,7 +119,7 @@ where
 
 async fn execute<T, C>(
     client: &KasbClient<T, C>,
-    operation: &str,
+    operation: OperationName,
     input: Value,
     cancellation: &CancellationToken,
 ) -> Result<Value, KasbError>
@@ -128,17 +128,22 @@ where
     C: Clock,
 {
     match operation {
-        "search-standards" => serialize(client.execute_search_standards(input, cancellation).await),
-        "get-standard-structure" => serialize(
+        OperationName::SearchStandards => {
+            serialize(client.execute_search_standards(input, cancellation).await)
+        }
+        OperationName::GetStandardStructure => serialize(
             client
                 .execute_get_standard_structure(input, cancellation)
                 .await,
         ),
-        "get-section" => serialize(client.execute_get_section(input, cancellation).await),
-        "get-paragraph" => serialize(client.execute_get_paragraph(input, cancellation).await),
-        "search-qna" => serialize(client.execute_search_qna(input, cancellation).await),
-        "get-qna" => serialize(client.execute_get_qna(input, cancellation).await),
-        _ => unreachable!("clap accepts only declared operations"),
+        OperationName::GetSection => {
+            serialize(client.execute_get_section(input, cancellation).await)
+        }
+        OperationName::GetParagraph => {
+            serialize(client.execute_get_paragraph(input, cancellation).await)
+        }
+        OperationName::SearchQna => serialize(client.execute_search_qna(input, cancellation).await),
+        OperationName::GetQna => serialize(client.execute_get_qna(input, cancellation).await),
     }
 }
 

@@ -78,10 +78,11 @@ native-target, and live verification.
   scripts or on first execution.
 - Keep live KASB checks separate from ordinary deterministic validation. Live
   availability is provider evidence, not contract authority.
-- Keep the frozen JavaScript UTF-16 summary limits, but truncate at complete
-  Unicode scalar boundaries. Emitting an escaped lone surrogate solely to copy
-  the transition CLI's pathological boundary behavior is an intentional
-  compatibility exception, covered by the CLI process judge.
+- Keep the frozen JavaScript UTF-16 summary limits. The Rust CLI must back up
+  to a complete Unicode scalar boundary and remain Unicode-scalar-valid. Only
+  the transition TypeScript CLI may emit an escaped lone surrogate at that
+  pathological boundary; the intentional replacement difference is covered by
+  the CLI process judge.
 - Keep publishing, version selection, registry mutation, and changes to KASB
   external state outside the rewrite. Delivery may prepare releasable artifacts
   but cannot publish them without explicit authorization.
