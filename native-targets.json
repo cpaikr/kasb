@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "supportClaim": "planned",
+  "minimumNodeVersion": "20.18.1",
+  "rootPackage": "packages/node",
+  "nativePackageRoot": "packages/native",
+  "targets": [
+    {
+      "rustTarget": "x86_64-unknown-linux-gnu",
+      "npmPlatform": "linux",
+      "npmArch": "x64",
+      "libc": "glibc",
+      "packageName": "@sjunepark/kasb-linux-x64-gnu",
+      "packageDirectory": "linux-x64-gnu",
+      "addonFile": "kasb.linux-x64-gnu.node",
+      "cliFile": "kasb",
+      "runner": "ubuntu-24.04"
+    },
+    {
+      "rustTarget": "aarch64-unknown-linux-gnu",
+      "npmPlatform": "linux",
+      "npmArch": "arm64",
+      "libc": "glibc",
+      "packageName": "@sjunepark/kasb-linux-arm64-gnu",
+      "packageDirectory": "linux-arm64-gnu",
+      "addonFile": "kasb.linux-arm64-gnu.node",
+      "cliFile": "kasb",
+      "runner": "ubuntu-24.04-arm"
+    },
+    {
+      "rustTarget": "aarch64-apple-darwin",
+      "npmPlatform": "darwin",
+      "npmArch": "arm64",
+      "packageName": "@sjunepark/kasb-darwin-arm64",
+      "packageDirectory": "darwin-arm64",
+      "addonFile": "kasb.darwin-arm64.node",
+      "cliFile": "kasb",
+      "runner": "macos-15"
+    },
+    {
+      "rustTarget": "x86_64-pc-windows-msvc",
+      "npmPlatform": "win32",
+      "npmArch": "x64",
+      "packageName": "@sjunepark/kasb-win32-x64-msvc",
+      "packageDirectory": "win32-x64-msvc",
+      "addonFile": "kasb.win32-x64-msvc.node",
+      "cliFile": "kasb.exe",
+      "runner": "windows-2025"
+    }
+  ],
+  "notClaimed": [
+    "darwin-x64",
+    "linux-musl",
+    "win32-arm64",
+    "win32-ia32",
+    "freebsd",
+    "android",
+    "wasm"
+  ]
+}

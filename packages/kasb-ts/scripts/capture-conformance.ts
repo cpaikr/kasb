@@ -8,6 +8,11 @@ import {
 } from "../test/conformance/harness.ts";
 
 const repoRoot = join(import.meta.dir, "../../..");
+if (process.env.KASB_REVIEWED_BASELINE_UPDATE !== "1") {
+  throw new Error(
+    "Conformance expectations are reviewed evidence. Set KASB_REVIEWED_BASELINE_UPDATE=1 only during an explicitly reviewed baseline update.",
+  );
+}
 const manifest = readConformanceManifest(repoRoot);
 
 for (const testCase of manifest.cases) {
@@ -46,3 +51,10 @@ const serializationMismatch = structuredClone(
 );
 serializationMismatch.value.result.request.stdNum = 1116;
 writeKnownBad("serialization-mismatch", serializationMismatch);
+
+const sourceMetadataCorruption = structuredClone(
+  readCaptured("conformance/v1/expected/get-paragraph-success.json"),
+);
+sourceMetadataCorruption.value.metadata.source.endpoint =
+  "https://db.kasb.or.kr/api/paragraphs/content/1116/24";
+writeKnownBad("source-metadata-corruption", sourceMetadataCorruption);

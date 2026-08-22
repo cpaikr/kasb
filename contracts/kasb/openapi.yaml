@@ -1,0 +1,431 @@
+openapi: 3.1.0
+info:
+  title: KASB Read API HTTP Contract
+  version: 1.0.0
+  description: >-
+    Sole repository authority for the supported external KASB HTTP and JSON
+    wire surface. Public SDK semantics and normalized results are outside this
+    contract.
+servers:
+  - url: https://db.kasb.or.kr/api
+    description: Observed public KASB JSON API origin
+security: []
+tags:
+  - name: Standards
+  - name: Q&A
+
+x-kasb-authority:
+  role: sole-external-http-wire-authority
+  evidenceCorpus: fixtures/kasb
+  semanticContract: docs/specs/kasb-standards-v1.md
+  handwrittenConformer: crates/kasb
+  generatedConsumers: []
+  knownBoundary:
+    closed:
+      - origin
+      - paths
+      - methods
+      - path and query parameter names
+      - response media type
+      - required envelope members
+    open:
+      - unknown response object properties
+      - unknown standard and Q&A classifications
+      - additional standard index and paragraph metadata
+
+x-kasb-json-profile:
+  version: 1
+  request:
+    pathIdentifiers: utf8-percent-encoded-single-segments
+    omittedOptionalQueryParameters: absent
+    body: forbidden
+  response:
+    encoding: UTF-8
+    mediaType: application/json
+    topLevel: object
+    unknownProperties: allowed
+    malformedJson: source-changed
+    malformedRequiredEnvelope: source-changed
+  transport:
+    method: GET
+    requestHeaders:
+      Accept: application/json
+      Accept-Language: ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7
+    requestDeadlineMilliseconds: 15000
+    connectDeadlineMilliseconds: 10000
+    redirects: bounded-by-client-policy
+    automaticRetries: 0
+    maxInFlightPerClient: 8
+    cookies: in-memory-per-client
+    successStatuses: 200-299
+    notFoundStatus: 404
+    retryableStatuses: [429]
+    retryableStatusClasses: [5XX]
+
+paths:
+  /standard:
+    get:
+      operationId: searchStandardsSource
+      summary: Retrieve standard-level search counts
+      tags: [Standards]
+      parameters:
+        - $ref: '#/components/parameters/SearchWord'
+      responses:
+        2XX:
+          description: Standard search envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardSearchEnvelope'
+        default:
+          $ref: '#/components/responses/TransportFailure'
+
+  /standard-indexes/{stdNum}:
+    get:
+      operationId: getStandardIndexesSource
+      summary: Retrieve the structural index for one standard
+      tags: [Standards]
+      parameters:
+        - $ref: '#/components/parameters/StdNum'
+      responses:
+        2XX:
+          description: Standard index envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardIndexesEnvelope'
+        default:
+          $ref: '#/components/responses/TransportFailure'
+
+  /standard-indexes/{stdNum}/searchWord:
+    get:
+      operationId: searchStandardIndexesSource
+      summary: Retrieve search metadata for one standard index
+      tags: [Standards]
+      parameters:
+        - $ref: '#/components/parameters/StdNum'
+        - $ref: '#/components/parameters/SearchWord'
+      responses:
+        2XX:
+          description: Standard index search metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardIndexSearchEnvelope'
+        default:
+          $ref: '#/components/responses/TransportFailure'
+
+  /paragraphs/{stdNum}/{indexDocumentId}:
+    get:
+      operationId: getSectionSource
+      summary: Retrieve ordered clauses for one structural index node
+      tags: [Standards]
+      parameters:
+        - $ref: '#/components/parameters/StdNum'
+        - $ref: '#/components/parameters/IndexDocumentId'
+        - $ref: '#/components/parameters/OptionalSearchWord'
+      responses:
+        2XX:
+          description: Section clause envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SectionEnvelope'
+        default:
+          $ref: '#/components/responses/TransportFailure'
+
+  /paragraphs/content/{stdNum}/{paraNum}:
+    get:
+      operationId: getParagraphSource
+      summary: Retrieve one exact paragraph candidate set
+      tags: [Standards]
+      parameters:
+        - $ref: '#/components/parameters/StdNum'
+        - $ref: '#/components/parameters/ParaNum'
+      responses:
+        2XX:
+          description: Exact paragraph envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParagraphEnvelope'
+        default:
+          $ref: '#/components/responses/TransportFailure'
+
+  /qnas/v2:
+    get:
+      operationId: searchQnaSource
+      summary: Search Q&A documents
+      tags: [Q&A]
+      parameters:
+        - $ref: '#/components/parameters/QnaTypes'
+        - $ref: '#/components/parameters/SearchWord'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Rows'
+      responses:
+        2XX:
+          description: Q&A search envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QnaSearchEnvelope'
+        default:
+          $ref: '#/components/responses/TransportFailure'
+
+  /qnas/v2/{docNumber}:
+    get:
+      operationId: getQnaSource
+      summary: Retrieve one Q&A document
+      tags: [Q&A]
+      parameters:
+        - $ref: '#/components/parameters/DocNumber'
+        - $ref: '#/components/parameters/OptionalSearchWord'
+      responses:
+        2XX:
+          description: Q&A detail envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QnaDetailEnvelope'
+        default:
+          $ref: '#/components/responses/TransportFailure'
+
+components:
+  parameters:
+    SearchWord:
+      name: searchWord
+      in: query
+      required: true
+      schema: { type: string, minLength: 1 }
+    OptionalSearchWord:
+      name: searchWord
+      in: query
+      required: false
+      schema: { type: string, minLength: 1 }
+    StdNum:
+      name: stdNum
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    IndexDocumentId:
+      name: indexDocumentId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    ParaNum:
+      name: paraNum
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    DocNumber:
+      name: docNumber
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    QnaTypes:
+      name: types
+      in: query
+      required: true
+      schema:
+        type: string
+        pattern: '^[0-9]+(?:,[0-9]+)*$'
+    Page:
+      name: page
+      in: query
+      required: true
+      schema: { type: integer, minimum: 1 }
+    Rows:
+      name: rows
+      in: query
+      required: true
+      schema: { type: integer, minimum: 1 }
+
+  responses:
+    TransportFailure:
+      description: Non-success HTTP status or transport failure; no provider JSON schema is assumed
+
+  schemas:
+    OpenObject:
+      type: object
+      additionalProperties: true
+    IdentifierScalar:
+      type: [string, number]
+    NullableString:
+      type: [string, 'null']
+    StringOrStringArray:
+      oneOf:
+        - type: string
+        - type: array
+          items: { type: string }
+    Status:
+      type: integer
+    StandardSearchEnvelope:
+      type: object
+      required: [standards]
+      properties:
+        standards:
+          type: object
+          required: [stdCountArr]
+          properties:
+            stdCountArr:
+              type: array
+              items: { $ref: '#/components/schemas/StandardSearchRow' }
+            stdCountObj: { $ref: '#/components/schemas/OpenObject' }
+            totalCount: { type: integer }
+          additionalProperties: true
+      additionalProperties: true
+    StandardSearchRow:
+      type: object
+      required: [key, doc_count]
+      properties:
+        key: { $ref: '#/components/schemas/IdentifierScalar' }
+        doc_count: { type: number }
+      additionalProperties: true
+    StandardIndexesEnvelope:
+      type: object
+      required: [standardIndexes]
+      properties:
+        status: { $ref: '#/components/schemas/Status' }
+        standardIndexes:
+          type: array
+          items: { $ref: '#/components/schemas/StandardIndexRow' }
+      additionalProperties: true
+    StandardIndexRow:
+      type: object
+      required: [documentId, level, stdNum, title]
+      properties:
+        documentId: { type: string }
+        documentType: { type: [string, 'null'] }
+        level: { type: number }
+        parentDocumentIds:
+          type: array
+          items: { type: [string, 'null'] }
+        ref: { type: [string, 'null'] }
+        stdNum: { type: [string, integer] }
+        title: { type: string }
+      additionalProperties: true
+    StandardIndexSearchEnvelope:
+      type: object
+      required: [searchedUniqueKeys, searchedIndexCountMap]
+      properties:
+        searchedUniqueKeys:
+          type: array
+          items: { type: string }
+        searchedIndexCountMap:
+          type: object
+          additionalProperties: { type: integer }
+      additionalProperties: true
+    SectionEnvelope:
+      type: object
+      required: [clauses]
+      properties:
+        status: { $ref: '#/components/schemas/Status' }
+        clauses:
+          type: array
+          items: { $ref: '#/components/schemas/SectionClauseRow' }
+        mainTitle: { type: [string, 'null'] }
+        mainTitleLevel: { type: [integer, 'null'] }
+        mainTitleSort: { type: [integer, number, 'null'] }
+      additionalProperties: true
+    SectionClauseRow:
+      type: object
+      minProperties: 1
+      properties:
+        uniqueKey: { $ref: '#/components/schemas/IdentifierScalar' }
+        stdNum: { $ref: '#/components/schemas/IdentifierScalar' }
+        paraNum: { $ref: '#/components/schemas/IdentifierScalar' }
+        documentId: { $ref: '#/components/schemas/IdentifierScalar' }
+        title: { type: string }
+        paraContent: { type: string }
+        fullContent: { type: string }
+        faqDocNumbers: { $ref: '#/components/schemas/NullableString' }
+        faqCount: { type: [number, 'null'] }
+        sort: { type: [number, 'null'] }
+        type: { type: string }
+      additionalProperties: true
+    ParagraphEnvelope:
+      type: object
+      required: [paraContents]
+      properties:
+        status: { $ref: '#/components/schemas/Status' }
+        paraContents:
+          type: array
+          maxItems: 1
+          items: { $ref: '#/components/schemas/ParagraphRow' }
+      additionalProperties: true
+    ParagraphRow:
+      type: object
+      required: [uniqueKey, stdNum, paraNum, documentId, paraContent, fullContent]
+      properties:
+        uniqueKey: { $ref: '#/components/schemas/IdentifierScalar' }
+        stdNum: { $ref: '#/components/schemas/IdentifierScalar' }
+        paraNum: { $ref: '#/components/schemas/IdentifierScalar' }
+        documentId: { $ref: '#/components/schemas/IdentifierScalar' }
+        paraContent: { type: string }
+        fullContent: { type: string }
+        faqDocNumbers: { $ref: '#/components/schemas/NullableString' }
+        faqCount: { type: [number, 'null'] }
+        sort: { type: [number, 'null'] }
+      additionalProperties: true
+    QnaSearchEnvelope:
+      type: object
+      required: [facilityQnas]
+      properties:
+        status: { $ref: '#/components/schemas/Status' }
+        facilityQnas:
+          type: array
+          items: { $ref: '#/components/schemas/QnaSearchRow' }
+        facilityQnaCountData:
+          type: object
+          additionalProperties: { type: integer }
+      additionalProperties: true
+    QnaSearchRow:
+      type: object
+      required: [docNumber, type]
+      properties:
+        docNumber: { $ref: '#/components/schemas/IdentifierScalar' }
+        type: { type: number }
+        title: { $ref: '#/components/schemas/StringOrStringArray' }
+        fullContent: { $ref: '#/components/schemas/StringOrStringArray' }
+        fullContent_snippet: { type: string }
+        tags:
+          oneOf:
+            - type: string
+            - type: array
+              items: { $ref: '#/components/schemas/IdentifierScalar' }
+        contentLink: { $ref: '#/components/schemas/NullableString' }
+        publishDate: { $ref: '#/components/schemas/NullableString' }
+        deprecatedYn: { type: [number, 'null'] }
+      additionalProperties: true
+    QnaDetailEnvelope:
+      type: object
+      properties:
+        status: { $ref: '#/components/schemas/Status' }
+        facilityQna:
+          oneOf:
+            - $ref: '#/components/schemas/QnaDetailRow'
+            - type: 'null'
+      additionalProperties: true
+    QnaDetailRow:
+      type: object
+      required: [docNumber, type, fullContent]
+      properties:
+        docNumber: { $ref: '#/components/schemas/IdentifierScalar' }
+        type: { type: number }
+        fullContent: { type: string }
+        title: { $ref: '#/components/schemas/StringOrStringArray' }
+        reference: { $ref: '#/components/schemas/NullableString' }
+        contentHtml: { $ref: '#/components/schemas/NullableString' }
+        relStds: { $ref: '#/components/schemas/NullableString' }
+        tags:
+          oneOf:
+            - type: string
+            - type: array
+              items: { $ref: '#/components/schemas/IdentifierScalar' }
+        contentLink: { $ref: '#/components/schemas/NullableString' }
+        publishDate: { $ref: '#/components/schemas/NullableString' }
+        date: { $ref: '#/components/schemas/NullableString' }
+        prevDocNumber: { $ref: '#/components/schemas/NullableString' }
+        nextDocNumber: { $ref: '#/components/schemas/NullableString' }
+        deprecatedYn: { type: [number, 'null'] }
+      additionalProperties: true

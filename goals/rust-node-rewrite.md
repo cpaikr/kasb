@@ -60,13 +60,15 @@ _None._
 
 Phase 1: freeze the compatibility baseline, establish the OpenAPI wire
 authority, strengthen the adversarial public-surface judge, and prove Node-API
-and native-launcher feasibility.
+and native-launcher feasibility. Implementation, validation, and independent
+code review are complete on `codex/rust-node-rewrite-phase-1`; integration is
+pending the required PR lifecycle.
 
 ### Next in-scope action
 
-Inventory the existing public surfaces and validation baseline, then implement
-the phase-1 authorities, judge, and disposable feasibility slices on a review
-branch from the integration base.
+Commit and push the reviewed phase-1 slice, then open, review, and merge its PR
+into `codex/rust-node-rewrite-integration` before beginning the dependent Rust
+SDK implementation.
 
 ### Evidence and blockers
 
@@ -77,5 +79,19 @@ branch from the integration base.
   implementation remains reviewable.
 - `main` starts one local planning commit (`31ef0ec`) ahead of `origin/main`;
   that approved rewrite plan is retained as the integration base.
+- The frozen compatibility inventory, OpenAPI wire authority and source
+  profile, fixture/contract/declaration freshness checks, process-isolated
+  adversarial judge, and private Node-API/native-launcher feasibility proof are
+  implemented on the phase-1 branch.
+- Full deterministic validation passes: frozen install, contract and
+  declaration checks, 31 adversarial/conformance tests, macOS ARM64 native
+  feasibility, typecheck, 191 Bun tests with one live test skipped, 28 Rust
+  tests, build, formatting, clippy with warnings denied, Rust 1.88 workspace
+  check, and diff hygiene.
+- The opt-in live suite passes 184 tests, including the bounded KASB traversal.
+- Independent repository-required review reports no Bucket I or Bucket II
+  findings and gives the phase-1 exit gate a PASS verdict.
+- Native feasibility is evidenced only for macOS ARM64. Linux GNU x64/ARM64
+  and Windows x64 remain planned and unclaimed until their later native gates.
 - No blocker is currently known. Registry publication, version selection,
   release tags, and external KASB mutation remain unauthorized.

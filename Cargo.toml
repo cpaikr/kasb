@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/kasb"]
+members = ["crates/kasb", "crates/kasb-node"]
 resolver = "2"
 
 [workspace.package]
@@ -8,3 +8,12 @@ license = "Elastic-2.0"
 repository = "https://github.com/sjunepark/kasb"
 rust-version = "1.88"
 version = "0.1.0"
+
+[workspace.dependencies]
+futures-util = "=0.3.32"
+napi = { version = "=3.12.1", default-features = false, features = ["async", "napi8"] }
+napi-build = "=2.4.1"
+napi-derive = "=3.6.3"
+
+[profile.release]
+panic = "unwind"

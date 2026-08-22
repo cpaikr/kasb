@@ -4,7 +4,7 @@
 
 - `name`: `kasb-standards`
 - `owner`: repo-local spec
-- `status`: implemented semantic contract; Rust/Node rewrite planned
+- `status`: implemented semantic contract; Rust/Node rewrite in progress
 - `domain`: Korean accounting standards access
 - `users`: LLM agents, agent developers, researchers, and humans using an SDK or the CLI
 
@@ -28,7 +28,7 @@ results through an asynchronous Node-API boundary. The npm executable only
 launches the packaged Rust CLI. The current TypeScript implementation remains
 executable reference evidence until the approved rewrite cuts over.
 
-This document owns public semantic behavior. The planned
+This document owns public semantic behavior.
 `contracts/kasb/openapi.yaml` owns supported HTTP wire facts, while
 `docs/research/kasb-standard-source-map.md` records dated provider evidence.
 
@@ -218,11 +218,12 @@ Every CLI operation output mode still emits a JSON envelope:
 
 Implementation notes:
 
-- Map public `keyword` to source parameter `searchWord`.
-- Use `GET /api/standard?searchWord={keyword}`.
+- Map public `keyword` to the source parameter named by the
+  [`searchStandardsSource` OpenAPI operation](../../contracts/kasb/openapi.yaml).
 - Do not hide the source's match-count behavior; expose enough metadata to explain ranking or truncation.
 - Include a `nextActions.getStandardStructure` action for each result so agent tools can call the follow-up operation without translating API URLs; CLI transport may render that action as `kasb get-standard-structure --std-num ... --output summary`.
-- Default search UX should use relevance ranking rather than source order because observed `/api/standard` order is not `doc_count` relevance order.
+- Default search UX should use relevance ranking rather than source order
+  because provider evidence shows that source order is not match-count order.
 
 ### `get-standard-structure`
 
@@ -241,10 +242,10 @@ Implementation notes:
 
 Implementation notes:
 
-- Use `GET /api/standard-indexes/{stdNum}` without search.
-- Map optional public `keyword` to source parameter `searchWord`.
-- Use `GET /api/standard-indexes/{stdNum}/searchWord?searchWord={keyword}` when `keyword` is supplied.
-- Do not expose `/api/title/{stdNum}` ids as public section ids.
+- Use the OpenAPI `getStandardIndexesSource` operation without search and
+  `searchStandardIndexesSource` when `keyword` is supplied.
+- Map optional public `keyword` to the source parameter named by OpenAPI.
+- Do not expose browser-route title ids as public section ids.
 
 ### `get-section`
 
@@ -263,8 +264,9 @@ Implementation notes:
 
 Implementation notes:
 
-- Use `GET /api/paragraphs/{stdNum}/{indexDocumentId}`.
-- For `ref` input, resolve the ref through `GET /api/standard-indexes/{stdNum}` first, then fetch the resolved section id.
+- Use the OpenAPI `getSectionSource` operation.
+- For `ref` input, resolve the ref through `getStandardIndexesSource` first,
+  then fetch the resolved section id.
 - If multiple structure nodes share a ref, choose the most specific deepest node and return `ambiguous_ref_resolved`.
 - Map optional public `keyword` to source parameter `searchWord`.
 - Include the source `searchWord` parameter only when requested.
@@ -289,7 +291,7 @@ Implementation notes:
 
 Implementation notes:
 
-- Use `GET /api/paragraphs/content/{stdNum}/{paraNum}`.
+- Use the OpenAPI `getParagraphSource` operation.
 - Normalize the direct paragraph response into a single exact result or a typed `not_found` failure.
 - Treat more than one returned paragraph row as `source_changed`; an exact lookup must not silently choose one row.
 - Treat missing `documentId`, `fullContent`, or other required paragraph fields as `source_changed`; do not synthesize them from optional fields.
@@ -314,7 +316,7 @@ Implementation notes:
 
 Implementation notes:
 
-- Use `GET /api/qnas/v2?types={csv}&searchWord={keyword}&page={page}&rows={rows}`.
+- Use the OpenAPI `searchQnaSource` operation.
 - Default observed public `types` to `11,12,13,14,15,24,25`.
 - The observed source endpoint does not accept date sort/filter parameters; `sortDate`, `from`, and `to` are applied client-side to source `publishDate` across a bounded Q&A search window. When the bounded scan cannot cover all matching source rows, return partial metadata and a warning.
 - Treat `types` as an explicit v1 exception to the usual semantic-field rule; keep type numbers source-facing until a later spec promotes semantic type names.
@@ -339,7 +341,7 @@ Implementation notes:
 
 Implementation notes:
 
-- Use `GET /api/qnas/v2/{docNumber}`.
+- Use the OpenAPI `getQnaSource` operation.
 - Include source `searchWord` only when optional `keyword` is supplied.
 - Treat `contentHtml` and related-standards fragments as source HTML; preserve them rather than inventing lossy citations.
 - Reject numeric-only `docNumber` values as `invalid_input` and direct callers to recover the full identifier through `search-qna`.
@@ -403,7 +405,8 @@ Failure envelope shape:
 The Rust KASB source adapter owns:
 
 - source URL construction
-- source response schemas
+- private decoding models that implement the OpenAPI-owned source response
+  schemas
 - fetch and timeout behavior
 - source-level error detection
 - normalization from KASB payloads into provider-facing results
@@ -416,7 +419,8 @@ the mapping boundary.
 
 - read-only only
 - no auth required in current evidence
-- conservative retry on transient upstream failures
+- no automatic source replay; transient upstream failures are marked
+  `retryable: true` so callers can choose a retry policy
 - source-shape drift becomes `source_changed`
 - invalid or stale ids become `not_found` or `invalid_input` depending on whether the input shape was valid
 - log request inputs, source endpoint, and identifier classification decisions when diagnostics are enabled

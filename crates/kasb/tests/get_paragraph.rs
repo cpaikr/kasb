@@ -223,7 +223,7 @@ async fn normalization_separates_compound_basis_paragraph_list_markers() {
 }
 
 #[tokio::test]
-async fn shared_get_paragraph_conformance_cases_match_the_typescript_baseline() {
+async fn shared_get_paragraph_conformance_cases_match_committed_expectations() {
     let root = repository_root();
     let manifest: Value = serde_json::from_slice(
         &std::fs::read(root.join("conformance/v1/cases.json"))
@@ -237,7 +237,7 @@ async fn shared_get_paragraph_conformance_cases_match_the_typescript_baseline() 
         .iter()
         .filter(|case| case["operation"] == "get-paragraph")
         .collect();
-    assert_eq!(paragraph_cases.len(), 2);
+    assert_eq!(paragraph_cases.len(), 3);
 
     for case in paragraph_cases {
         let routes = case["routes"]

@@ -44,8 +44,7 @@
     "prepublishOnly": "bun run typecheck && bun test",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "test:live": "LIVE_KASB_TESTS=1 bun test",
-    "conformance:capture": "bun run scripts/capture-conformance.ts"
+    "test:live": "LIVE_KASB_TESTS=1 bun test"
   },
   "dependencies": {
     "commander": "^14.0.3",
