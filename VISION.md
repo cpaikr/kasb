@@ -3,8 +3,8 @@
 ## Product
 
 - `name`: `kasb-standards`
-- `status`: Rust/Node rewrite in progress; TypeScript product and Rust paragraph
-  pilot remain active until cutover
+- `status`: Rust SDK complete; TypeScript transition product retained pending
+  cutover (see [MIGRATION.md](MIGRATION.md))
 - `domain`: Korean accounting standards and related interpretation material
   exposed through KASB public read surfaces
 - `users`: LLM agents, agent developers, researchers, and humans who need
@@ -131,16 +131,10 @@ The rewrite succeeds when:
 
 ## Current State
 
-- The complete TypeScript npm product and all six v1 operations are implemented.
-- The public Rust SDK implements and validates the `get-paragraph` vertical
-  pilot with `wreq`, typed failures, cancellation, fixtures, and conformance.
-- The rewrite baseline now has a validated OpenAPI wire authority, a reviewed
-  compatibility inventory, and a process-isolated adversarial judge. Native
-  binding and launcher work remains feasibility-only until its phase gate
-  passes.
-- The prior additive migration foundation is complete and retained as history.
-- [plans/rust-node-rewrite.md](plans/rust-node-rewrite.md) owns the approved
-  path to the single-conformer Rust SDK, Rust CLI, and Node SDK product.
+[MIGRATION.md](MIGRATION.md) owns authoritative transition status.
+[plans/rust-node-rewrite.md](plans/rust-node-rewrite.md) owns the approved
+sequence and exit gates. This document owns the enduring product scope and
+success criteria.
 
 ## Later Product Questions
 

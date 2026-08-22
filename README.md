@@ -3,12 +3,9 @@
 Read-only access to KASB standards and Q&A material through a public Rust SDK,
 Rust-backed Node SDK, and Rust CLI.
 
-The repository is preparing a `../ytm`-shaped rewrite: `crates/kasb` will become
-the sole KASB HTTP and domain implementation. A Node SDK will call it through a
-narrow asynchronous Node-API binding, and a separate `clap` CLI will call the
-same Rust SDK directly. The npm package retains `kasb` as a transparent launcher
-for the packaged Rust binary and retains `@sjunepark/kasb/toolset`. The Pi
-adapter will be removed at cutover.
+The repository is executing a `../ytm`-shaped Rust/Node rewrite. See
+[MIGRATION.md](MIGRATION.md) for authoritative transition status and
+[ARCHITECTURE.md](ARCHITECTURE.md) for the target boundaries.
 
 ## Current checkout
 
@@ -16,18 +13,20 @@ adapter will be removed at cutover.
   package, complete six-operation TypeScript implementation, CLI, toolset, and
   Pi adapter.
 - [`crates/kasb`](crates/kasb/README.md) is an independently buildable public
-  Rust SDK with the validated `get-paragraph` vertical pilot.
+  Rust SDK implementing all six v1 operations. The TypeScript implementation
+  remains present as the executable cutover reference until later gates pass.
 - `fixtures/` and `conformance/` contain shared source evidence and serialized
-  compatibility cases. The process-isolated judge verifies the public surfaces
-  and rejects deliberate behavioral corruption.
+  compatibility cases. The process-isolated judge verifies both complete
+  TypeScript and Rust operation surfaces and rejects deliberate behavioral
+  corruption.
 - `contracts/kasb/openapi.yaml` owns the supported provider wire facts; its
   source-adapter profile records only cross-response and decoding rules that
   OpenAPI cannot express. The Node-API and native-launcher code in
   this phase remains a private feasibility proof, not the cutover product.
 
 The current implementations remain intact until the replacement passes the
-approved cutover gates. See [ARCHITECTURE.md](ARCHITECTURE.md) for current and
-target boundaries, [VISION.md](VISION.md) for product scope, and
+approved cutover gates. See [MIGRATION.md](MIGRATION.md) for current status,
+[VISION.md](VISION.md) for product scope, and
 [plans/rust-node-rewrite.md](plans/rust-node-rewrite.md) for the scheduled work.
 
 ## Development commands

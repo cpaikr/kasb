@@ -9,21 +9,22 @@
   supports the Node SDK, while a separate Rust `clap` crate owns the CLI.
 - The npm `kasb` entrypoint is only a platform resolver and process launcher for
   the packaged Rust CLI binary. It must not become a second CLI implementation.
-- The Rust `get-paragraph` pilot and the complete TypeScript product currently
-  coexist during the transition. Do not describe target paths as implemented.
+- [MIGRATION.md](MIGRATION.md) owns the authoritative rewrite status; do not
+  describe planned paths as implemented.
 - The Pi adapter is intentionally retired at cutover and must not be replaced
   by MCP or another host adapter without a product decision.
 
 ## Read First
 
 1. Start with [README.md](README.md).
-2. Read [ARCHITECTURE.md](ARCHITECTURE.md) for current and target boundaries.
-3. Read [VISION.md](VISION.md) for product scope and non-goals.
-4. Read [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md)
+2. Read [MIGRATION.md](MIGRATION.md) for authoritative transition status.
+3. Read [ARCHITECTURE.md](ARCHITECTURE.md) for current and target boundaries.
+4. Read [VISION.md](VISION.md) for product scope and non-goals.
+5. Read [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md)
    before changing provider assumptions.
-5. Read [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md)
+6. Read [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md)
    before changing public capability semantics.
-6. Read [plans/rust-node-rewrite.md](plans/rust-node-rewrite.md) before rewrite
+7. Read [plans/rust-node-rewrite.md](plans/rust-node-rewrite.md) before rewrite
    implementation or cutover work.
 
 ## Current Commands

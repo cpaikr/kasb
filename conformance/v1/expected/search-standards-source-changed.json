@@ -1,0 +1,9 @@
+{
+  "ok": false,
+  "error": {
+    "code": "source_changed",
+    "message": "Could not find standards response object.",
+    "retryable": false,
+    "sourceUrl": "https://db.kasb.or.kr/api/standard?searchWord=%EB%A6%AC%EC%8A%A4"
+  }
+}

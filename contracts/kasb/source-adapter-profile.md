@@ -22,6 +22,9 @@ semantics remain in
   values.
 - Send no request body. Reuse one session-scoped client so cookies, connection
   pooling, proxy affinity, and the concurrency budget remain coherent.
+- Reject a successful response once its decoded body exceeds 8 MiB. Enforce the
+  limit from both declared content length and streamed bytes so chunked or
+  compressed responses cannot bypass it.
 - Make no automatic replay. One logical KASB request produces at most one HTTP
   attempt; retry policy belongs to callers after a typed failure.
 
@@ -33,8 +36,17 @@ semantics remain in
   absolute values in `[1e-6, 1e21)` and lowercase scientific notation outside
   that interval, with an explicit `+` for nonnegative exponents. Do not promote
   source ordering fields or browser-facing title ids into public identifiers.
+- Reject source-derived identifiers equal to `.` or `..` before constructing a
+  follow-up URL. Search rows follow the partial-data policy; exact or
+  identity-bearing responses fail as `source_changed`. No dot-segment value may
+  reach path encoding or URL assembly.
 - A paragraph response must match the requested `stdNum` and `paraNum`, and its
   `uniqueKey` must equal `{stdNum}-{paraNum}`.
+- Every base-structure row that supplies both a source `documentId` and
+  `stdNum` must match the requested `stdNum`; a mismatch is `source_changed`.
+- Every section clause with an explicit `stdNum` must match the requested
+  `stdNum`. A clause may carry a child `documentId`; otherwise the requested
+  section id is the fallback retrieval identity.
 - A Q&A detail response must match the requested `docNumber`.
 - Filtered structure keys other than the literal string `"null"` must resolve
   to nodes from the base structure response.
@@ -60,6 +72,11 @@ semantics remain in
 - Ref resolution chooses the deepest matching node, then stable source order,
   and reports ambiguity. Structure and paragraph enrichment is best-effort;
   cancellation always stops both primary and enrichment work.
+- Relevance and title standard searches enrich at most 512 candidate rows
+  before sorting, with at most eight enrichment requests in flight. A larger
+  candidate set is source drift rather than a partially ranked result.
+  Match-count and standard-number searches sort and truncate first, then enrich
+  only the public `limit` rows.
 - Q&A recency controls scan at most 500 rows in pages of at most 50 and report
   partial metadata when the bounded window cannot cover the source count.
 
@@ -69,7 +86,10 @@ semantics remain in
   text normalization is deterministic and must not invent missing required
   content.
 - Malformed JSON, malformed required envelopes, identity mismatches, and
-  impossible cardinality are `source_changed`.
+  impossible cardinality are `source_changed`. A successful response above the
+  decoded-body limit is also non-retryable `source_changed`, regardless of
+  whether the concrete transport rejects it while streaming or returns the
+  oversized bytes to the shared adapter boundary.
 - HTTP 404 is `not_found`. HTTP 429 and every 5xx response are retryable
   `source_unavailable`; other non-success statuses are non-retryable
   `source_unavailable`. Connection and timeout failures are retryable

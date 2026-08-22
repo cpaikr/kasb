@@ -7,10 +7,11 @@ committed expected outcomes. It contains no imports from a conformer.
 The conformer-neutral judge in `judge.ts` materializes fixture payloads and
 executes each public-surface adapter in a separate process. It does not import a
 conformer or give a runner the expected outcome. The transition currently has a
-complete TypeScript runner and a public Rust SDK runner for `get-paragraph`;
-Rust CLI and Rust-backed Node SDK adapters join the same protocol as those
-surfaces are implemented. The direct and npm-launched CLI paths must ultimately
-produce the same process contract.
+complete TypeScript runner retained as the frozen compatibility oracle and a
+public Rust SDK runner for all six v1 operations. Rust CLI and Rust-backed Node
+SDK adapters join the same protocol as those surfaces are implemented. The
+direct and npm-launched CLI paths must ultimately produce the same process
+contract.
 
 Each conforming public-surface runner must:
 
@@ -54,7 +55,8 @@ review.
 must reject all of them and report the declared first-difference class. The
 controls cover a wrong success value, wrong failure category, serialization
 type drift, and corrupted source metadata. The shared malformed-source cases
-prove that an upstream paragraph envelope without `paraContents` or with two
-exact rows becomes the committed `source_changed` failure; Q&A controls prove
-that an absent or null `facilityQna` member is `not_found`. These controls
-prevent a runner that merely accepts both implementations.
+prove that missing required standards, structure, section, paragraph, or Q&A
+search envelopes become the committed `source_changed` failures. Paragraph
+controls also reject multiple exact rows, while Q&A detail controls prove that
+an absent or null `facilityQna` member is `not_found`. These controls prevent a
+runner that merely accepts both implementations.

@@ -24,6 +24,15 @@
       "expected": "conformance/v1/expected/search-standards-invalid-input.json"
     },
     {
+      "id": "search-standards-source-changed",
+      "operation": "search-standards",
+      "input": { "keyword": "리스" },
+      "routes": [
+        { "requestUrl": "https://db.kasb.or.kr/api/standard?searchWord=%EB%A6%AC%EC%8A%A4", "fixture": "conformance/v1/source-controls/standards-missing-envelope.json", "responseSchemaValidity": "invalid" }
+      ],
+      "expected": "conformance/v1/expected/search-standards-source-changed.json"
+    },
+    {
       "id": "get-standard-structure-success",
       "operation": "get-standard-structure",
       "input": { "stdNum": "1116", "keyword": "리스" },
@@ -41,6 +50,15 @@
       "expected": "conformance/v1/expected/get-standard-structure-invalid-input.json"
     },
     {
+      "id": "get-standard-structure-source-changed",
+      "operation": "get-standard-structure",
+      "input": { "stdNum": "1116" },
+      "routes": [
+        { "requestUrl": "https://db.kasb.or.kr/api/standard-indexes/1116", "fixture": "conformance/v1/source-controls/structure-missing-envelope.json", "responseSchemaValidity": "invalid" }
+      ],
+      "expected": "conformance/v1/expected/get-standard-structure-source-changed.json"
+    },
+    {
       "id": "get-section-success",
       "operation": "get-section",
       "input": { "stdNum": "1116", "indexDocumentId": "ZB2hJW" },
@@ -56,6 +74,15 @@
       "input": { "stdNum": "1116", "indexDocumentId": "ZB2hJW", "ref": "1~2" },
       "routes": [],
       "expected": "conformance/v1/expected/get-section-invalid-input.json"
+    },
+    {
+      "id": "get-section-source-changed",
+      "operation": "get-section",
+      "input": { "stdNum": "1116", "indexDocumentId": "ZB2hJW" },
+      "routes": [
+        { "requestUrl": "https://db.kasb.or.kr/api/paragraphs/1116/ZB2hJW", "fixture": "conformance/v1/source-controls/section-missing-envelope.json", "responseSchemaValidity": "invalid" }
+      ],
+      "expected": "conformance/v1/expected/get-section-source-changed.json"
     },
     {
       "id": "get-paragraph-success",
@@ -107,6 +134,15 @@
       "input": { "keyword": "리스", "types": "11,a" },
       "routes": [],
       "expected": "conformance/v1/expected/search-qna-invalid-input.json"
+    },
+    {
+      "id": "search-qna-source-changed",
+      "operation": "search-qna",
+      "input": { "keyword": "리스" },
+      "routes": [
+        { "requestUrl": "https://db.kasb.or.kr/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=10", "fixture": "conformance/v1/source-controls/qna-search-missing-envelope.json", "responseSchemaValidity": "invalid" }
+      ],
+      "expected": "conformance/v1/expected/search-qna-source-changed.json"
     },
     {
       "id": "get-qna-success",

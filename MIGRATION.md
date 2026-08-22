@@ -1,8 +1,18 @@
 # Rust/Node Rewrite Decision
 
-Status: approved for planning; implementation not started.
+Status: approved; implementation in progress.
 
 Decision date: 2026-08-22.
+
+## Current transition state
+
+The compatibility authorities and adversarial judge are integrated, and the
+public Rust SDK implements all six approved operations. The TypeScript npm
+product remains the executable reference until the Rust CLI, asynchronous Node
+projection, native-package, packed-consumer, live, and final cutover gates pass.
+The Pi surface remains present only until that cutover. The scheduled phase and
+validation evidence are maintained in
+[plans/rust-node-rewrite.md](plans/rust-node-rewrite.md).
 
 ## Decision
 

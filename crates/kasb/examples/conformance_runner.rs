@@ -96,23 +96,48 @@ async fn run() -> Result<(), Box<dyn Error>> {
         )
         .into());
     }
-    if request.operation != "get-paragraph" {
-        return Err(format!(
-            "Rust SDK conformance runner does not support operation {} for {}",
-            request.operation, request.case_id
-        )
-        .into());
-    }
-
     let transport = FixtureTransport::new(request.routes)?;
     let client = KasbClient::from_parts(
         transport.clone(),
         FixedClock::new("2026-05-18T00:00:00.000Z"),
     );
-    let outcome = match client
-        .execute_get_paragraph(request.input, &CancellationToken::new())
-        .await
-    {
+    let cancellation = CancellationToken::new();
+    let result = match request.operation.as_str() {
+        "search-standards" => to_value(
+            client
+                .execute_search_standards(request.input, &cancellation)
+                .await,
+        )?,
+        "get-standard-structure" => to_value(
+            client
+                .execute_get_standard_structure(request.input, &cancellation)
+                .await,
+        )?,
+        "get-section" => to_value(
+            client
+                .execute_get_section(request.input, &cancellation)
+                .await,
+        )?,
+        "get-paragraph" => to_value(
+            client
+                .execute_get_paragraph(request.input, &cancellation)
+                .await,
+        )?,
+        "search-qna" => to_value(
+            client
+                .execute_search_qna(request.input, &cancellation)
+                .await,
+        )?,
+        "get-qna" => to_value(client.execute_get_qna(request.input, &cancellation).await)?,
+        _ => {
+            return Err(format!(
+                "Rust SDK conformance runner does not support operation {} for {}",
+                request.operation, request.case_id
+            )
+            .into());
+        }
+    };
+    let outcome = match result {
         Ok(value) => json!({"ok": true, "value": value}),
         Err(KasbError::Failure(error)) => json!({"ok": false, "error": error}),
         Err(KasbError::Cancelled) => {
@@ -131,4 +156,13 @@ async fn run() -> Result<(), Box<dyn Error>> {
 
     println!("{}", serde_json::to_string(&outcome)?);
     Ok(())
+}
+
+fn to_value<T: serde::Serialize>(
+    result: Result<T, KasbError>,
+) -> Result<Result<Value, KasbError>, serde_json::Error> {
+    match result {
+        Ok(value) => Ok(Ok(serde_json::to_value(value)?)),
+        Err(error) => Ok(Err(error)),
+    }
 }
