@@ -58,19 +58,22 @@ _None._
   language-neutral source profile, fixture/contract/declaration freshness
   checks, process-isolated adversarial judge, and private Node-API/native
   launcher feasibility proof are integrated by PR #15.
+- Phase 2: all six approved public operations, shared bounded transport,
+  decoding, normalization, domain policy, typed failures, cancellation, and
+  malformed-source controls are integrated in the public Rust SDK by PR #16.
 
 ### Current in-scope result
 
-Phase 2: complete all six approved public operations in `crates/kasb` so the
-public Rust SDK becomes the replacement conformer while the TypeScript product
-remains intact behind the later cutover gates.
+Phase 3: build the first-class Rust `clap` CLI in `crates/kasb-cli` over the
+public Rust SDK while preserving the frozen command surface, machine envelopes,
+diagnostics, exit behavior, and current TypeScript product until later cutover
+gates pass.
 
 ### Next in-scope action
 
-Create the Phase 2 branch from `codex/rust-node-rewrite-integration`, inventory
-the remaining five TypeScript operations and shared domain policies against the
-frozen judge, then implement and validate the complete public Rust SDK as the
-next reviewable PR.
+Create the Phase 3 branch from `codex/rust-node-rewrite-integration`, inventory
+the frozen TypeScript CLI command, presentation, stdout/stderr, and exit
+contract, then implement and validate the Rust CLI as the next reviewable PR.
 
 ### Evidence and blockers
 
@@ -90,15 +93,20 @@ next reviewable PR.
   verified dispositions and were resolved; refreshed GitGuardian and
   CodeRabbit checks passed or skipped under the repository incremental-review
   policy with no new thread.
-- Full deterministic validation passes after the feedback fixes: frozen
-  install, contract and declaration checks, 36 adversarial/conformance tests,
-  macOS ARM64 native feasibility, typecheck, 195 Bun tests with one live test
-  skipped, 29 Rust tests, build, formatting, clippy with warnings denied, Rust
-  1.88 workspace check, and diff hygiene.
-- The opt-in live suite passes 188 tests, including the bounded KASB traversal.
-- Independent repository-required review of the feedback cluster reports no
-  remaining correctness, security, contract-drift, regression, or
-  overengineering findings and gives an explicit PASS verdict.
+- PR #16 merged into `codex/rust-node-rewrite-integration` as merge commit
+  `79876bc`, preserving the two reviewed commits. All 14 review threads received
+  verified dispositions and were resolved; refreshed GitGuardian and
+  CodeRabbit checks passed or skipped under the repository incremental-review
+  policy with no new thread.
+- Full deterministic validation after the Phase 2 feedback fixes passes:
+  frozen install, contract and declaration checks, 56 adversarial/conformance
+  tests, macOS ARM64 native feasibility, typecheck, 215 Bun tests with one live
+  test skipped, the full current Rust suite, build, formatting, clippy with
+  warnings denied, Rust 1.88 workspace check, and diff hygiene.
+- The opt-in live suite passes 208 tests, including the bounded KASB traversal.
+- Independent repository-required review of the Phase 2 feedback cluster
+  reports no remaining Bucket I or Bucket II findings and gives an explicit
+  PASS verdict.
 - Native feasibility is evidenced only for macOS ARM64. Linux GNU x64/ARM64
   and Windows x64 remain planned and unclaimed until their later native gates.
 - The TypeScript conformer, JavaScript CLI, and Pi adapter remain intentionally
