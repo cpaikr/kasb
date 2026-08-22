@@ -54,23 +54,23 @@ _None._
 
 ### Completed included results
 
-_None._
+- Phase 1: the compatibility baseline, sole OpenAPI wire authority and
+  language-neutral source profile, fixture/contract/declaration freshness
+  checks, process-isolated adversarial judge, and private Node-API/native
+  launcher feasibility proof are integrated by PR #15.
 
 ### Current in-scope result
 
-Phase 1: freeze the compatibility baseline, establish the OpenAPI wire
-authority, strengthen the adversarial public-surface judge, and prove Node-API
-and native-launcher feasibility. PR feedback fixes, validation, and the
-repository-required independent review are complete on
-`codex/rust-node-rewrite-phase-1`; integration is pending the remainder of the
-required PR lifecycle.
+Phase 2: complete all six approved public operations in `crates/kasb` so the
+public Rust SDK becomes the replacement conformer while the TypeScript product
+remains intact behind the later cutover gates.
 
 ### Next in-scope action
 
-Commit and push the cohesive PR-feedback fix, reply to and resolve every review
-thread, refresh checks and feedback, then merge PR #15 into
-`codex/rust-node-rewrite-integration` before beginning the dependent Rust SDK
-implementation.
+Create the Phase 2 branch from `codex/rust-node-rewrite-integration`, inventory
+the remaining five TypeScript operations and shared domain policies against the
+frozen judge, then implement and validate the complete public Rust SDK as the
+next reviewable PR.
 
 ### Evidence and blockers
 
@@ -85,10 +85,11 @@ implementation.
   profile, fixture/contract/declaration freshness checks, process-isolated
   adversarial judge, and private Node-API/native-launcher feasibility proof are
   implemented on the phase-1 branch.
-- PR #15 is open against the integration branch. Its initial CodeRabbit and
-  Codex reviews completed with 20 threads; every item was independently audited
-  and the accepted findings are implemented locally without expanding the
-  frozen public API or changing cancellation ownership.
+- PR #15 merged into `codex/rust-node-rewrite-integration` as merge commit
+  `2c7892d`, preserving the two reviewed commits. All 20 review threads received
+  verified dispositions and were resolved; refreshed GitGuardian and
+  CodeRabbit checks passed or skipped under the repository incremental-review
+  policy with no new thread.
 - Full deterministic validation passes after the feedback fixes: frozen
   install, contract and declaration checks, 36 adversarial/conformance tests,
   macOS ARM64 native feasibility, typecheck, 195 Bun tests with one live test
@@ -100,5 +101,8 @@ implementation.
   overengineering findings and gives an explicit PASS verdict.
 - Native feasibility is evidenced only for macOS ARM64. Linux GNU x64/ARM64
   and Windows x64 remain planned and unclaimed until their later native gates.
+- The TypeScript conformer, JavaScript CLI, and Pi adapter remain intentionally
+  present until the replacement SDK, CLI, Node, native-target, and packed
+  consumer gates pass.
 - No blocker is currently known. Registry publication, version selection,
   release tags, and external KASB mutation remain unauthorized.
