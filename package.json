@@ -17,7 +17,7 @@
     "test:rust": "cargo test --workspace --locked",
     "test:live": "bun run --cwd packages/kasb-ts test:live",
     "contracts:check": "node scripts/validate-contracts.mjs && node scripts/check-public-declarations.mjs",
-    "conformance:judge": "bun test conformance/judge.test.ts packages/kasb-ts/test/conformance/conformance.test.ts",
+    "conformance:judge": "bun test conformance/judge.test.ts conformance/cli-judge.test.ts packages/kasb-ts/test/conformance/conformance.test.ts",
     "native:feasibility": "node scripts/test-native-feasibility.mjs"
   },
   "devDependencies": {

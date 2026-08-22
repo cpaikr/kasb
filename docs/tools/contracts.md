@@ -52,7 +52,12 @@ Most tools benefit from a consistent success envelope:
 - `warnings`
   Partial coverage, empty sections, source drift, fallback use, parsing or normalization uncertainty.
 
-Typed failures are separate from the success schema. Do not put an `error` field in a success result schema. For this repo's CLI, failures should still be JSON: success envelopes go to `stdout`, failure envelopes go to `stderr`, and nonzero exits keep `stdout` empty.
+Typed failures are separate from the success schema. Do not put an `error`
+field in a success result schema. For this repository's CLI, both operation
+success and failure envelopes go to `stdout`; failures exit `1` and leave
+`stderr` empty. The frozen replacement inventory in
+[`../contracts/kasb-v1-compatibility.md`](../contracts/kasb-v1-compatibility.md)
+owns the complete process contract.
 
 ## Output Modes
 

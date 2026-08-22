@@ -56,7 +56,11 @@ Internal typed evals use `evals/typed-tools.ts`. These definitions call `package
 CLI smoke tests should assert stream and exit behavior:
 
 - success: exit code `0`, JSON envelope on `stdout`, empty `stderr`
-- failure: nonzero exit code, empty `stdout`, JSON failure envelope on `stderr`
+- failure: exit code `1`, JSON failure envelope on `stdout`, empty `stderr`
+
+The frozen replacement inventory in
+[`../contracts/kasb-v1-compatibility.md`](../contracts/kasb-v1-compatibility.md)
+owns the complete CLI process contract.
 
 Initial deterministic CLI/test scenarios, before adding `evals/` artifacts:
 

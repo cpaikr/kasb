@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/kasb", "crates/kasb-node"]
+members = ["crates/kasb", "crates/kasb-cli", "crates/kasb-node"]
 resolver = "2"
 
 [workspace.package]

@@ -27,11 +27,15 @@ native-target, and live verification.
 - The former additive dual-SDK direction is superseded. The target is one Rust
   conformer with three supported public projections: the Rust SDK, Rust CLI,
   and Rust-backed Node SDK.
-- Delivery phase 1 is implemented, validated, and independently reviewed on
-  `codex/rust-node-rewrite-phase-1`. It establishes the frozen compatibility
-  inventory, OpenAPI authority and freshness checks, adversarial process judge,
-  and private Node-API/native-launcher feasibility proof. It does not yet claim
-  a cutover or native support beyond the proven macOS ARM64 host check.
+- Delivery phases 1 and 2 are integrated. The frozen compatibility inventory,
+  OpenAPI authority and freshness checks, adversarial process judge, private
+  Node-API/native-launcher feasibility proof, and all six public Rust SDK
+  operations are complete. No cutover or native support beyond the proven
+  macOS ARM64 host check is claimed yet.
+- Delivery phase 3 is implemented, fully validated, and independently reviewed
+  on `codex/rust-node-rewrite-phase-3`; its PR lifecycle remains pending. The
+  native Rust CLI covers all six operations while the TypeScript npm executable
+  remains unchanged until later packaging and cutover gates pass.
 
 ## Decisions
 
@@ -74,6 +78,10 @@ native-target, and live verification.
   scripts or on first execution.
 - Keep live KASB checks separate from ordinary deterministic validation. Live
   availability is provider evidence, not contract authority.
+- Keep the frozen JavaScript UTF-16 summary limits, but truncate at complete
+  Unicode scalar boundaries. Emitting an escaped lone surrogate solely to copy
+  the transition CLI's pathological boundary behavior is an intentional
+  compatibility exception, covered by the CLI process judge.
 - Keep publishing, version selection, registry mutation, and changes to KASB
   external state outside the rewrite. Delivery may prepare releasable artifacts
   but cannot publish them without explicit authorization.
@@ -231,8 +239,7 @@ native-target, and live verification.
 
 ## Next action
 
-Complete the required validation and PR review lifecycle for delivery phase 2:
-the public Rust SDK now implements all six operations and the process-isolated
-judge exercises every Rust operation. After integration, begin delivery phase
-3 on a fresh review branch by building the first-class Rust `clap` CLI over the
-public SDK.
+Complete the Phase 3 PR review lifecycle for the first-class Rust `clap` CLI
+and its independent process judge. After integration, begin the dependent
+asynchronous Node-API, Node SDK, native-package, and npm-launcher phase on a
+fresh review branch.
