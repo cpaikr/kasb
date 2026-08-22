@@ -61,19 +61,22 @@ _None._
 - Phase 2: all six approved public operations, shared bounded transport,
   decoding, normalization, domain policy, typed failures, cancellation, and
   malformed-source controls are integrated in the public Rust SDK by PR #16.
+- Phase 3: the first-class Rust `clap` CLI, all six commands, frozen machine
+  behavior, and independent native-process judge are integrated by PR #17.
 
 ### Current in-scope result
 
-Phase 3: build the first-class Rust `clap` CLI in `crates/kasb-cli` over the
-public Rust SDK while preserving the frozen command surface, machine envelopes,
-diagnostics, exit behavior, and current TypeScript product until later cutover
-gates pass.
+Phase 4: build the complete asynchronous Node-API projection, thin Node
+SDK/toolset, exact-version native packages, and transparent npm Rust CLI
+launcher while preserving the TypeScript product until every replacement and
+packed-consumer gate passes.
 
 ### Next in-scope action
 
-Deliver the independently reviewed and validated Rust CLI and its process judge
-through the Phase 3 PR review lifecycle before beginning the dependent
-Node/native product phase.
+Create the Phase 4 branch from the integration tip, reconcile the feasibility
+proof and `../ytm` distribution pattern against the frozen Node/package
+surface, then implement and validate the complete Rust-backed Node product and
+claimed native package matrix as the next reviewable PR.
 
 ### Evidence and blockers
 
@@ -112,26 +115,18 @@ Node/native product phase.
 - The TypeScript conformer, JavaScript CLI, and Pi adapter remain intentionally
   present until the replacement SDK, CLI, Node, native-target, and packed
   consumer gates pass.
-- The Phase 3 branch implements all six `clap` commands over the public Rust
-  SDK and an independent fixture-backed native-process judge. The full gate
-  passes: frozen install, contract/declaration checks, 99 conformance/judge
-  tests, macOS ARM64 native feasibility, typecheck, 215 deterministic Bun tests
-  with one live test skipped, workspace Rust tests, build, formatting, clippy
-  with warnings denied, release-binary smoke checks, Rust 1.88 workspace check,
-  diff hygiene, and 208 opt-in live tests. The CLI-specific judge passes 43
-  cases, and independent review reports no remaining Bucket I or II findings
-  with an explicit PASS verdict. The Phase 3 PR lifecycle remains pending.
-- The Phase 3 PR feedback cluster addresses all seven verified CodeRabbit
-  findings: bounded build setup, stable control selection, a scalar-safe UTF-16
-  oracle with its own boundary control, typed exhaustive operation dispatch,
-  clap-derived diagnostic metadata, redundant configuration removal, and
-  unambiguous transition-only lone-surrogate wording. Codex reports no major
-  issue, and the repository-required feedback review reports no Bucket I or II
-  finding with an explicit PASS. The refreshed deterministic gate passes 100
-  conformance/judge cases (44 CLI process cases), 215 Bun tests with one live
-  test skipped, workspace Rust tests and build, contract/declaration checks,
-  typecheck, formatting, clippy with warnings denied, Rust 1.88, and diff
-  hygiene. Commit, thread disposition, refreshed checks, and merge remain
-  pending.
+- PR #17 merged into `codex/rust-node-rewrite-integration` as merge commit
+  `691506e`, preserving the two reviewed commits. All seven review threads
+  received verified dispositions, CodeRabbit acknowledged every fix, and the
+  refreshed CodeRabbit and GitGuardian checks passed. Codex reported no major
+  issue.
+- Full deterministic validation after the Phase 3 feedback fixes passes:
+  frozen install, contract and declaration checks, 100 adversarial/conformance
+  tests including 44 CLI process cases, macOS ARM64 native feasibility,
+  typecheck, 215 Bun tests with one live test skipped, workspace Rust tests and
+  build, release-binary smoke checks, formatting, clippy with warnings denied,
+  Rust 1.88 workspace check, and diff hygiene. The opt-in live suite passes 208
+  tests, and independent repository-required review reports no Bucket I or II
+  finding with an explicit PASS.
 - No blocker is currently known. Registry publication, version selection,
   release tags, and external KASB mutation remain unauthorized.
