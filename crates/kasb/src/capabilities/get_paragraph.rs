@@ -4,6 +4,8 @@ use serde_json::{Map, Number, Value};
 use crate::KasbFailure;
 use crate::text::trim_ecmascript_whitespace;
 
+pub use super::{Completeness, ContentMetadata, ResultMetadata, SourceBehavior, SourceMetadata};
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetParagraphRequest {
@@ -195,44 +197,6 @@ pub struct Paragraph {
 pub struct GetParagraphPayload {
     pub request: GetParagraphRequest,
     pub paragraph: Paragraph,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResultMetadata {
-    pub fetched_at: String,
-    pub source: SourceMetadata,
-    pub source_behavior: SourceBehavior,
-    pub completeness: Completeness,
-    pub content: ContentMetadata,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct SourceMetadata {
-    pub system: String,
-    pub endpoint: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SourceBehavior {
-    pub observation_status: String,
-    pub api_base: String,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Completeness {
-    Complete,
-    Partial,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ContentMetadata {
-    pub html_fields: Vec<String>,
-    pub text_fields: Vec<String>,
-    pub notes: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

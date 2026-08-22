@@ -1,6 +1,6 @@
 # Rust/Node Rewrite Decision
 
-Status: approved for planning; implementation not started.
+Status: approved; implementation in progress.
 
 Decision date: 2026-08-22.
 

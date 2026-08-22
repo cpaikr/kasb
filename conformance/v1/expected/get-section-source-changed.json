@@ -1,0 +1,9 @@
+{
+  "ok": false,
+  "error": {
+    "code": "source_changed",
+    "message": "Could not find clauses array.",
+    "retryable": false,
+    "sourceUrl": "https://db.kasb.or.kr/api/paragraphs/1116/ZB2hJW"
+  }
+}

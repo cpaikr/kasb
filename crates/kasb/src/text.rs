@@ -4,7 +4,11 @@ pub(crate) fn trim_ecmascript_whitespace(value: &str) -> &str {
     value.trim_matches(is_ecmascript_whitespace)
 }
 
-fn is_ecmascript_whitespace(value: char) -> bool {
+pub(crate) fn trim_end_ecmascript_whitespace(value: &str) -> &str {
+    value.trim_end_matches(is_ecmascript_whitespace)
+}
+
+pub(crate) fn is_ecmascript_whitespace(value: char) -> bool {
     matches!(
         value,
         '\u{0009}'..='\u{000D}'
@@ -39,5 +43,19 @@ mod tests {
                 value as u32
             );
         }
+    }
+
+    #[test]
+    fn trim_helpers_preserve_non_ecmascript_unicode_whitespace() {
+        assert_eq!(trim_ecmascript_whitespace("\u{feff}value\u{3000}"), "value");
+        assert_eq!(trim_end_ecmascript_whitespace("value\u{2029}"), "value");
+        assert_eq!(
+            trim_ecmascript_whitespace("\u{0085}value\u{0085}"),
+            "\u{0085}value\u{0085}"
+        );
+        assert_eq!(
+            trim_end_ecmascript_whitespace("value\u{0085}"),
+            "value\u{0085}"
+        );
     }
 }

@@ -231,7 +231,8 @@ native-target, and live verification.
 
 ## Next action
 
-Complete the required PR review lifecycle for delivery phase 1 into
-`codex/rust-node-rewrite-integration`, then begin delivery phase 2 on a fresh
-review branch by implementing the five remaining operations in the public Rust
-SDK and extending the independent judge to every Rust operation.
+Complete the required validation and PR review lifecycle for delivery phase 2:
+the public Rust SDK now implements all six operations and the process-isolated
+judge exercises every Rust operation. After integration, begin delivery phase
+3 on a fresh review branch by building the first-class Rust `clap` CLI over the
+public SDK.

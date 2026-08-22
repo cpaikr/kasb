@@ -9,8 +9,9 @@
   supports the Node SDK, while a separate Rust `clap` crate owns the CLI.
 - The npm `kasb` entrypoint is only a platform resolver and process launcher for
   the packaged Rust CLI binary. It must not become a second CLI implementation.
-- The Rust `get-paragraph` pilot and the complete TypeScript product currently
-  coexist during the transition. Do not describe target paths as implemented.
+- The complete public Rust replacement conformer and the complete TypeScript
+  product currently coexist during the transition. The Rust CLI, Node, native
+  packaging, and cutover target paths remain planned until their gates pass.
 - The Pi adapter is intentionally retired at cutover and must not be replaced
   by MCP or another host adapter without a product decision.
 

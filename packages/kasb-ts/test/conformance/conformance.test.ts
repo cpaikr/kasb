@@ -144,7 +144,7 @@ describe("public Rust SDK conformance runner", () => {
     cwd: repoRoot,
   } as const;
 
-  for (const testCase of manifest.cases.filter(({ operation }) => operation === "get-paragraph")) {
+  for (const testCase of manifest.cases) {
     test(`${testCase.id} matches through the public Rust SDK process`, async () => {
       expect(await judgeConformanceCase(repoRoot, manifest, rustRunner, testCase)).toBeUndefined();
     }, 30_000);

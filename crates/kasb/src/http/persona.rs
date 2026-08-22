@@ -2,12 +2,15 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures_util::StreamExt;
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 use wreq::header::{ACCEPT, ACCEPT_LANGUAGE as ACCEPT_LANGUAGE_HEADER};
 use wreq_util::Emulation;
 
 pub const ACCEPT_LANGUAGE: &str = "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7";
+/// Maximum decoded body size accepted from a successful KASB response.
+pub const MAX_RESPONSE_BYTES: usize = 8 * 1024 * 1024;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PersonaConfig {
@@ -149,16 +152,43 @@ impl HttpTransport for PersonaClient {
                     body: Vec::new(),
                 });
             }
-            let body = tokio::select! {
-                biased;
-                _ = cancellation.cancelled() => return Err(TransportError::Cancelled),
-                body = response.bytes() => body.map_err(map_wreq_error)?.to_vec(),
-            };
+            if response
+                .content_length()
+                .is_some_and(|length| length > MAX_RESPONSE_BYTES as u64)
+            {
+                return Err(response_too_large());
+            }
+            let mut body = Vec::with_capacity(
+                response
+                    .content_length()
+                    .unwrap_or_default()
+                    .min(MAX_RESPONSE_BYTES as u64) as usize,
+            );
+            let mut chunks = response.bytes_stream();
+            loop {
+                let chunk = tokio::select! {
+                    biased;
+                    _ = cancellation.cancelled() => return Err(TransportError::Cancelled),
+                    chunk = chunks.next() => chunk,
+                };
+                let Some(chunk) = chunk else { break };
+                let chunk = chunk.map_err(map_wreq_error)?;
+                if body.len().saturating_add(chunk.len()) > MAX_RESPONSE_BYTES {
+                    return Err(response_too_large());
+                }
+                body.extend_from_slice(&chunk);
+            }
 
             drop(permit);
             Ok(HttpResponse { status, body })
         }
     }
+}
+
+fn response_too_large() -> TransportError {
+    TransportError::Unavailable(format!(
+        "response body exceeded the {MAX_RESPONSE_BYTES}-byte limit"
+    ))
 }
 
 fn map_wreq_error(error: wreq::Error) -> TransportError {
@@ -318,6 +348,83 @@ mod tests {
 
         assert_eq!(response.status, 404);
         assert!(response.body.is_empty());
+    }
+
+    #[tokio::test]
+    async fn rejects_a_declared_success_body_above_the_byte_limit() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("test listener should bind");
+        let address = listener
+            .local_addr()
+            .expect("listener should have an address");
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("test request should connect");
+            let mut request = Vec::new();
+            let mut buffer = [0_u8; 4096];
+            while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+                let count = stream
+                    .read(&mut buffer)
+                    .expect("request should be readable");
+                assert!(count > 0, "request ended before headers completed");
+                request.extend_from_slice(&buffer[..count]);
+            }
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                MAX_RESPONSE_BYTES + 1
+            )
+            .expect("response headers should be writable");
+        });
+
+        let client = PersonaClient::new(PersonaConfig::default()).expect("persona should build");
+        let result = client
+            .get(
+                &format!("http://{address}/oversized"),
+                &CancellationToken::new(),
+            )
+            .await;
+        server.join().expect("test server should finish");
+
+        assert_eq!(result, Err(response_too_large()));
+    }
+
+    #[tokio::test]
+    async fn rejects_a_chunked_success_body_above_the_byte_limit() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("test listener should bind");
+        let address = listener
+            .local_addr()
+            .expect("listener should have an address");
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("test request should connect");
+            let mut request = Vec::new();
+            let mut buffer = [0_u8; 4096];
+            while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+                let count = stream
+                    .read(&mut buffer)
+                    .expect("request should be readable");
+                assert!(count > 0, "request ended before headers completed");
+                request.extend_from_slice(&buffer[..count]);
+            }
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n{:x}\r\n",
+                MAX_RESPONSE_BYTES + 1
+            )
+            .expect("chunk header should be writable");
+            let body = vec![b'x'; MAX_RESPONSE_BYTES + 1];
+            let _ = stream.write_all(&body);
+            let _ = stream.write_all(b"\r\n0\r\n\r\n");
+        });
+
+        let client = PersonaClient::new(PersonaConfig::default()).expect("persona should build");
+        let result = client
+            .get(
+                &format!("http://{address}/chunked"),
+                &CancellationToken::new(),
+            )
+            .await;
+        server.join().expect("test server should finish");
+
+        assert_eq!(result, Err(response_too_large()));
     }
 
     #[tokio::test]

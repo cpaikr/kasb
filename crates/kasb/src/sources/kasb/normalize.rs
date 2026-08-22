@@ -28,6 +28,10 @@ static QUOT_ENTITY: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)&quot;").expect("quot entity regex is valid"));
 static APOSTROPHE_ENTITY: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)&#39;").expect("apostrophe entity regex is valid"));
+static ECMASCRIPT_WHITESPACE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(&format!(r"[{ECMASCRIPT_WHITESPACE_CLASS}]+"))
+        .expect("ECMAScript whitespace regex is valid")
+});
 static INLINE_SPACE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[\t\x0c\x0b ]+").expect("inline whitespace regex is valid"));
 static AROUND_NEWLINE: LazyLock<Regex> =
@@ -65,6 +69,14 @@ pub(crate) fn normalize_kasb_plain_text(value: &str) -> String {
     let inline_collapsed = INLINE_SPACE.replace_all(&separated, " ");
     let trimmed_lines = AROUND_NEWLINE.replace_all(&inline_collapsed, "\n");
     let collapsed = MANY_NEWLINES.replace_all(&trimmed_lines, "\n\n");
+    trim_ecmascript_whitespace(&collapsed).to_owned()
+}
+
+pub(crate) fn strip_html(value: &str) -> String {
+    let block_separated = BLOCK_TAGS.replace_all(value, " ");
+    let without_tags = ANY_TAG.replace_all(&block_separated, " ");
+    let decoded = decode_html_entities(&without_tags);
+    let collapsed = ECMASCRIPT_WHITESPACE.replace_all(&decoded, " ");
     trim_ecmascript_whitespace(&collapsed).to_owned()
 }
 
@@ -122,6 +134,15 @@ mod tests {
         assert_eq!(
             normalize_kasb_plain_text("A.\u{0085}(1)B"),
             "A.\u{0085}(1)B"
+        );
+    }
+
+    #[test]
+    fn strip_html_uses_ecmascript_whitespace_semantics() {
+        assert_eq!(strip_html("\u{FEFF}<b>A</b>\u{3000}B\u{FEFF}"), "A B");
+        assert_eq!(
+            strip_html("\u{0085}<b>A</b>\u{0085}"),
+            "\u{0085} A \u{0085}"
         );
     }
 }

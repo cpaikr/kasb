@@ -22,6 +22,9 @@ semantics remain in
   values.
 - Send no request body. Reuse one session-scoped client so cookies, connection
   pooling, proxy affinity, and the concurrency budget remain coherent.
+- Reject a successful response once its decoded body exceeds 8 MiB. Enforce the
+  limit from both declared content length and streamed bytes so chunked or
+  compressed responses cannot bypass it.
 - Make no automatic replay. One logical KASB request produces at most one HTTP
   attempt; retry policy belongs to callers after a typed failure.
 
@@ -35,6 +38,11 @@ semantics remain in
   source ordering fields or browser-facing title ids into public identifiers.
 - A paragraph response must match the requested `stdNum` and `paraNum`, and its
   `uniqueKey` must equal `{stdNum}-{paraNum}`.
+- Every base-structure row that supplies both a source `documentId` and
+  `stdNum` must match the requested `stdNum`; a mismatch is `source_changed`.
+- Every section clause with an explicit `stdNum` must match the requested
+  `stdNum`. A clause may carry a child `documentId`; otherwise the requested
+  section id is the fallback retrieval identity.
 - A Q&A detail response must match the requested `docNumber`.
 - Filtered structure keys other than the literal string `"null"` must resolve
   to nodes from the base structure response.
@@ -60,6 +68,9 @@ semantics remain in
 - Ref resolution chooses the deepest matching node, then stable source order,
   and reports ambiguity. Structure and paragraph enrichment is best-effort;
   cancellation always stops both primary and enrichment work.
+- Standard search enriches at most 512 candidate rows, with at most eight
+  enrichment requests in flight. A larger candidate set is source drift rather
+  than a partially ranked result.
 - Q&A recency controls scan at most 500 rows in pages of at most 50 and report
   partial metadata when the bounded window cannot cover the source count.
 

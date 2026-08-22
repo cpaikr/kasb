@@ -132,8 +132,9 @@ The rewrite succeeds when:
 ## Current State
 
 - The complete TypeScript npm product and all six v1 operations are implemented.
-- The public Rust SDK implements and validates the `get-paragraph` vertical
-  pilot with `wreq`, typed failures, cancellation, fixtures, and conformance.
+- The public Rust SDK implements and validates all six v1 operations with
+  `wreq`, typed failures, cancellation, fixtures, and process-isolated
+  conformance. The TypeScript reference remains until the later cutover gates.
 - The rewrite baseline now has a validated OpenAPI wire authority, a reviewed
   compatibility inventory, and a process-isolated adversarial judge. Native
   binding and launcher work remains feasibility-only until its phase gate

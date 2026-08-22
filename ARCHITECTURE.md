@@ -8,10 +8,10 @@ Rust implementation of KASB HTTP and domain behavior. The Node SDK calls that
 implementation through a narrow asynchronous Node-API binding. The CLI is a
 separate `clap` binary over the same public Rust SDK.
 
-The current checkout is transitional: `packages/kasb-ts` still implements all
-six operations in TypeScript, while `crates/kasb` implements the Rust
-`get-paragraph` pilot. The rewrite keeps both paths intact until the replacement
-passes its cutover gates.
+The current checkout is transitional: `crates/kasb` implements all six public
+operations and is the replacement conformer, while `packages/kasb-ts` remains
+intact as the executable reference until the later CLI, Node, native-package,
+and cutover gates pass.
 
 The npm package also exposes `kasb`, but its JavaScript entrypoint only selects
 and launches the packaged Rust CLI binary. Pi, MCP, browser automation,
@@ -54,7 +54,7 @@ SDK, and JavaScript never owns KASB wire or source behavior.
 - `contracts/kasb/openapi.yaml` — validated sole authority for supported HTTP
   paths, parameters, statuses, media types, and wire schemas, complemented by
   the language-neutral source-adapter profile in the same directory.
-- `crates/kasb` — existing public Rust SDK and future sole conformer. Start at
+- `crates/kasb` — complete public Rust SDK and replacement conformer. Start at
   `src/lib.rs`, then follow capability, source, and HTTP modules.
 - `crates/kasb-cli` — planned first-class Rust `clap` CLI over `crates/kasb`.
   It owns command parsing, presentation, stdout/stderr, and exit status.
