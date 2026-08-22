@@ -71,9 +71,9 @@ gates pass.
 
 ### Next in-scope action
 
-Create the Phase 3 branch from `codex/rust-node-rewrite-integration`, inventory
-the frozen TypeScript CLI command, presentation, stdout/stderr, and exit
-contract, then implement and validate the Rust CLI as the next reviewable PR.
+Deliver the independently reviewed and validated Rust CLI and its process judge
+through the Phase 3 PR review lifecycle before beginning the dependent
+Node/native product phase.
 
 ### Evidence and blockers
 
@@ -112,5 +112,26 @@ contract, then implement and validate the Rust CLI as the next reviewable PR.
 - The TypeScript conformer, JavaScript CLI, and Pi adapter remain intentionally
   present until the replacement SDK, CLI, Node, native-target, and packed
   consumer gates pass.
+- The Phase 3 branch implements all six `clap` commands over the public Rust
+  SDK and an independent fixture-backed native-process judge. The full gate
+  passes: frozen install, contract/declaration checks, 99 conformance/judge
+  tests, macOS ARM64 native feasibility, typecheck, 215 deterministic Bun tests
+  with one live test skipped, workspace Rust tests, build, formatting, clippy
+  with warnings denied, release-binary smoke checks, Rust 1.88 workspace check,
+  diff hygiene, and 208 opt-in live tests. The CLI-specific judge passes 43
+  cases, and independent review reports no remaining Bucket I or II findings
+  with an explicit PASS verdict. The Phase 3 PR lifecycle remains pending.
+- The Phase 3 PR feedback cluster addresses all seven verified CodeRabbit
+  findings: bounded build setup, stable control selection, a scalar-safe UTF-16
+  oracle with its own boundary control, typed exhaustive operation dispatch,
+  clap-derived diagnostic metadata, redundant configuration removal, and
+  unambiguous transition-only lone-surrogate wording. Codex reports no major
+  issue, and the repository-required feedback review reports no Bucket I or II
+  finding with an explicit PASS. The refreshed deterministic gate passes 100
+  conformance/judge cases (44 CLI process cases), 215 Bun tests with one live
+  test skipped, workspace Rust tests and build, contract/declaration checks,
+  typecheck, formatting, clippy with warnings denied, Rust 1.88, and diff
+  hygiene. Commit, thread disposition, refreshed checks, and merge remain
+  pending.
 - No blocker is currently known. Registry publication, version selection,
   release tags, and external KASB mutation remain unauthorized.

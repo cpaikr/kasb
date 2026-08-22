@@ -57,8 +57,10 @@ SDK, and JavaScript never owns KASB wire or source behavior.
 - `crates/kasb` — public Rust SDK and target sole conformer. Start at
   `src/lib.rs`, then follow capability, source, and HTTP modules; consult
   [MIGRATION.md](MIGRATION.md) for transition status.
-- `crates/kasb-cli` — planned first-class Rust `clap` CLI over `crates/kasb`.
-  It owns command parsing, presentation, stdout/stderr, and exit status.
+- `crates/kasb-cli` — implemented first-class Rust `clap` CLI over
+  `crates/kasb`. It owns command parsing, presentation, stdout/stderr, and exit
+  status, while npm stays on the transition CLI until the native packaging
+  cutover gates pass.
 - `crates/kasb-node` — currently a private asynchronous feasibility projection
   over the paragraph pilot; the completed binding will own cancellation and
   panic containment, not source rules.

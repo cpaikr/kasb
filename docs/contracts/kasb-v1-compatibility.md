@@ -93,11 +93,29 @@ fixture path emits no warning.
 - Preserve failure transport metadata version `1`, CLI flag recovery metadata,
   command-local suggestions, the get-section structure next action, and the
   Q&A `--limit` alias in diagnostics.
+- When both `search-qna --rows` and `--limit` are present, `--limit` wins
+  regardless of argument order. This preserves the frozen alias behavior.
+- Embedded `command` and `nextCommands` strings keep one stable illustrative
+  quoting form on every target. Their structured `operation` and `input`
+  siblings are the shell-independent recovery contract.
+- SIGINT and SIGTERM remain process-control events: the CLI installs no
+  transport-local `aborted` envelope and produces no operation JSON after the
+  operating system terminates it. The later npm launcher must forward the
+  signal contract unchanged.
+- `kasb help <unknown>` follows the normative parse-failure contract above.
+  The transition CLI's silent exit for that one shape is a known TypeScript
+  transport defect, not replacement behavior.
 - `structured` remains the default. `summary` replaces only `result` with the
   approved compact projection. `raw` may remain equal to `structured` until a
   richer already-public result exists; it never exposes raw provider payloads.
 - Preserve the CLI-only `nextCommands.getStandardStructure` projection on
   standard search results.
+- Intentional replacement difference: summary truncation still counts the
+  frozen JavaScript UTF-16 unit limits, but if the boundary falls between an
+  astral scalar's surrogate pair, the Rust CLI must back up to the preceding
+  complete scalar before appending the ellipsis and must remain
+  Unicode-scalar-valid. Only the transition TypeScript CLI can emit an escaped
+  lone surrogate in this pathological case.
 
 The exact command/flag matrix is:
 
