@@ -31,9 +31,10 @@ native-target, and live verification.
   inventory, OpenAPI authority and freshness checks, adversarial process judge,
   all six public Rust SDK operations, and the first-class Rust CLI are complete.
 - Delivery phase 4 has an implemented Rust-backed Node and native-package
-  candidate under validation. No cutover or native support beyond the proven
-  macOS ARM64 host check is claimed yet. The TypeScript npm executable remains
-  unchanged until the Node, packaging, review, and cutover gates pass.
+  candidate. Linux GNU x64/ARM64, macOS ARM64, and Windows x64 have passed
+  native builds, same-revision direct archives, exact packed consumers, and
+  aggregate artifact validation. The TypeScript npm executable remains
+  unchanged until the Phase 4 PR lifecycle and canonical cutover pass.
 
 ## Decisions
 
@@ -248,8 +249,8 @@ native-target, and live verification.
 
 ## Next action
 
-Complete Phase 4 validation and review for the asynchronous Node-API binding,
-Node SDK/toolset, immutable native and direct-CLI artifacts, clean consumers,
-and transparent npm launcher. After its PR lifecycle is complete, perform the
-dependent canonical cutover and retire the TypeScript conformer, JavaScript
-CLI behavior, and Pi surface.
+Complete the Phase 4 PR lifecycle with the validated asynchronous Node-API
+binding, Node SDK/toolset, immutable native and direct-CLI artifacts, clean
+consumers, and transparent npm launcher. Then perform the dependent canonical
+cutover and retire the TypeScript conformer, JavaScript CLI behavior, and Pi
+surface.

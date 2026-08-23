@@ -22,8 +22,9 @@ The repository is executing a `../ytm`-shaped Rust/Node rewrite. See
 - `contracts/kasb/openapi.yaml` owns the supported provider wire facts; its
   source-adapter profile records only cross-response and decoding rules that
   OpenAPI cannot express. `crates/kasb-node`, `packages/node`, and
-  `packages/native` now contain the private Phase 4 cutover candidate under
-  validation; they are not yet the canonical or supported npm product.
+  `packages/native` contain the private Phase 4 cutover candidate. Its four
+  native targets have passed build, exact-artifact, and clean-consumer gates,
+  but the candidate is not yet the canonical npm product.
 
 The current implementations remain intact until the replacement passes the
 approved cutover gates. See [MIGRATION.md](MIGRATION.md) for current status,
@@ -44,9 +45,10 @@ cargo fmt --all --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 ```
 
-`bun run native:feasibility` probes the current host. The target matrix stays
-unclaimed until every native build, immutable packed-consumer, direct CLI
-archive, and review gate passes in CI.
+`bun run native:feasibility` probes the current host. Linux GNU x64/ARM64,
+macOS ARM64, and Windows x64 are the supported native target matrix after each
+passed native build, immutable packed-consumer, direct CLI archive, and
+aggregate artifact validation. Canonical npm cutover remains a separate gate.
 
 The candidate Linux GNU packages target glibc 2.28 or newer. The npm launcher
 preserves POSIX signal identity where the platform supports it; Windows uses

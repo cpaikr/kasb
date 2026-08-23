@@ -9,10 +9,10 @@ implementation through a narrow asynchronous Node-API binding. The CLI is a
 separate `clap` binary over the same public Rust SDK.
 
 The current checkout is transitional: the complete Rust SDK and Rust CLI are
-integrated, and the Rust-backed Node product and native packages are being
-validated before cutover. [MIGRATION.md](MIGRATION.md) owns the authoritative
-implementation status; this document owns current and target component
-boundaries.
+integrated, and the Rust-backed Node product and four-target native package
+matrix have passed their replacement gates before cutover.
+[MIGRATION.md](MIGRATION.md) owns the authoritative implementation status; this
+document owns current and target component boundaries.
 
 The npm package also exposes `kasb`, but its JavaScript entrypoint only selects
 and launches the packaged Rust CLI binary. Pi, MCP, browser automation,
@@ -60,18 +60,18 @@ SDK, and JavaScript never owns KASB wire or source behavior.
   [MIGRATION.md](MIGRATION.md) for transition status.
 - `crates/kasb-cli` — implemented first-class Rust `clap` CLI over
   `crates/kasb`. It owns command parsing, presentation, stdout/stderr, and exit
-  status, while npm stays on the transition CLI until the native packaging
-  cutover gates pass.
+  status, while npm stays on the transition CLI until the canonical cutover.
 - `crates/kasb-node` — implemented Phase 4 candidate for the asynchronous
   projection of all six public Rust SDK operations. It owns cancellation,
   stable failure serialization, reusable client lifetime, and panic
-  containment, not source rules; native support gates are still in progress.
+  containment, not source rules; the four-target native gates have passed.
 - `packages/node` — private cutover candidate for the Node SDK, network-free
   toolset, native loader, and transparent npm CLI launcher. It replaces
   `packages/kasb-ts` only at cutover.
 - `packages/native` — generated platform-package metadata for the Node addon
-  and same-revision Rust CLI. Support remains unclaimed until native CI and
-  packed-consumer validation pass on every listed target.
+  and same-revision Rust CLI. Linux GNU x64/ARM64, macOS ARM64, and Windows x64
+  are supported by native CI and packed-consumer evidence at the candidate
+  revision.
 - `fixtures` — captured provider responses used as independent deterministic
   evidence.
 - `conformance` and its process-isolated judge — public behavior cases,
@@ -183,11 +183,11 @@ from the same revision. The JavaScript `bin` entrypoint resolves that package
 and launches its binary; it does not download or compile artifacts during
 install or first use.
 
-The candidate matrix is Linux GNU x64/ARM64, macOS ARM64, and Windows x64.
-Those targets remain planned until the complete native build and clean
-packed-consumer matrix passes. Unsupported or incompletely installed targets
-fail with a stable, actionable installation error rather than a raw loader or
-spawn exception.
+The supported matrix is Linux GNU x64/ARM64, macOS ARM64, and Windows x64.
+Each target passed native build, same-revision artifact, direct CLI, and clean
+packed-consumer validation before this support claim was promoted. Unsupported
+or incompletely installed targets fail with a stable, actionable installation
+error rather than a raw loader or spawn exception.
 
 Linux GNU x64 and ARM64 use glibc 2.28 as the minimum runtime. The addon and
 same-revision CLI are built in digest-pinned manylinux 2.28 containers, rejected

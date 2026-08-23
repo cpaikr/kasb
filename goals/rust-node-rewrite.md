@@ -84,10 +84,9 @@ packed-consumer gate passes.
 
 ### Next in-scope action
 
-Commit and push the independently reviewed cross-platform text-canonicalization
-correction exposed by run `32621109003`, rerun every deterministic and native
-consumer gate, promote support only from passing evidence, and complete the
-Phase 4 PR lifecycle. Only afterward begin the dependent canonical cutover.
+Validate the promoted four-target support claim, complete the Phase 4 PR
+lifecycle using the passing native and exact-artifact evidence, and only then
+begin the dependent canonical cutover.
 
 ### Evidence and blockers
 
@@ -287,3 +286,18 @@ Phase 4 PR lifecycle. Only afterward begin the dependent canonical cutover.
   reports no Bucket I or Bucket II finding and confirms generated native
   binaries remain outside the tracked-text rule. Support remains unclaimed
   pending a clean aggregate rerun from the corrected revision.
+- The seventh full native run, Actions run `32622016449`, passes deterministic
+  validation, the immutable root package, and all four complete native target
+  jobs, including both Linux glibc floors, every Node 20.18.1 through 26 packed
+  consumer, direct CLI archives, process equivalence, and target artifact
+  uploads. GitHub did not start the dependent aggregate job because the
+  repository account's Actions budget was exhausted; it executed no steps and
+  reported no validator failure. The exact nine immutable artifacts from that
+  revision were downloaded and passed the repository's unchanged
+  `scripts/validate-release-artifacts.mjs` aggregate validator locally. This
+  closes the artifact-content gate without treating the external budget event
+  as product evidence, and the four listed native targets are now supported.
+- Independent repository-required review reproduced the exact nine-artifact
+  download and unchanged aggregate validation, confirmed `supportClaim` is
+  metadata-only at runtime, and found no Bucket I or Bucket II issue in the
+  support promotion or current-versus-cutover documentation boundary.

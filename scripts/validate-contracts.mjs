@@ -233,7 +233,7 @@ for (const relativePath of [
 
 const targets = JSON.parse(await readText("../native-targets.json"));
 check(targets.schemaVersion === 1, "native target manifest schemaVersion must be 1");
-check(targets.supportClaim === "planned", "phase 1 must not claim unverified native support");
+check(targets.supportClaim === "supported", "validated native targets must carry the supported claim");
 check(targets.minimumNodeVersion === "20.18.1", "native planning must preserve the current Node floor");
 check(targets.minimumGlibcVersion === "2.28", "GNU/Linux native artifacts must use the approved glibc 2.28 floor");
 equal(
@@ -244,7 +244,7 @@ equal(
     "aarch64-apple-darwin",
     "x86_64-pc-windows-msvc",
   ],
-  "planned native target matrix must remain explicit",
+  "supported native target matrix must remain explicit",
 );
 check(
   new Set(targets.targets?.map(({ packageName }) => packageName)).size === targets.targets?.length,
@@ -274,4 +274,4 @@ if (failures.length > 0) {
   console.error(failures.map((failure) => `- ${failure}`).join("\n"));
   process.exit(1);
 }
-console.log("KASB wire authority, evidence boundary, and planned native matrix are valid");
+console.log("KASB wire authority, evidence boundary, and supported native matrix are valid");

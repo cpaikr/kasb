@@ -8,15 +8,16 @@ forwards the child process contract without a shell.
 
 The candidate intentionally uses a temporary package identity while the
 existing TypeScript product remains installed for comparison. It must not be
-published. The canonical `@sjunepark/kasb` identity is promoted only during
-the final cutover after every native target and clean packed-consumer gate
-passes.
+published. Every native target and clean packed-consumer gate has passed; the
+canonical `@sjunepark/kasb` identity is still promoted only during the final
+cutover.
 
-Supported-target claims are generated from `native-targets.json`. A target is
-still planned until its native CI build, exact-artifact consumer matrix across
-the listed Node versions, direct CLI archive, and aggregate artifact gates pass.
-The Node engine floor remains `20.18.1`; the manifest separately records the
-listed versions with explicit native-consumer evidence.
+Supported-target claims are generated from `native-targets.json`. Linux GNU
+x64/ARM64, macOS ARM64, and Windows x64 passed native CI builds, the
+exact-artifact consumer matrix across the listed Node versions, direct CLI
+archives, and aggregate artifact validation. The Node engine floor remains
+`20.18.1`; the manifest separately records the listed versions with explicit
+native-consumer evidence.
 
 Contained native panics surface to SDK callers only as the sanitized
 `internal_failure`. Operators may subscribe to the Node diagnostics channel

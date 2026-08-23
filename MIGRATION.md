@@ -9,12 +9,13 @@ Decision date: 2026-08-22.
 The compatibility authorities and adversarial judge are integrated, the public
 Rust SDK implements all six approved operations, and the replacement Rust CLI
 is integrated and independently validated over that SDK. An implemented
-Rust-backed Node candidate and generated native package matrix are now under
-Phase 4 validation. The contained-panic diagnostics channel, Windows signal
-exception, and Linux glibc 2.28 floor are approved; their native CI and review
-gates remain open. The TypeScript npm product remains the executable reference
-until the Node, native-package, packed-consumer, live, review, and final cutover
-gates pass. The Pi surface remains present only until that cutover. The
+Rust-backed Node candidate and generated native package matrix have passed the
+Phase 4 replacement gates. The contained-panic diagnostics channel, Windows
+signal exception, Linux glibc 2.28 floor, all four native builds, packed
+consumers, and exact aggregate artifacts are validated; Phase 4 integration and
+the final canonical cutover remain. The TypeScript npm product remains the
+executable reference until that cutover. The Pi surface remains present only
+until then. The
 scheduled phase and validation evidence are maintained in
 [plans/rust-node-rewrite.md](plans/rust-node-rewrite.md).
 
