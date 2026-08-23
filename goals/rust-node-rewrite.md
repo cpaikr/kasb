@@ -89,9 +89,10 @@ lifecycle remain before the goal can be marked complete.
 
 ### Next in-scope action
 
-Commit and push the reviewed cutover, run its four-target native and packed
-consumer CI, and complete the Phase 5 PR lifecycle; then record completion
-without publishing, selecting a version, or creating a release tag.
+Restore GitHub Actions capacity, rerun the current Phase 5 revision's
+four-target native and packed-consumer CI, and complete PR #19's review and
+merge lifecycle; then record completion without publishing, selecting a
+version, or creating a release tag.
 
 ### Evidence and blockers
 
@@ -119,6 +120,13 @@ without publishing, selecting a version, or creating a release tag.
   identity and Pi absence on extracted root artifacts, schema-valid eval
   fixtures, the aggregate artifact-validator workflow step, and a judge-only
   transport-start handshake that cannot compile into a release addon.
+- The reviewed Phase 5 cutover is committed as `7f74506` and opened as PR #19
+  against `codex/rust-node-rewrite-integration`. CodeRabbit and GitGuardian
+  report success. Actions run `32625886321` executed zero workflow steps:
+  GitHub annotated both entry jobs with “The job was not started because an
+  Actions budget is preventing further use,” so the dependent four-target and
+  aggregate jobs were skipped. This external capacity event is not product
+  evidence; the current-revision native CI and PR merge gates remain open.
 
 - The user resumed the blocked goal on 2026-08-23 by approving all three Phase
   4 compatibility recommendations. Implementation and validation may proceed;

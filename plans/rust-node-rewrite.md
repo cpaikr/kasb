@@ -1,6 +1,6 @@
 # Rewrite KASB around a public Rust SDK, Node SDK, and Rust CLI
 
-Status: cutover implemented; final native CI and PR lifecycle in progress.
+Status: cutover implemented; final native CI blocked by GitHub Actions budget.
 
 ## Outcome
 
@@ -247,6 +247,7 @@ completion status.
 
 ## Next action
 
-Commit and push the reviewed cutover, run its four-target native and packed
-consumer CI, and complete the Phase 5 PR lifecycle; then record the cutover as
-complete without publishing or selecting a release version.
+Restore GitHub Actions capacity, rerun PR #19's current revision through the
+four-target native and packed-consumer CI, and complete its review and merge
+lifecycle; then record the cutover as complete without publishing or selecting
+a release version.
