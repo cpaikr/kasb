@@ -27,8 +27,8 @@ const temporary = await mkdtemp(resolve(tmpdir(), "kasb-native-consumer-"));
 try {
   const rootTarball = await suppliedTarball(process.argv[3]) ?? pack(rootDirectory);
   const nativeTarball = await suppliedTarball(process.argv[4]) ?? pack(nativeDirectory);
-  inspectPack(rootDirectory, false);
-  inspectPack(nativeDirectory, true);
+  inspectPack(rootTarball, false);
+  inspectPack(nativeTarball, true);
 
   await writeFile(resolve(temporary, "package.json"), `${JSON.stringify({
     private: true,
@@ -332,9 +332,15 @@ function pack(directory) {
   return resolve(temporary, result.filename);
 }
 
-function inspectPack(directory, native) {
-  const [result] = JSON.parse(exec(npm, ["pack", "--ignore-scripts", "--dry-run", "--json", directory], { encoding: "utf8" }));
-  const files = result.files.map(({ path }) => path).sort();
+function inspectPack(tarball, native) {
+  const entries = exec("tar", ["-tzf", tarball], { encoding: "utf8" })
+    .split(/\r?\n/u)
+    .filter(Boolean);
+  assert(entries.every((entry) => entry.startsWith("package/")), "npm artifact entries must stay under package/");
+  const files = entries
+    .filter((entry) => !entry.endsWith("/"))
+    .map((entry) => entry.slice("package/".length))
+    .sort();
   if (native) {
     assert.deepEqual(files, [
       "LICENSE.md",

@@ -14,12 +14,21 @@ if (document.errors.length > 0) {
 const workflow = document.toJS();
 const missing = [];
 const jobs = workflow?.jobs ?? {};
+const deterministicJob = jobs.deterministic;
 const linuxJob = jobs["native-linux"];
 const nativeJob = jobs.native;
 const artifactJob = jobs["artifact-set"];
 
 const linuxTargets = manifest.targets.filter(({ libc }) => libc === "glibc");
 const otherTargets = manifest.targets.filter(({ libc }) => libc !== "glibc");
+check(
+  hasRun(deterministicJob, "cargo install cargo-about --version 0.9.2 --locked --features cli"),
+  "deterministic validation must install the cargo-about CLI feature",
+);
+check(
+  hasRun(linuxJob, "dnf install -y clang-devel"),
+  "native-linux must install libclang for dependency binding generation",
+);
 check(
   sameValue(matrix(linuxJob), linuxTargets.map((target) => ({
     rust_target: target.rustTarget,

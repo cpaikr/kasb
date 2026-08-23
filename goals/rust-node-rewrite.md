@@ -84,9 +84,10 @@ packed-consumer gate passes.
 
 ### Next in-scope action
 
-Commit and open the completed Phase 4 candidate, run the full native CI matrix,
-promote support only from passing evidence, and complete the Phase 4 PR
-lifecycle. Only afterward begin the dependent canonical cutover.
+Review, commit, and push the first full-matrix portability corrections to PR
+#18, rerun every deterministic and native consumer gate, promote support only
+from passing evidence, and complete the Phase 4 PR lifecycle. Only afterward
+begin the dependent canonical cutover.
 
 ### Evidence and blockers
 
@@ -178,3 +179,19 @@ lifecycle. Only afterward begin the dependent canonical cutover.
   containers, generated package docs, symbol-floor validator, and clean
   consumer workflow. Linux support remains unclaimed until that CI evidence
   passes.
+- The first full native run, Actions run `32616678745`, exercised all four
+  target jobs far enough to identify four merge-gate portability defects:
+  cargo-about was installed without its required CLI feature, Windows text
+  checkout made the generated-metadata freshness comparison line-ending
+  dependent, native consumers inspected the runner's unbuilt source directory
+  instead of the downloaded root tarball, and both pinned manylinux containers
+  lacked libclang for dependency binding generation. The local correction
+  makes text comparison CRLF-invariant, inspects the exact immutable tarballs,
+  installs cargo-about with `cli`, and installs `clang-devel`; native metadata,
+  license, macOS ARM64 packed-consumer, and diff-hygiene checks pass locally.
+  No target support claim has been promoted pending a clean full rerun.
+- Independent repository-required review of those portability corrections
+  reports no Bucket I or Bucket II findings. The reviewers verified the
+  fail-closed immutable-tarball allowlists, direct/npm equivalence ordering,
+  CRLF-only freshness normalization, and workflow prerequisite enforcement;
+  the remaining evidence requirement is the clean four-target CI rerun.

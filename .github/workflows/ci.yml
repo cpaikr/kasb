@@ -35,7 +35,7 @@ jobs:
       - name: Validate contracts and generated metadata
         run: bun run contracts:check && bun run native:check
       - name: Install cargo-about
-        run: cargo install cargo-about --version 0.9.2 --locked
+        run: cargo install cargo-about --version 0.9.2 --locked --features cli
       - name: Validate third-party notices
         run: bun run licenses:check
       - name: Typecheck
@@ -98,7 +98,7 @@ jobs:
       image: ${{ matrix.build_container }}
     steps:
       - name: Install Linux build prerequisites
-        run: dnf install -y cmake curl git ninja-build perl-core pkgconf-pkg-config
+        run: dnf install -y clang-devel cmake curl git ninja-build perl-core pkgconf-pkg-config
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Set up packaging Node 24

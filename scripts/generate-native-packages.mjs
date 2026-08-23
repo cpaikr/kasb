@@ -53,13 +53,18 @@ for (const [path, expected] of outputs) {
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
   }
-  if (actual === expected) continue;
+  if (sameText(actual, expected)) continue;
   if (checkOnly) {
     stale.push(path.slice(repositoryRoot.length + 1));
   } else {
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, expected);
   }
+}
+
+function sameText(actual, expected) {
+  if (actual === undefined) return false;
+  return actual.replaceAll("\r\n", "\n") === expected.replaceAll("\r\n", "\n");
 }
 
 if (stale.length > 0) {
