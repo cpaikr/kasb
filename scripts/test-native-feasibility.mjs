@@ -90,6 +90,7 @@ try {
   await testPackedAddon(consumer);
   await testLauncherContract(consumer, targetDirectory);
   await testSignals(consumer, targetDirectory);
+  await testSignalProbeCleanup(consumer, targetDirectory);
   await testInstallationErrors(consumer);
 
   const missingConsumer = join(scratch, "consumer-missing-native");
@@ -292,25 +293,108 @@ async function testSignals(consumer, targetDirectory) {
   assert.equal(direct.signal, "SIGTERM");
 }
 
-function terminateAfterReady(command, args, options) {
+function terminateAfterReady(command, args, options, timeoutMilliseconds = 10_000) {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(command, args, {
+      ...options,
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
     let stderr = "";
-    const timeout = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(new Error(`timed out waiting for ${command}`));
-    }, 10_000);
+    let terminationRequested = false;
+    let settled = false;
+    let timeout;
+    const rejectWithCleanup = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      killProbeGroup(child);
+      reject(error);
+    };
+    timeout = setTimeout(() => {
+      const phase = terminationRequested ? "process termination" : "process readiness";
+      rejectWithCleanup(new Error(`timed out waiting for ${phase}: ${command}`));
+    }, timeoutMilliseconds);
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
-      if (stderr.includes("probe-ready")) child.kill("SIGTERM");
+      if (!terminationRequested && stderr.includes("probe-ready")) {
+        terminationRequested = true;
+        child.kill("SIGTERM");
+      }
     });
-    child.once("error", reject);
+    child.once("error", rejectWithCleanup);
     child.once("close", (status, signal) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timeout);
       resolvePromise({ status, signal, stderr });
     });
   });
+}
+
+async function testSignalProbeCleanup(consumer, targetDirectory) {
+  if (process.platform === "win32") return;
+  const brokenLauncher = join(consumer, "broken-launcher.mjs");
+  const descendantPidFile = join(consumer, "broken-launcher-child.pid");
+  await writeFile(brokenLauncher, `
+    import { spawn } from "node:child_process";
+    import { writeFile } from "node:fs/promises";
+    process.on("SIGTERM", () => {});
+    const child = spawn(process.argv[2], [], {
+      env: process.env,
+      stdio: ["ignore", "inherit", "inherit"]
+    });
+    await writeFile(process.env.KASB_BROKEN_PID_FILE, String(child.pid));
+    child.unref();
+    process.exit(0);
+  `);
+  const startedAt = Date.now();
+  await assert.rejects(
+    terminateAfterReady(process.execPath, [brokenLauncher, probeBinary(targetDirectory)], {
+      cwd: consumer,
+      env: {
+        ...process.env,
+        KASB_PROBE_WAIT_SIGNAL: "1",
+        KASB_BROKEN_PID_FILE: descendantPidFile
+      }
+    }, 250),
+    /timed out waiting for process termination/,
+    "a broken launcher must fail within the bounded probe timeout"
+  );
+  assert(Date.now() - startedAt < 2_000, "broken-launcher cleanup must remain bounded");
+  const descendantPid = Number.parseInt(await readFile(descendantPidFile, "utf8"), 10);
+  assert(Number.isSafeInteger(descendantPid), "broken launcher must record its descendant PID");
+  await assertProcessExited(descendantPid);
+}
+
+function killProbeGroup(child) {
+  if (child.pid !== undefined) {
+    try {
+      process.kill(-child.pid, "SIGKILL");
+      return;
+    } catch {
+      // Fall back when spawn failed before the dedicated group existed.
+    }
+  }
+  try {
+    child.kill("SIGKILL");
+  } catch {
+    // Cleanup is best-effort after the primary probe failure.
+  }
+}
+
+async function assertProcessExited(pid) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    try {
+      process.kill(pid, 0);
+    } catch (error) {
+      if (error?.code === "ESRCH") return;
+      throw error;
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 10));
+  }
+  assert.fail(`signal-probe cleanup left descendant ${pid} running`);
 }
 
 async function testInstallationErrors(consumer) {

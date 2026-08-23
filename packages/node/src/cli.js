@@ -16,16 +16,14 @@ if (target) {
 
 function launch(binary, args) {
   let settled = false;
-  const child = spawn(binary, args, {
-    cwd: process.cwd(),
-    env: process.env,
-    shell: false,
-    stdio: "inherit",
-    windowsHide: false
-  });
+  let child;
   const handlers = new Map();
+  // Install forwarding before the child can inherit stdio and announce
+  // readiness. Otherwise a fast caller can terminate this process during the
+  // spawn-to-listener window and strand the native child holding those pipes.
   for (const signal of forwardedSignals()) {
     const handler = () => {
+      if (!child) return;
       if (child.exitCode !== null || child.signalCode !== null) return;
       try {
         child.kill(process.platform === "win32" ? "SIGTERM" : signal);
@@ -35,6 +33,23 @@ function launch(binary, args) {
     };
     handlers.set(signal, handler);
     process.on(signal, handler);
+  }
+
+  try {
+    child = spawn(binary, args, {
+      cwd: process.cwd(),
+      env: process.env,
+      shell: false,
+      stdio: "inherit",
+      windowsHide: false
+    });
+  } catch (error) {
+    cleanup(handlers);
+    installationFailure({
+      code: "native_cli_spawn_failed",
+      message: `The packaged KASB CLI could not be launched: ${error.code || "spawn failed"}. Reinstall the KASB package.`
+    });
+    return;
   }
 
   child.once("error", (error) => {

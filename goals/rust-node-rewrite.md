@@ -84,10 +84,11 @@ packed-consumer gate passes.
 
 ### Next in-scope action
 
-Commit and push the reviewed Rust-component and Windows path-canonicalization
-corrections exposed by run `32619558167`, rerun every deterministic and native
-consumer gate, promote support only from passing evidence, and complete the
-Phase 4 PR lifecycle. Only afterward begin the dependent canonical cutover.
+Commit and push the independently reviewed launcher signal-registration and
+probe-cleanup correction exposed by run `32620270180`, rerun every deterministic
+and native consumer gate, promote support only from passing evidence, and
+complete the Phase 4 PR lifecycle. Only afterward begin the dependent canonical
+cutover.
 
 ### Evidence and blockers
 
@@ -254,3 +255,23 @@ Phase 4 PR lifecycle. Only afterward begin the dependent canonical cutover.
   components and compares real paths on both sides while retaining exact
   direct/npm launcher equivalence. Windows target support and the aggregate
   matrix remain unclaimed pending the clean rerun.
+- The fifth full native run, Actions run `32620270180`, confirms the pinned
+  Rust components and Windows path correction while passing deterministic
+  validation, the immutable root package, and the complete Windows x64, macOS
+  ARM64, and Linux GNU x64 matrices. Its Linux GNU ARM64 Node 20.18.1 consumer
+  passed addon loading and ordinary direct/npm process equivalence, then timed
+  out in the npm launcher's POSIX
+  termination probe. The launcher spawned the native child before installing
+  forwarding handlers, so a child that announced readiness immediately could
+  expose a window in which SIGTERM killed only the launcher and stranded the
+  native child holding inherited pipes. The local correction installs handlers
+  before spawn and makes both signal probes issue one termination request with
+  phase-specific timeout diagnostics. Independent review confirmed the
+  production correction and found that failure-path probe cleanup could still
+  strand the same native descendant. The current harness therefore creates a
+  dedicated POSIX process group and kills that group on every rejection; a
+  deliberately broken-launcher regression proves bounded failure and descendant
+  cleanup. Independent re-review reports no remaining Bucket I or Bucket II
+  finding. macOS ARM64 native feasibility, all 13 Node tests, Node typechecking,
+  contract and native metadata checks, Rust formatting, syntax checks, and diff
+  hygiene pass locally. Support remains unclaimed pending a fully clean rerun.

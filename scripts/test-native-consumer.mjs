@@ -205,24 +205,56 @@ function terminateAfterReady(command, args, options) {
     const child = spawnChild(invocation.command, invocation.args, {
       ...options,
       ...invocation.options,
+      detached: true,
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stderr = "";
-    const timeout = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(new Error(`Timed out waiting for process probe: ${command}`));
+    let terminationRequested = false;
+    let settled = false;
+    let timeout;
+    const rejectWithCleanup = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      killProbeGroup(child);
+      reject(error);
+    };
+    timeout = setTimeout(() => {
+      const phase = terminationRequested ? "process termination" : "process readiness";
+      rejectWithCleanup(new Error(`Timed out waiting for ${phase}: ${command}`));
     }, 10_000);
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
-      if (stderr.includes("probe-ready")) child.kill("SIGTERM");
+      if (!terminationRequested && stderr.includes("probe-ready")) {
+        terminationRequested = true;
+        child.kill("SIGTERM");
+      }
     });
-    child.once("error", reject);
+    child.once("error", rejectWithCleanup);
     child.once("close", (status, signal) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timeout);
       resolvePromise({ status, signal, stderr });
     });
   });
+}
+
+function killProbeGroup(child) {
+  if (child.pid !== undefined) {
+    try {
+      process.kill(-child.pid, "SIGKILL");
+      return;
+    } catch {
+      // Fall back when spawn failed before the dedicated group existed.
+    }
+  }
+  try {
+    child.kill("SIGKILL");
+  } catch {
+    // Cleanup is best-effort after the primary probe failure.
+  }
 }
 
 function terminateWindowsProcess(command, args, terminate, options) {
