@@ -6,6 +6,7 @@ import {
   copyFile,
   mkdtemp,
   mkdir,
+  readdir,
   readFile,
   realpath,
   rename,
@@ -26,7 +27,7 @@ const manifest = JSON.parse(await readFile(join(repositoryRoot, "native-targets.
 const packageJson = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
 const npmCommand = process.platform === "win32" ? await resolveWindowsCommand("npm.cmd") : "npm";
 const host = runtimeTarget();
-const target = selectNativeTarget(manifest.targets, host);
+const target = selectNativeTarget(manifest.targets, host, manifest.minimumGlibcVersion);
 assert(target, `no feasibility target for ${host.key}`);
 assert.throws(
   () => assertTargetAlignment(manifest, {
@@ -72,7 +73,7 @@ try {
   );
 
   run("cargo", ["build", "--locked", "--release", "-p", "kasb-node", "--lib", "--bin", "kasb-process-probe"]);
-  run(process.execPath, [join(packageRoot, "scripts/build.mjs")]);
+  run("bun", ["run", "--cwd", packageRoot, "build"]);
 
   const nativePackageRoot = join(scratch, "native-package");
   await assembleNativePackage(nativePackageRoot, targetDirectory);
@@ -89,6 +90,7 @@ try {
   await testPackedAddon(consumer);
   await testLauncherContract(consumer, targetDirectory);
   await testSignals(consumer, targetDirectory);
+  await testSignalProbeCleanup(consumer, targetDirectory);
   await testInstallationErrors(consumer);
 
   const missingConsumer = join(scratch, "consumer-missing-native");
@@ -140,6 +142,11 @@ async function judgeBinding(addonPath) {
       const panicked = JSON.parse(await addon.panicProbe());
       assert.equal(panicked.ok, false);
       assert.equal(panicked.error.code, "internal_failure");
+      assert.equal(panicked.operatorSignal, "binding_panic");
+
+      const invalidOperation = JSON.parse(await addon.executeOperation("unknown", "{}"));
+      assert.equal(invalidOperation.ok, false);
+      assert.equal(invalidOperation.error.parameter, "operationName");
     })().catch((error) => { console.error(error); process.exitCode = 1; });
   `;
   const result = run(process.execPath, ["-e", source, addonPath]);
@@ -167,10 +174,15 @@ async function assembleNativePackage(directory, targetDirectory) {
 async function assembleLauncherPackage(directory) {
   await mkdir(directory, { recursive: true });
   await mkdir(join(directory, "dist"));
-  for (const file of ["cli.js", "error.js", "native.js", "native-targets.json", "runtime-target.js", "target.js"]) {
+  for (const file of await readdir(join(packageRoot, "dist"))) {
     await copyFile(join(packageRoot, "dist", file), join(directory, "dist", file));
   }
   await copyFile(join(packageRoot, "README.md"), join(directory, "README.md"));
+  await copyFile(join(packageRoot, "LICENSE.md"), join(directory, "LICENSE.md"));
+  await copyFile(
+    join(packageRoot, "THIRD_PARTY_LICENSES.md"),
+    join(directory, "THIRD_PARTY_LICENSES.md")
+  );
   const optionalDependencies = Object.fromEntries(
     manifest.targets.map((candidate) => [candidate.packageName, packageJson.version])
   );
@@ -197,6 +209,7 @@ function assertPackContents(nativePack, rootPack) {
   const rootFiles = new Set(rootPack.files.map((file) => file.path));
   assert(rootFiles.has("dist/native-targets.json"), "launcher package must contain the target authority");
   assert(rootFiles.has("dist/runtime-target.js"), "launcher package must contain shared target selection");
+  assert(rootFiles.has("THIRD_PARTY_LICENSES.md"), "launcher package must contain bundled Node notices");
   assert([...rootFiles].every((file) => !file.endsWith(".node")), "launcher package must not contain an addon");
   assert(!rootFiles.has(target.cliFile), "launcher package must not contain the Rust binary");
 }
@@ -223,7 +236,7 @@ async function installConsumer(directory, rootTarball, nativeTarball, includeNat
 async function testPackedAddon(consumer) {
   const source = String.raw`
     import assert from "node:assert/strict";
-    import { getParagraph } from "@sjunepark/kasb-native-feasibility/native";
+    import { getParagraph } from ${JSON.stringify(packageJson.name)};
     await assert.rejects(
       getParagraph({}),
       (error) => error.name === "KasbFailure" &&
@@ -280,25 +293,108 @@ async function testSignals(consumer, targetDirectory) {
   assert.equal(direct.signal, "SIGTERM");
 }
 
-function terminateAfterReady(command, args, options) {
+function terminateAfterReady(command, args, options, timeoutMilliseconds = 10_000) {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, { ...options, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(command, args, {
+      ...options,
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
     let stderr = "";
-    const timeout = setTimeout(() => {
-      child.kill("SIGKILL");
-      reject(new Error(`timed out waiting for ${command}`));
-    }, 10_000);
+    let terminationRequested = false;
+    let settled = false;
+    let timeout;
+    const rejectWithCleanup = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      killProbeGroup(child);
+      reject(error);
+    };
+    timeout = setTimeout(() => {
+      const phase = terminationRequested ? "process termination" : "process readiness";
+      rejectWithCleanup(new Error(`timed out waiting for ${phase}: ${command}`));
+    }, timeoutMilliseconds);
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
-      if (stderr.includes("probe-ready")) child.kill("SIGTERM");
+      if (!terminationRequested && stderr.includes("probe-ready")) {
+        terminationRequested = true;
+        child.kill("SIGTERM");
+      }
     });
-    child.once("error", reject);
+    child.once("error", rejectWithCleanup);
     child.once("close", (status, signal) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timeout);
       resolvePromise({ status, signal, stderr });
     });
   });
+}
+
+async function testSignalProbeCleanup(consumer, targetDirectory) {
+  if (process.platform === "win32") return;
+  const brokenLauncher = join(consumer, "broken-launcher.mjs");
+  const descendantPidFile = join(consumer, "broken-launcher-child.pid");
+  await writeFile(brokenLauncher, `
+    import { spawn } from "node:child_process";
+    import { writeFile } from "node:fs/promises";
+    process.on("SIGTERM", () => {});
+    const child = spawn(process.argv[2], [], {
+      env: process.env,
+      stdio: ["ignore", "inherit", "inherit"]
+    });
+    await writeFile(process.env.KASB_BROKEN_PID_FILE, String(child.pid));
+    child.unref();
+    process.exit(0);
+  `);
+  const startedAt = Date.now();
+  await assert.rejects(
+    terminateAfterReady(process.execPath, [brokenLauncher, probeBinary(targetDirectory)], {
+      cwd: consumer,
+      env: {
+        ...process.env,
+        KASB_PROBE_WAIT_SIGNAL: "1",
+        KASB_BROKEN_PID_FILE: descendantPidFile
+      }
+    }, 250),
+    /timed out waiting for process termination/,
+    "a broken launcher must fail within the bounded probe timeout"
+  );
+  assert(Date.now() - startedAt < 2_000, "broken-launcher cleanup must remain bounded");
+  const descendantPid = Number.parseInt(await readFile(descendantPidFile, "utf8"), 10);
+  assert(Number.isSafeInteger(descendantPid), "broken launcher must record its descendant PID");
+  await assertProcessExited(descendantPid);
+}
+
+function killProbeGroup(child) {
+  if (child.pid !== undefined) {
+    try {
+      process.kill(-child.pid, "SIGKILL");
+      return;
+    } catch {
+      // Fall back when spawn failed before the dedicated group existed.
+    }
+  }
+  try {
+    child.kill("SIGKILL");
+  } catch {
+    // Cleanup is best-effort after the primary probe failure.
+  }
+}
+
+async function assertProcessExited(pid) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    try {
+      process.kill(pid, 0);
+    } catch (error) {
+      if (error?.code === "ESRCH") return;
+      throw error;
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 10));
+  }
+  assert.fail(`signal-probe cleanup left descendant ${pid} running`);
 }
 
 async function testInstallationErrors(consumer) {
@@ -312,6 +408,15 @@ async function testInstallationErrors(consumer) {
   assert.match(missingArtifact.stderr, /missing_native_artifact/);
   await rename(hiddenCli, installedCli);
 
+  if (process.platform !== "win32") {
+    await chmod(installedCli, 0o644);
+    const notExecutable = spawnSync(process.execPath, [launcherPath(consumer)], { encoding: "utf8" });
+    assert.equal(notExecutable.status, 1);
+    assert.equal(notExecutable.stdout, "");
+    assert.match(notExecutable.stderr, /native_cli_not_executable/);
+    await chmod(installedCli, 0o755);
+  }
+
   const nativePackageJson = join(nativeDirectory, "package.json");
   const original = await readFile(nativePackageJson, "utf8");
   const skewed = JSON.parse(original);
@@ -321,6 +426,31 @@ async function testInstallationErrors(consumer) {
   assert.equal(mismatch.status, 1);
   assert.equal(mismatch.stdout, "");
   assert.match(mismatch.stderr, /native_version_mismatch/);
+  assert.doesNotMatch(mismatch.stderr, /9\.9\.9/);
+  await writeFile(nativePackageJson, original);
+
+  for (const invalidMetadata of [
+    "{ invalid package metadata\n",
+    "null\n",
+    "{}\n",
+    `${JSON.stringify({ name: "wrong-package", version: packageJson.version })}\n`,
+    `${JSON.stringify({ name: target.packageName, version: { private: "detail" } })}\n`,
+  ]) {
+    await writeFile(nativePackageJson, invalidMetadata);
+    const malformed = spawnSync(process.execPath, [launcherPath(consumer)], { encoding: "utf8" });
+    assert.equal(malformed.status, 1);
+    assert.equal(malformed.stdout, "");
+    assert.match(malformed.stderr, /invalid_native_package/);
+    assert.doesNotMatch(malformed.stderr, /SyntaxError|JSON|package\.json|private|detail|wrong-package/);
+  }
+
+  const untrustedVersion = { ...JSON.parse(original), version: "\u001b[31mprivate-version" };
+  await writeFile(nativePackageJson, `${JSON.stringify(untrustedVersion)}\n`);
+  const untrustedMismatch = spawnSync(process.execPath, [launcherPath(consumer)], { encoding: "utf8" });
+  assert.equal(untrustedMismatch.status, 1);
+  assert.equal(untrustedMismatch.stdout, "");
+  assert.match(untrustedMismatch.stderr, /native_version_mismatch/);
+  assert.doesNotMatch(untrustedMismatch.stderr, /private-version|\u001b/);
   await writeFile(nativePackageJson, original);
 }
 

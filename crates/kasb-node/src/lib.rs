@@ -12,6 +12,9 @@ use std::{
     task::{Context, Poll},
 };
 
+#[cfg(feature = "feasibility-judge")]
+use std::{collections::HashMap, sync::Arc};
+
 use futures_util::FutureExt;
 #[cfg(feature = "feasibility-judge")]
 use kasb::{
@@ -20,7 +23,6 @@ use kasb::{
 };
 use kasb::{
     KasbClient, KasbError, KasbFailure, SystemClock,
-    capabilities::get_paragraph::GetParagraphRequest,
     http::{CancellationToken, PersonaClient, PersonaConfig},
 };
 use napi::{
@@ -28,12 +30,23 @@ use napi::{
     bindgen_prelude::{AbortSignal, AsyncBlock, AsyncBlockBuilder},
 };
 use napi_derive::napi;
+#[cfg(feature = "feasibility-judge")]
+use serde::Deserialize;
 use serde_json::{Value, json};
 
 type SharedClient = KasbClient<PersonaClient, SystemClock>;
 
+#[cfg(feature = "feasibility-judge")]
+type FixtureRoutes = Arc<HashMap<String, FixtureResponse>>;
+
 enum Operation {
+    Invalid,
+    SearchStandards(String),
+    GetStandardStructure(String),
+    GetSection(String),
     GetParagraph(String),
+    SearchQna(String),
+    GetQna(String),
     #[cfg(feature = "feasibility-judge")]
     FixtureGetParagraph(String),
     #[cfg(feature = "feasibility-judge")]
@@ -46,26 +59,100 @@ enum Operation {
 #[derive(Clone, Debug)]
 struct FixtureTransport;
 
+#[cfg(feature = "feasibility-judge")]
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FixtureConfiguration {
+    routes: Vec<FixtureRoute>,
+}
+
+#[cfg(feature = "feasibility-judge")]
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FixtureRoute {
+    request_url: String,
+    payload: Value,
+    #[serde(default)]
+    wait_for_cancellation: bool,
+    #[serde(default)]
+    panic: bool,
+}
+
+#[cfg(feature = "feasibility-judge")]
+#[derive(Clone, Debug)]
+struct FixtureResponse {
+    response: HttpResponse,
+    wait_for_cancellation: bool,
+    panic: bool,
+}
+
+#[cfg(feature = "feasibility-judge")]
+#[derive(Clone, Debug)]
+struct ConfiguredFixtureTransport {
+    routes: FixtureRoutes,
+    requests: Arc<std::sync::Mutex<Vec<String>>>,
+}
+
 enum BindingError {
     Capability(KasbFailure),
     Cancelled,
     Internal,
     InvalidJson,
+    InvalidOperation,
 }
 
-#[napi(js_name = "getParagraph")]
-fn get_paragraph(
+#[napi(js_name = "executeOperation")]
+fn execute_operation(
     env: Env,
+    operation_name: String,
     input_json: String,
     signal: Option<AbortSignal>,
     pre_aborted: Option<bool>,
 ) -> napi::Result<AsyncBlock<String>> {
-    task(
-        &env,
-        Operation::GetParagraph(input_json),
-        signal,
-        pre_aborted.unwrap_or(false),
-    )
+    let operation = match operation_name.as_str() {
+        "search-standards" => Operation::SearchStandards(input_json),
+        "get-standard-structure" => Operation::GetStandardStructure(input_json),
+        "get-section" => Operation::GetSection(input_json),
+        "get-paragraph" => Operation::GetParagraph(input_json),
+        "search-qna" => Operation::SearchQna(input_json),
+        "get-qna" => Operation::GetQna(input_json),
+        _ => {
+            return task(
+                &env,
+                Operation::Invalid,
+                signal,
+                pre_aborted.unwrap_or(false),
+            );
+        }
+    };
+    task(&env, operation, signal, pre_aborted.unwrap_or(false))
+}
+
+#[cfg(feature = "feasibility-judge")]
+#[napi(js_name = "configureFixture")]
+fn configure_fixture(configuration_json: String) -> napi::Result<()> {
+    let configuration: FixtureConfiguration = serde_json::from_str(&configuration_json)
+        .map_err(|_| napi::Error::from_reason("invalid fixture configuration"))?;
+    let mut routes = HashMap::with_capacity(configuration.routes.len());
+    for route in configuration.routes {
+        let response = FixtureResponse {
+            response: HttpResponse {
+                status: 200,
+                body: serde_json::to_vec(&route.payload)
+                    .map_err(|_| napi::Error::from_reason("invalid fixture payload"))?,
+            },
+            wait_for_cancellation: route.wait_for_cancellation,
+            panic: route.panic,
+        };
+        if routes.insert(route.request_url, response).is_some() {
+            return Err(napi::Error::from_reason("duplicate fixture route"));
+        }
+    }
+    fixture_configuration()
+        .lock()
+        .map_err(|_| napi::Error::from_reason("fixture configuration lock failed"))?
+        .replace(Arc::new(routes));
+    Ok(())
 }
 
 #[cfg(feature = "feasibility-judge")]
@@ -123,12 +210,20 @@ fn task(
         let envelope = match outcome {
             Ok(Ok(value)) => json!({ "ok": true, "value": value }),
             Ok(Err(error)) => error_envelope(error),
-            Err(_) => error_envelope(BindingError::Internal),
+            Err(_) => contained_panic_envelope(),
         };
         serde_json::to_string(&envelope)
             .map_err(|_| napi::Error::from_reason("native result serialization failed"))
     };
     AsyncBlockBuilder::new(future).build(env)
+}
+
+fn contained_panic_envelope() -> Value {
+    let mut envelope = error_envelope(BindingError::Internal);
+    if let Value::Object(fields) = &mut envelope {
+        fields.insert("operatorSignal".into(), json!("binding_panic"));
+    }
+    envelope
 }
 
 fn install_sanitizing_panic_hook() {
@@ -188,31 +283,60 @@ async fn execute(
     operation: Operation,
     cancellation: CancellationToken,
 ) -> Result<Value, BindingError> {
-    match operation {
-        Operation::GetParagraph(input_json) => {
-            let input = serde_json::from_str(&input_json).map_err(|_| BindingError::InvalidJson)?;
-            let request =
-                GetParagraphRequest::from_json(input).map_err(BindingError::Capability)?;
-            let result = shared_client()?
-                .get_paragraph(request, &cancellation)
-                .await
-                .map_err(BindingError::from)?;
-            serde_json::to_value(result).map_err(|_| BindingError::Internal)
+    #[cfg(feature = "feasibility-judge")]
+    if operation.is_public() {
+        let routes = fixture_configuration()
+            .lock()
+            .map_err(|_| BindingError::Internal)?
+            .clone();
+        if let Some(routes) = routes {
+            return execute_fixture(operation, cancellation, routes).await;
         }
+    }
+
+    match operation {
+        Operation::Invalid => Err(BindingError::InvalidOperation),
+        Operation::SearchStandards(input_json) => to_value(
+            shared_client()?
+                .execute_search_standards(parse_input(&input_json)?, &cancellation)
+                .await,
+        ),
+        Operation::GetStandardStructure(input_json) => to_value(
+            shared_client()?
+                .execute_get_standard_structure(parse_input(&input_json)?, &cancellation)
+                .await,
+        ),
+        Operation::GetSection(input_json) => to_value(
+            shared_client()?
+                .execute_get_section(parse_input(&input_json)?, &cancellation)
+                .await,
+        ),
+        Operation::GetParagraph(input_json) => to_value(
+            shared_client()?
+                .execute_get_paragraph(parse_input(&input_json)?, &cancellation)
+                .await,
+        ),
+        Operation::SearchQna(input_json) => to_value(
+            shared_client()?
+                .execute_search_qna(parse_input(&input_json)?, &cancellation)
+                .await,
+        ),
+        Operation::GetQna(input_json) => to_value(
+            shared_client()?
+                .execute_get_qna(parse_input(&input_json)?, &cancellation)
+                .await,
+        ),
         #[cfg(feature = "feasibility-judge")]
         Operation::FixtureGetParagraph(input_json) => {
-            let input = serde_json::from_str(&input_json).map_err(|_| BindingError::InvalidJson)?;
-            let request =
-                GetParagraphRequest::from_json(input).map_err(BindingError::Capability)?;
             let client = KasbClient::from_parts(
                 FixtureTransport,
                 FixedClock::new("2026-05-18T00:00:00.000Z"),
             );
-            let result = client
-                .get_paragraph(request, &cancellation)
-                .await
-                .map_err(BindingError::from)?;
-            serde_json::to_value(result).map_err(|_| BindingError::Internal)
+            to_value(
+                client
+                    .execute_get_paragraph(parse_input(&input_json)?, &cancellation)
+                    .await,
+            )
         }
         #[cfg(feature = "feasibility-judge")]
         Operation::CancellationProbe => {
@@ -222,6 +346,88 @@ async fn execute(
         #[cfg(feature = "feasibility-judge")]
         Operation::PanicProbe => panic!("deliberate feasibility panic"),
     }
+}
+
+#[cfg(feature = "feasibility-judge")]
+impl Operation {
+    fn is_public(&self) -> bool {
+        matches!(
+            self,
+            Self::SearchStandards(_)
+                | Self::GetStandardStructure(_)
+                | Self::GetSection(_)
+                | Self::GetParagraph(_)
+                | Self::SearchQna(_)
+                | Self::GetQna(_)
+        )
+    }
+}
+
+#[cfg(feature = "feasibility-judge")]
+fn fixture_configuration() -> &'static std::sync::Mutex<Option<FixtureRoutes>> {
+    static CONFIGURATION: OnceLock<std::sync::Mutex<Option<FixtureRoutes>>> = OnceLock::new();
+    CONFIGURATION.get_or_init(|| std::sync::Mutex::new(None))
+}
+
+#[cfg(feature = "feasibility-judge")]
+async fn execute_fixture(
+    operation: Operation,
+    cancellation: CancellationToken,
+    routes: FixtureRoutes,
+) -> Result<Value, BindingError> {
+    let transport = ConfiguredFixtureTransport {
+        routes,
+        requests: Arc::default(),
+    };
+    let client = KasbClient::from_parts(
+        transport.clone(),
+        FixedClock::new("2026-05-18T00:00:00.000Z"),
+    );
+    let result = match operation {
+        Operation::SearchStandards(input) => to_value(
+            client
+                .execute_search_standards(parse_input(&input)?, &cancellation)
+                .await,
+        ),
+        Operation::GetStandardStructure(input) => to_value(
+            client
+                .execute_get_standard_structure(parse_input(&input)?, &cancellation)
+                .await,
+        ),
+        Operation::GetSection(input) => to_value(
+            client
+                .execute_get_section(parse_input(&input)?, &cancellation)
+                .await,
+        ),
+        Operation::GetParagraph(input) => to_value(
+            client
+                .execute_get_paragraph(parse_input(&input)?, &cancellation)
+                .await,
+        ),
+        Operation::SearchQna(input) => to_value(
+            client
+                .execute_search_qna(parse_input(&input)?, &cancellation)
+                .await,
+        ),
+        Operation::GetQna(input) => to_value(
+            client
+                .execute_get_qna(parse_input(&input)?, &cancellation)
+                .await,
+        ),
+        _ => Err(BindingError::InvalidOperation),
+    };
+    if !transport.used_exactly_once()? {
+        return Err(BindingError::Internal);
+    }
+    result
+}
+
+fn parse_input(input_json: &str) -> Result<Value, BindingError> {
+    serde_json::from_str(input_json).map_err(|_| BindingError::InvalidJson)
+}
+
+fn to_value<T: serde::Serialize>(result: Result<T, KasbError>) -> Result<Value, BindingError> {
+    serde_json::to_value(result.map_err(BindingError::from)?).map_err(|_| BindingError::Internal)
 }
 
 #[cfg(feature = "feasibility-judge")]
@@ -250,15 +456,53 @@ impl HttpTransport for FixtureTransport {
     }
 }
 
-fn shared_client() -> Result<&'static SharedClient, BindingError> {
-    static CLIENT: OnceLock<SharedClient> = OnceLock::new();
-    if let Some(client) = CLIENT.get() {
-        return Ok(client);
+#[cfg(feature = "feasibility-judge")]
+impl ConfiguredFixtureTransport {
+    fn used_exactly_once(&self) -> Result<bool, BindingError> {
+        let mut expected = self.routes.keys().cloned().collect::<Vec<_>>();
+        let mut actual = self
+            .requests
+            .lock()
+            .map_err(|_| BindingError::Internal)?
+            .clone();
+        expected.sort();
+        actual.sort();
+        Ok(expected == actual)
     }
+}
 
-    let client = KasbClient::new(PersonaConfig::default()).map_err(|_| BindingError::Internal)?;
-    let _ = CLIENT.set(client);
-    CLIENT.get().ok_or(BindingError::Internal)
+#[cfg(feature = "feasibility-judge")]
+impl HttpTransport for ConfiguredFixtureTransport {
+    #[allow(clippy::manual_async_fn)]
+    fn get<'a>(
+        &'a self,
+        url: &'a str,
+        cancellation: &'a CancellationToken,
+    ) -> impl Future<Output = Result<HttpResponse, TransportError>> + Send + 'a {
+        let response = self.routes.get(url).cloned();
+        if let Ok(mut requests) = self.requests.lock() {
+            requests.push(url.to_owned());
+        }
+        async move {
+            let fixture = response.ok_or_else(|| {
+                TransportError::Unavailable(format!("undeclared fixture request: {url}"))
+            })?;
+            assert!(!fixture.panic, "deliberate configured fixture panic");
+            if fixture.wait_for_cancellation {
+                cancellation.cancelled().await;
+                return Err(TransportError::Cancelled);
+            }
+            Ok(fixture.response)
+        }
+    }
+}
+
+fn shared_client() -> Result<&'static SharedClient, BindingError> {
+    static CLIENT: OnceLock<Result<SharedClient, ()>> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| KasbClient::new(PersonaConfig::default()).map_err(|_| ()))
+        .as_ref()
+        .map_err(|_| BindingError::Internal)
 }
 
 impl From<KasbError> for BindingError {
@@ -298,6 +542,15 @@ fn error_envelope(error: BindingError) -> Value {
                 "parameter": "input"
             }
         }),
+        BindingError::InvalidOperation => json!({
+            "ok": false,
+            "error": {
+                "code": "invalid_input",
+                "message": "Native operation must be one of the six KASB v1 operation names.",
+                "retryable": false,
+                "parameter": "operationName"
+            }
+        }),
     }
 }
 
@@ -333,6 +586,20 @@ mod tests {
         assert_eq!(
             details.keys().map(String::as_str).collect::<Vec<_>>(),
             ["code", "message", "retryable", "parameter", "sourceUrl"]
+        );
+    }
+
+    #[test]
+    fn only_the_contained_panic_envelope_carries_the_operator_signal() {
+        let ordinary = error_envelope(BindingError::Internal);
+        assert!(ordinary.get("operatorSignal").is_none());
+
+        let panicked = contained_panic_envelope();
+        assert_eq!(panicked["operatorSignal"], "binding_panic");
+        assert_eq!(panicked["error"]["code"], "internal_failure");
+        assert_eq!(
+            panicked["error"].as_object().expect("error object").len(),
+            3
         );
     }
 }

@@ -8,10 +8,11 @@ Rust implementation of KASB HTTP and domain behavior. The Node SDK calls that
 implementation through a narrow asynchronous Node-API binding. The CLI is a
 separate `clap` binary over the same public Rust SDK.
 
-The current checkout is transitional: Rust capability expansion is complete,
-while the later cutover gates remain. [MIGRATION.md](MIGRATION.md) owns the
-authoritative implementation status; this document owns current and target
-component boundaries.
+The current checkout is transitional: the complete Rust SDK and Rust CLI are
+integrated, and the Rust-backed Node product and four-target native package
+matrix have passed their replacement gates before cutover.
+[MIGRATION.md](MIGRATION.md) owns the authoritative implementation status; this
+document owns current and target component boundaries.
 
 The npm package also exposes `kasb`, but its JavaScript entrypoint only selects
 and launches the packaged Rust CLI binary. Pi, MCP, browser automation,
@@ -59,17 +60,18 @@ SDK, and JavaScript never owns KASB wire or source behavior.
   [MIGRATION.md](MIGRATION.md) for transition status.
 - `crates/kasb-cli` — implemented first-class Rust `clap` CLI over
   `crates/kasb`. It owns command parsing, presentation, stdout/stderr, and exit
-  status, while npm stays on the transition CLI until the native packaging
-  cutover gates pass.
-- `crates/kasb-node` — currently a private asynchronous feasibility projection
-  over the paragraph pilot; the completed binding will own cancellation and
-  panic containment, not source rules.
-- `packages/node` — currently a private clean-consumer and launcher feasibility
-  package. It becomes the Node SDK, toolset, native loader, and transparent npm
-  CLI launcher only in the later product phase, replacing `packages/kasb-ts`
-  at cutover.
-- `packages/native` — planned generated platform packages containing the exact
-  Node-API artifact and Rust CLI binary for each claimed target.
+  status, while npm stays on the transition CLI until the canonical cutover.
+- `crates/kasb-node` — implemented Phase 4 candidate for the asynchronous
+  projection of all six public Rust SDK operations. It owns cancellation,
+  stable failure serialization, reusable client lifetime, and panic
+  containment, not source rules; the four-target native gates have passed.
+- `packages/node` — private cutover candidate for the Node SDK, network-free
+  toolset, native loader, and transparent npm CLI launcher. It replaces
+  `packages/kasb-ts` only at cutover.
+- `packages/native` — generated platform-package metadata for the Node addon
+  and same-revision Rust CLI. Linux GNU x64/ARM64, macOS ARM64, and Windows x64
+  are supported by native CI and packed-consumer evidence at the candidate
+  revision.
 - `fixtures` — captured provider responses used as independent deterministic
   evidence.
 - `conformance` and its process-isolated judge — public behavior cases,
@@ -109,7 +111,11 @@ npm bin shim -> JavaScript target resolver -> packaged Rust kasb binary
 The Node facade may reject malformed public input without network access. Rust
 validates again at the native trust boundary. `KasbClient` owns reusable
 transport lifetime, clock/cancellation composition, and capability execution.
-The binding serializes project-owned values and contains panics. The Rust CLI
+The binding serializes project-owned values and contains panics. A contained
+panic remains a sanitized `internal_failure`; the Node facade additionally
+publishes only `{ code: "binding_panic" }` on the
+`sjunepark.kasb.native` diagnostics channel when subscribed. It never exposes
+panic details or writes unsolicited diagnostics. The Rust CLI
 alone owns flags, stdout/stderr, formatting, help, and exit status. The npm
 launcher forwards arguments, environment, current directory, standard streams,
 signals, and exit status without parsing KASB commands.
@@ -177,9 +183,19 @@ from the same revision. The JavaScript `bin` entrypoint resolves that package
 and launches its binary; it does not download or compile artifacts during
 install or first use.
 
-The planned initial matrix is Linux GNU x64/ARM64, macOS ARM64, and Windows
-x64. Unsupported or incompletely installed targets fail with a stable,
-actionable installation error rather than a raw loader or spawn exception.
+The supported matrix is Linux GNU x64/ARM64, macOS ARM64, and Windows x64.
+Each target passed native build, same-revision artifact, direct CLI, and clean
+packed-consumer validation before this support claim was promoted. Unsupported
+or incompletely installed targets fail with a stable, actionable installation
+error rather than a raw loader or spawn exception.
+
+Linux GNU x64 and ARM64 use glibc 2.28 as the minimum runtime. The addon and
+same-revision CLI are built in digest-pinned manylinux 2.28 containers, rejected
+when imported symbols require a newer glibc, and exercised by clean consumers
+on the floor runtime. On Windows, the launcher preserves arguments,
+environment, working directory, stdio, normal exits, and termination, but does
+not claim exact POSIX signal identity because Node exposes forceful process
+termination rather than POSIX signals there.
 
 The public Rust crate and CLI are also distributable independently from npm.
 Direct CLI archives and npm target packages reuse the same release-built binary

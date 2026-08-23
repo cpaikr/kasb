@@ -17,7 +17,7 @@ assertTargetAlignment(targetManifest, packageJson);
 await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 for (const entry of await readdir(source, { withFileTypes: true })) {
-  if (!entry.isFile()) continue;
+  if (!entry.isFile() || !/\.(?:js|d\.ts)$/u.test(entry.name)) continue;
   await copyFile(resolve(source, entry.name), resolve(dist, entry.name));
 }
 await copyFile(
@@ -25,3 +25,4 @@ await copyFile(
   resolve(dist, "native-targets.json")
 );
 await chmod(resolve(dist, "cli.js"), 0o755);
+await copyFile(resolve(repositoryRoot, "LICENSE.md"), resolve(packageRoot, "LICENSE.md"));

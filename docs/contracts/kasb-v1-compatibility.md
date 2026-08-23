@@ -134,8 +134,9 @@ The npm executable becomes a shell-free resolver/launcher only. It forwards
 arguments, environment, working directory, standard streams, signals, and the
 child exit status without parsing commands or rendering output. Each
 exact-version native package contains the Node addon and same-revision Rust CLI
-binary. `native-targets.json` is only a planned matrix until native build and
-clean-consumer checks pass on every target.
+binary. `native-targets.json` records the supported matrix after native build,
+direct-archive, aggregate-artifact, and clean-consumer checks passed on every
+target.
 
 Committed fixtures and expected outcomes are reviewed evidence, never output
 from routine validation. The process judge compares exact serialized values

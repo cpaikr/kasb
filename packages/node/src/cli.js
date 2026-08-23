@@ -16,25 +16,40 @@ if (target) {
 
 function launch(binary, args) {
   let settled = false;
-  const child = spawn(binary, args, {
-    cwd: process.cwd(),
-    env: process.env,
-    shell: false,
-    stdio: "inherit",
-    windowsHide: false
-  });
+  let child;
   const handlers = new Map();
+  // Install forwarding before the child can inherit stdio and announce
+  // readiness. Otherwise a fast caller can terminate this process during the
+  // spawn-to-listener window and strand the native child holding those pipes.
   for (const signal of forwardedSignals()) {
     const handler = () => {
+      if (!child) return;
       if (child.exitCode !== null || child.signalCode !== null) return;
       try {
-        child.kill(signal);
+        child.kill(process.platform === "win32" ? "SIGTERM" : signal);
       } catch {
         // The child may have exited between the state check and signal delivery.
       }
     };
     handlers.set(signal, handler);
     process.on(signal, handler);
+  }
+
+  try {
+    child = spawn(binary, args, {
+      cwd: process.cwd(),
+      env: process.env,
+      shell: false,
+      stdio: "inherit",
+      windowsHide: false
+    });
+  } catch (error) {
+    cleanup(handlers);
+    installationFailure({
+      code: "native_cli_spawn_failed",
+      message: `The packaged KASB CLI could not be launched: ${error.code || "spawn failed"}. Reinstall the KASB package.`
+    });
+    return;
   }
 
   child.once("error", (error) => {
@@ -58,7 +73,7 @@ function launch(binary, args) {
 
 function forwardedSignals() {
   return process.platform === "win32"
-    ? ["SIGINT", "SIGTERM", "SIGBREAK"]
+    ? ["SIGINT", "SIGBREAK"]
     : ["SIGHUP", "SIGINT", "SIGTERM", "SIGQUIT"];
 }
 
@@ -68,8 +83,9 @@ function cleanup(handlers) {
 
 function mirrorSignal(signal) {
   if (process.platform === "win32") {
-    // Inferred pending the later Windows native and packed-consumer gates.
-    process.exitCode = signal === "SIGINT" ? 130 : 143;
+    // Windows has no POSIX signal identity; Node models these as forceful
+    // termination. Preserve nonzero termination without inventing identity.
+    process.exitCode = 1;
     return;
   }
   try {

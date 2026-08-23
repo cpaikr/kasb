@@ -1,24 +1,48 @@
 {
-  "name": "@sjunepark/kasb-native-feasibility",
-  "version": "0.0.0-feasibility",
-  "description": "Private phase-1 probe for the KASB native Node and npm launcher boundaries.",
+  "name": "@sjunepark/kasb-native-candidate",
+  "version": "0.2.1",
+  "description": "Private cutover candidate for the Rust-backed KASB Node SDK and native CLI launcher.",
   "private": true,
   "type": "module",
+  "license": "Elastic-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sjunepark/kasb.git",
+    "directory": "packages/node"
+  },
   "bin": {
     "kasb": "dist/cli.js"
   },
   "exports": {
-    "./native": "./dist/native.js",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./toolset": {
+      "types": "./dist/toolset.d.ts",
+      "import": "./dist/toolset.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE.md",
+    "THIRD_PARTY_LICENSES.md"
   ],
   "engines": {
     "node": ">=20.18.1"
   },
   "scripts": {
-    "build": "node scripts/build.mjs"
+    "build": "node scripts/build.mjs && bun scripts/build-toolset.ts",
+    "prepack": "bun run build",
+    "test": "bun run build && bun test test",
+    "typecheck": "bun run build && tsc --noEmit -p tsconfig.json"
+  },
+  "optionalDependencies": {
+    "@sjunepark/kasb-linux-x64-gnu": "0.2.1",
+    "@sjunepark/kasb-linux-arm64-gnu": "0.2.1",
+    "@sjunepark/kasb-darwin-arm64": "0.2.1",
+    "@sjunepark/kasb-win32-x64-msvc": "0.2.1"
   }
 }

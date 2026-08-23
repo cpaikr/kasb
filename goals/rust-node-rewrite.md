@@ -48,7 +48,18 @@ Delivery: Use the fewest sequential reviewable PRs practical. Run the repository
 
 ## Authorized amendments
 
-_None._
+- On 2026-08-23, the user approved all three recommended Phase 4
+  compatibility policies:
+  - contained native panics emit only the sanitized
+    `sjunepark.kasb.native` diagnostics-channel event
+    `{ "code": "binding_panic" }`, without panic details or unsolicited
+    stderr;
+  - Windows preserves the launcher process contract except that exact POSIX
+    signal identity is not promised because Node exposes forceful termination
+    semantics there; and
+  - Linux GNU x64 and ARM64 native packages require glibc 2.28, enforced for
+    both the Node addon and same-revision Rust CLI artifact before support is
+    promoted.
 
 ## Execution status
 
@@ -73,12 +84,16 @@ packed-consumer gate passes.
 
 ### Next in-scope action
 
-Create the Phase 4 branch from the integration tip, reconcile the feasibility
-proof and `../ytm` distribution pattern against the frozen Node/package
-surface, then implement and validate the complete Rust-backed Node product and
-claimed native package matrix as the next reviewable PR.
+Validate the promoted four-target support claim, complete the Phase 4 PR
+lifecycle using the passing native and exact-artifact evidence, and only then
+begin the dependent canonical cutover.
 
 ### Evidence and blockers
+
+- The user resumed the blocked goal on 2026-08-23 by approving all three Phase
+  4 compatibility recommendations. Implementation and validation may proceed;
+  publication, release tags, version selection, and external KASB mutation
+  remain unauthorized.
 
 - Boundary check: phase 1 is included directly by the first named result and
   is the prerequisite for the remaining implementation phases.
@@ -128,5 +143,161 @@ claimed native package matrix as the next reviewable PR.
   Rust 1.88 workspace check, and diff hygiene. The opt-in live suite passes 208
   tests, and independent repository-required review reports no Bucket I or II
   finding with an explicit PASS.
-- No blocker is currently known. Registry publication, version selection,
-  release tags, and external KASB mutation remain unauthorized.
+- No independent implementation blocker is currently known. The contained
+  panic observability channel, Windows console-signal support statement, and
+  Linux GNU glibc floor are approved and being implemented. Registry
+  publication, version selection, release tags, and external KASB mutation
+  remain unauthorized.
+- Phase 4 now has an implemented six-operation asynchronous Node-API candidate,
+  root Node facade, frozen network-free toolset projection, generated four-target
+  native package matrix, shell-free launcher, Node public-surface judge, and
+  same-revision macOS ARM64 packed-consumer evidence. Support remains explicitly
+  unclaimed until the full native CI matrix passes.
+- Repository-required Phase 4 review corrections now pass independent
+  verification for binding safety, facade sanitization and class identity,
+  immutable artifact allowlists, extracted direct-archive execution,
+  per-target process evidence, action pinning, and documentation freshness.
+  Exact napi 3.12.2 includes the upstream AbortSignal memory-safety fix.
+- The post-policy repository-required review clean loop found and fixed four
+  safe gate gaps: cancellation-field coverage, sanitized resolver failures for
+  corrupted target metadata, parsed per-job native-workflow validation, and a
+  native Windows `CTRL_BREAK_EVENT` termination probe. Independent binding,
+  launcher, and native-CI reviewers report no remaining Bucket I or Bucket II
+  findings. Windows execution remains correctly unclaimed until native CI.
+- Current local evidence passes contract/declaration/native metadata freshness,
+  123 adversarial/conformance tests, nine Node package tests and typecheck,
+  including the real-Node cancellation and sanitized panic-diagnostic paths,
+  macOS ARM64 packed native and extracted direct-archive consumers on Node 24,
+  Rust 1.88, formatting and strict clippy, license and diff hygiene, the full
+  deterministic suite, and the 208-test opt-in live suite. The four-target,
+  seven-version CI matrix remains unrun and support remains `planned`.
+- Current Node documentation establishes that Windows does not have POSIX
+  signal semantics and Node emulates child termination; the approved launcher
+  contract therefore excludes exact signal identity there. The approved glibc
+  2.28 floor is now encoded in the native manifest, digest-pinned Linux build
+  containers, generated package docs, symbol-floor validator, and clean
+  consumer workflow. Linux support remains unclaimed until that CI evidence
+  passes.
+- The first full native run, Actions run `32616678745`, exercised all four
+  target jobs far enough to identify four merge-gate portability defects:
+  cargo-about was installed without its required CLI feature, Windows text
+  checkout made the generated-metadata freshness comparison line-ending
+  dependent, native consumers inspected the runner's unbuilt source directory
+  instead of the downloaded root tarball, and both pinned manylinux containers
+  lacked libclang for dependency binding generation. The local correction
+  makes text comparison CRLF-invariant, inspects the exact immutable tarballs,
+  installs cargo-about with `cli`, and installs `clang-devel`; native metadata,
+  license, macOS ARM64 packed-consumer, and diff-hygiene checks pass locally.
+  No target support claim has been promoted pending a clean full rerun.
+- Independent repository-required review of those portability corrections
+  reports no Bucket I or Bucket II findings. The reviewers verified the
+  fail-closed immutable-tarball allowlists, direct/npm equivalence ordering,
+  CRLF-only freshness normalization, and workflow prerequisite enforcement;
+  the remaining evidence requirement is the clean four-target CI rerun.
+- The second full native run, Actions run `32617272525`, passes the complete
+  macOS ARM64, Linux GNU x64, and Linux GNU ARM64 build, artifact, ABI-floor,
+  seven-version Node, direct-archive, and packed-consumer matrices. It exposed
+  two remaining gate defects: clean checkout typecheck ran before the Node
+  package generated its consumer-facing `dist` declarations, and the Windows
+  console-break probe targeted npm's generated `.cmd` shell shim, whose exit
+  does not prove descendant termination. The local correction makes Node
+  package typecheck self-preparing and targets the installed JavaScript
+  launcher for the Windows forwarding probe while retaining ordinary `.cmd`
+  invocation coverage. Node typecheck, native metadata, licenses, macOS ARM64
+  packed consumer, and diff hygiene pass locally. Independent review found and
+  closed one detached-tree cleanup path for Windows probe failures, then
+  reported no remaining Bucket I or Bucket II findings. Windows and the full
+  matrix remain unclaimed pending the clean rerun.
+- Independent repository-required review passes both run `32619558167`
+  corrections with no Bucket I or Bucket II findings. Review confirms the
+  pinned Rust components satisfy the exact later gates and that canonicalizing
+  both existing working-directory paths preserves effective directory identity
+  without weakening the exact direct/npm process comparison.
+- The third full native run, Actions run `32618511924`, passes the immutable
+  root package and complete macOS ARM64, Linux GNU x64, and Linux GNU ARM64
+  matrices. It confirms the clean-checkout Node typecheck fix. Two later gates
+  exposed clean-environment assumptions: the deterministic Bun suite started
+  twenty 30-second Rust conformance cases before cold-building their shared
+  example, and the headless Windows runner had no console for the native
+  `AttachConsole` sender. The local correction prebuilds the shared Rust
+  conformance example once, removes the unsafe console sender, exercises the
+  approved Windows forceful-termination contract directly, and triggers the
+  installed launcher's real Node `SIGBREAK` handler after its native child is
+  ready. The full 215-test deterministic TypeScript/eval suite, 13 Node tests,
+  Node typecheck, contract/native checks, macOS ARM64 packed consumer, Rust
+  formatting and strict binding clippy, and diff hygiene pass locally.
+- Initial Codex PR review found that a host below glibc 2.28 could select an
+  incompatible GNU package. The current feedback fix preserves Node's reported
+  glibc version, rejects missing, malformed, and below-floor versions before
+  addon or CLI resolution, emits an actionable sanitized diagnostic only for
+  an otherwise supported target family, and retains the generic unsupported
+  platform diagnostic for unsupported architectures. Real-Node addon and
+  launcher boundary tests cover glibc 2.27, exact 2.28 acceptance, and
+  unsupported-architecture precedence. The fix was pushed in `db4de8e`, the
+  review thread received its commit-and-validation reply, and the thread is
+  resolved.
+- Independent repository-required review now passes the complete correction
+  cluster with no Bucket I or Bucket II findings. The final Windows review
+  correction treats any non-successful termination as valid instead of
+  requiring a null signal field, preserving forceful Windows termination
+  without promising POSIX signal identity. The remaining evidence gate is a
+  clean full native matrix at the pushed revision.
+- The fourth full native run, Actions run `32619558167`, passes the immutable
+  root package, the cold typecheck and 215-test deterministic suite, the
+  123-case adversarial judge, all three Unix native target matrices, and every
+  Linux glibc floor and Node 20.18.1 through 26 consumer. It exposed two final
+  clean-runner prerequisites after reaching previously unopened gates: the
+  minimal Rust 1.88 deterministic install omitted `rustfmt` and `clippy`, and
+  Windows can report the inherited working directory through its equivalent
+  8.3 short-path alias. The current correction explicitly installs both Rust
+  components and compares real paths on both sides while retaining exact
+  direct/npm launcher equivalence. Windows target support and the aggregate
+  matrix remain unclaimed pending the clean rerun.
+- The fifth full native run, Actions run `32620270180`, confirms the pinned
+  Rust components and Windows path correction while passing deterministic
+  validation, the immutable root package, and the complete Windows x64, macOS
+  ARM64, and Linux GNU x64 matrices. Its Linux GNU ARM64 Node 20.18.1 consumer
+  passed addon loading and ordinary direct/npm process equivalence, then timed
+  out in the npm launcher's POSIX
+  termination probe. The launcher spawned the native child before installing
+  forwarding handlers, so a child that announced readiness immediately could
+  expose a window in which SIGTERM killed only the launcher and stranded the
+  native child holding inherited pipes. The local correction installs handlers
+  before spawn and makes both signal probes issue one termination request with
+  phase-specific timeout diagnostics. Independent review confirmed the
+  production correction and found that failure-path probe cleanup could still
+  strand the same native descendant. The current harness therefore creates a
+  dedicated POSIX process group and kills that group on every rejection; a
+  deliberately broken-launcher regression proves bounded failure and descendant
+  cleanup. Independent re-review reports no remaining Bucket I or Bucket II
+  finding. macOS ARM64 native feasibility, all 13 Node tests, Node typechecking,
+  contract and native metadata checks, Rust formatting, syntax checks, and diff
+  hygiene pass locally. Support remains unclaimed pending a fully clean rerun.
+- The sixth full native run, Actions run `32621109003`, passes deterministic
+  validation and all four complete native target jobs, including both Linux
+  glibc floors, all Node 20.18.1 through 26 packed consumers, direct CLI
+  archives, and the repaired Linux ARM64 signal path. The final aggregate job
+  downloaded every immutable artifact and found that Windows checkout had
+  converted the packaged license to CRLF while the Linux checkout authority
+  remained LF; byte inspection shows exactly 55 CRLF substitutions in both the
+  Windows npm package and direct CLI archive and no content difference. The
+  current correction adds a repository checkout invariant keeping all tracked
+  text LF across artifact-producing operating systems. Independent review
+  reports no Bucket I or Bucket II finding and confirms generated native
+  binaries remain outside the tracked-text rule. Support remains unclaimed
+  pending a clean aggregate rerun from the corrected revision.
+- The seventh full native run, Actions run `32622016449`, passes deterministic
+  validation, the immutable root package, and all four complete native target
+  jobs, including both Linux glibc floors, every Node 20.18.1 through 26 packed
+  consumer, direct CLI archives, process equivalence, and target artifact
+  uploads. GitHub did not start the dependent aggregate job because the
+  repository account's Actions budget was exhausted; it executed no steps and
+  reported no validator failure. The exact nine immutable artifacts from that
+  revision were downloaded and passed the repository's unchanged
+  `scripts/validate-release-artifacts.mjs` aggregate validator locally. This
+  closes the artifact-content gate without treating the external budget event
+  as product evidence, and the four listed native targets are now supported.
+- Independent repository-required review reproduced the exact nine-artifact
+  download and unchanged aggregate validation, confirmed `supportClaim` is
+  metadata-only at runtime, and found no Bucket I or Bucket II issue in the
+  support promotion or current-versus-cutover documentation boundary.
