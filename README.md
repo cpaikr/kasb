@@ -3,33 +3,35 @@
 Read-only access to KASB standards and Q&A material through a public Rust SDK,
 Rust-backed Node SDK, and Rust CLI.
 
-The repository is executing a `../ytm`-shaped Rust/Node rewrite. See
-[MIGRATION.md](MIGRATION.md) for authoritative transition status and
-[ARCHITECTURE.md](ARCHITECTURE.md) for the target boundaries.
+KASB has one implementation of provider transport and domain behavior:
+`crates/kasb`. The first-class Rust CLI uses that SDK directly, and the Node SDK
+uses it through an asynchronous Node-API binding. The npm `kasb` executable is
+only a transparent launcher for the packaged Rust CLI binary.
 
-## Current checkout
+See [ARCHITECTURE.md](ARCHITECTURE.md) for component boundaries,
+[VISION.md](VISION.md) for product scope, and [MIGRATION.md](MIGRATION.md) for
+the completed rewrite decision.
 
-- [`packages/kasb-ts`](packages/kasb-ts/README.md) currently contains the npm
-  package, complete six-operation TypeScript implementation, CLI, toolset, and
-  Pi adapter.
-- [`crates/kasb`](crates/kasb/README.md) is an independently buildable public
-  Rust SDK implementing all six v1 operations. The TypeScript implementation
-  remains present as the executable cutover reference until later gates pass.
-- `fixtures/` and `conformance/` contain shared source evidence and serialized
-  compatibility cases. The process-isolated judge verifies the TypeScript,
-  public Rust SDK, Rust CLI, and Rust-backed Node candidate surfaces and rejects
-  deliberate behavioral corruption.
-- `contracts/kasb/openapi.yaml` owns the supported provider wire facts; its
-  source-adapter profile records only cross-response and decoding rules that
-  OpenAPI cannot express. `crates/kasb-node`, `packages/node`, and
-  `packages/native` contain the private Phase 4 cutover candidate. Its four
-  native targets have passed build, exact-artifact, and clean-consumer gates,
-  but the candidate is not yet the canonical npm product.
+## System shape
 
-The current implementations remain intact until the replacement passes the
-approved cutover gates. See [MIGRATION.md](MIGRATION.md) for current status,
-[VISION.md](VISION.md) for product scope, and
-[plans/rust-node-rewrite.md](plans/rust-node-rewrite.md) for the scheduled work.
+- [`crates/kasb`](crates/kasb/README.md) is the public Rust SDK and sole KASB
+  conformer for all six v1 operations.
+- [`crates/kasb-cli`](crates/kasb-cli) is the Rust `clap` CLI over that SDK.
+- [`crates/kasb-node`](crates/kasb-node) and
+  [`packages/node`](packages/node/README.md) provide the asynchronous Node-API
+  projection, Node SDK, neutral toolset, and npm CLI launcher.
+- [`packages/native`](packages/native) contains exact-version platform package
+  metadata. Each target package carries the Node addon and same-revision Rust
+  CLI binary.
+- `contracts/kasb/openapi.yaml` owns supported provider wire facts.
+  `docs/specs/kasb-standards-v1.md` owns public semantics.
+- `fixtures/` and `conformance/` provide independent evidence and a
+  process-isolated adversarial judge for the Rust SDK, Rust CLI, and Node SDK.
+
+The supported npm native targets are Linux GNU x64/ARM64, macOS ARM64, and
+Windows x64. The Linux GNU packages require glibc 2.28 or newer. The launcher
+preserves POSIX signal identity where supported; Windows preserves termination
+without claiming POSIX signal identity.
 
 ## Development commands
 
@@ -45,26 +47,20 @@ cargo fmt --all --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 ```
 
-`bun run native:feasibility` probes the current host. Linux GNU x64/ARM64,
-macOS ARM64, and Windows x64 are the supported native target matrix after each
-passed native build, immutable packed-consumer, direct CLI archive, and
-aggregate artifact validation. Canonical npm cutover remains a separate gate.
+`bun run native:feasibility` exercises the current host. The cross-platform
+support claim is backed by native builds, immutable packed consumers, direct
+CLI archives, and aggregate artifact validation recorded in
+[the rewrite plan](plans/rust-node-rewrite.md).
 
-The candidate Linux GNU packages target glibc 2.28 or newer. The npm launcher
-preserves POSIX signal identity where the platform supports it; Windows uses
-Node's forceful termination semantics and does not claim exact POSIX signal
-identity.
+Use `cargo run --locked -p kasb-cli --bin kasb -- --help` for the direct Rust
+CLI. After `bun run build:node`, `node packages/node/dist/cli.js --help`
+exercises the npm launcher path when the matching native package is installed.
+Live KASB checks are opt-in through `bun run test:live` because upstream
+behavior can drift.
 
-Use `bun packages/kasb-ts/src/cli.ts --help` for the current npm/source CLI and
-`node packages/kasb-ts/dist/cli.js --help` after building. The replacement Rust
-CLI is available for direct validation with
-`cargo run --locked -p kasb-cli --bin kasb -- --help`; npm does not launch it
-until the later native-package cutover gate passes. Live KASB checks are opt-in
-through `bun run test:live` because upstream behavior can drift.
-
-The current npm runtime floor is Node.js 20.18.1 and the validated Rust minimum
-is 1.88. The rewrite preserves the Node floor unless native-binding evidence
-requires an explicitly reviewed change.
+The npm runtime floor is Node.js 20.18.1 and the validated Rust minimum is
+1.88. Registry publication, version selection, and release tags require
+separate authorization.
 
 ## License
 

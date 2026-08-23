@@ -12,7 +12,7 @@ try {
     "x",
     "tsc",
     "--project",
-    "packages/kasb-ts/tsconfig.build.json",
+    "packages/node/tsconfig.declarations.json",
     "--emitDeclarationOnly",
     "--outDir",
     outputDirectory,

@@ -2,7 +2,6 @@
   "name": "@sjunepark/kasb-linux-x64-gnu",
   "version": "0.2.1",
   "description": "Native KASB Node addon and Rust CLI for linux-x64.",
-  "private": true,
   "main": "kasb.linux-x64-gnu.node",
   "files": [
     "kasb.linux-x64-gnu.node",
@@ -27,5 +26,8 @@
     "url": "git+https://github.com/sjunepark/kasb.git",
     "directory": "packages/native/linux-x64-gnu"
   },
-  "license": "Elastic-2.0"
+  "license": "Elastic-2.0",
+  "publishConfig": {
+    "access": "public"
+  }
 }

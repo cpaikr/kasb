@@ -31,7 +31,7 @@ try {
 }
 
 async function checkNodeBundleNotices() {
-  const packageRequire = createRequire(resolve(repositoryRoot, "packages/kasb-ts/package.json"));
+  const packageRequire = createRequire(resolve(repositoryRoot, "packages/node/package.json"));
   const effectPackage = packageRequire.resolve("effect/package.json");
   const effectRequire = createRequire(effectPackage);
   const bundled = [

@@ -15,6 +15,9 @@ const notices = await readFile(resolve(repositoryRoot, "THIRD_PARTY_LICENSES.htm
 const nodeNotices = await readFile(resolve(repositoryRoot, manifest.rootPackage, "THIRD_PARTY_LICENSES.md"), "utf8");
 const expectedNative = new Map(manifest.targets.map((target) => [target.packageName, target]));
 
+assertPublicPackage(rootSource, "@sjunepark/kasb");
+assertNoPiMetadata(rootSource);
+
 const nativeTarballs = await tarballs(nativeDirectory);
 const rootTarballs = await tarballs(rootDirectory);
 const cliArchives = await archives(cliDirectory);
@@ -31,6 +34,7 @@ for (const tarball of nativeTarballs) {
   const pkg = packageJson(tarball);
   const target = expectedNative.get(pkg.name);
   if (!target) throw new Error(`Unexpected native package ${pkg.name}.`);
+  assertPublicPackage(pkg, target.packageName);
   if (seen.has(pkg.name)) throw new Error(`Duplicate native package ${pkg.name}.`);
   seen.add(pkg.name);
   if (pkg.version !== rootSource.version) throw new Error(`${pkg.name} has version skew.`);
@@ -83,7 +87,9 @@ for (const tarball of nativeTarballs) {
 
 const rootTarball = rootTarballs[0];
 const root = packageJson(rootTarball);
-if (root.name !== rootSource.name || root.version !== rootSource.version) throw new Error("Root package identity drifted.");
+assertPublicPackage(root, "@sjunepark/kasb");
+assertNoPiMetadata(root);
+if (root.version !== rootSource.version) throw new Error("Root package identity drifted.");
 const expectedOptional = Object.fromEntries(manifest.targets.map((target) => [target.packageName, rootSource.version]));
 if (JSON.stringify(root.optionalDependencies) !== JSON.stringify(expectedOptional)) throw new Error("Root optional dependencies drifted.");
 const rootEntries = listTarball(rootTarball);
@@ -181,5 +187,17 @@ function isExecutableMode(mode) {
 function assertNoInstallHooks(pkg, name) {
   for (const hook of ["preinstall", "install", "postinstall"]) {
     if (Object.hasOwn(pkg.scripts ?? {}, hook)) throw new Error(`${name} must not define a ${hook} hook.`);
+  }
+}
+
+function assertPublicPackage(pkg, expectedName) {
+  if (pkg.name !== expectedName) throw new Error(`Expected public package ${expectedName}, received ${pkg.name}.`);
+  if (pkg.private === true) throw new Error(`${expectedName} must not be private.`);
+  if (pkg.publishConfig?.access !== "public") throw new Error(`${expectedName} must declare public scoped-package access.`);
+}
+
+function assertNoPiMetadata(pkg) {
+  if (Object.hasOwn(pkg.exports ?? {}, "./pi") || Object.hasOwn(pkg, "pi")) {
+    throw new Error("The canonical package must not expose Pi metadata.");
   }
 }

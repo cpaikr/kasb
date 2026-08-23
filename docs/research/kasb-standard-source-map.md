@@ -246,7 +246,7 @@ Observed implication:
 - `stdNum + paraNum` behaves as an exact paragraph reference across numeric, Korean-prefixed, appendix, and basis-for-conclusions paragraph forms in tested cases
 - direct paragraph lookup also returns the parent retrieval `documentId`, so callers do not need to supply a section id to fetch one exact paragraph
 
-## Rust Pilot Validation Evidence
+## Rust Adapter Validation Evidence
 
 Validated locally from the captured observations above:
 

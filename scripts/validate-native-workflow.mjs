@@ -78,6 +78,12 @@ for (const expected of ["native-*", "cli-*", "root-package"]) {
     `artifact-set must download ${expected}`,
   );
 }
+check(
+  (artifactJob?.steps ?? []).some(
+    (step) => typeof step?.run === "string" && step.run.trim() === "node scripts/validate-release-artifacts.mjs",
+  ),
+  "artifact-set must run the aggregate release-artifact validator",
+);
 
 for (const [jobName, job] of Object.entries(jobs)) {
   for (const step of job?.steps ?? []) {

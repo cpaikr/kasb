@@ -1,46 +1,44 @@
-# Release
+# Release posture
 
-Release Please owns normal version bumps,
-`packages/kasb-ts/CHANGELOG.md`, source tags, and GitHub Releases for the npm
-package `@sjunepark/kasb`. The tag-triggered release workflow validates and
-publishes that package from `packages/kasb-ts/`.
+The repository produces releasable npm package contents and direct CLI
+artifacts, but it does not publish them. Registry publication, package-version
+selection, source tags, GitHub Releases, and external KASB mutation require
+separate authorization.
 
-This repo no longer builds or uploads standalone OS-native binaries.
+The previous Release Please and tag-triggered npm publication workflows were
+removed with the TypeScript product. There is no JavaScript fallback release
+path and no install-time compilation or runtime download path.
 
-## Manual setup
+## Artifact set
 
-Configure npm trusted publishing for `@sjunepark/kasb`:
+One revision produces:
 
-- Publisher: GitHub Actions
-- Organization or user: `sjunepark`
-- Repository: `kasb`
-- Workflow filename: `release.yml`
+- the root `@sjunepark/kasb` package from `packages/node`;
+- exact-version optional packages for Linux GNU x64/ARM64, macOS ARM64, and
+  Windows x64 from `packages/native`;
+- one Node addon and the same-revision Rust CLI binary in each platform
+  package; and
+- direct Rust CLI archives built from those same binaries.
 
-Configure this secret in the repository:
+`native-targets.json` owns package names, target triples, compatibility floors,
+and support claims. Linux GNU artifacts require glibc 2.28. Generated manifests
+and loaders must remain fresh, and the aggregate artifact validator requires
+the exact immutable artifact set.
 
-- `RELEASE_PLEASE_TOKEN`: token used by `.github/workflows/release-please.yml` to open release PRs and create source tags/releases. Use a fine-grained PAT or GitHub App token, not the default `GITHUB_TOKEN`, so Release Please-created tags trigger `.github/workflows/release.yml`. Grant this repository Contents read/write and Pull requests read/write access.
+## Required evidence before any future publication
 
-npm publishing uses OIDC trusted publishing, so no npm publish token is required.
+Before a separately authorized release can publish, the selected revision must
+pass:
 
-## Automated release flow
+- deterministic contracts, adversarial conformance, Rust, Node, CLI, license,
+  and generated-artifact checks;
+- native builds and ABI-floor checks on every claimed target;
+- direct CLI and clean packed npm consumers across the declared Node matrix;
+- direct and npm-launched CLI process equivalence; and
+- aggregate validation of the exact root, platform, and direct-CLI artifacts.
 
-1. Land normal work on `main` using Conventional Commits, especially `feat:`, `fix:`, and `docs:`. Use `!` or a `BREAKING CHANGE:` footer for breaking changes.
-2. `.github/workflows/release-please.yml` opens or updates a release PR that bumps `packages/kasb-ts/package.json`, updates `.release-please-manifest.json`, and writes `packages/kasb-ts/CHANGELOG.md`.
-3. Review and merge the release PR.
-4. Release Please creates the source tag and GitHub Release.
-5. The source tag triggers `.github/workflows/release.yml`, which typechecks, tests, builds, and publishes the npm package.
-
-The source tag must match `packages/kasb-ts/package.json` exactly. Version `x.y.z` uses source tag `vx.y.z`.
-
-## Manual fallback
-
-If automation needs to be bypassed, update `packages/kasb-ts/package.json` and `.release-please-manifest.json` to the same version, commit the change, and push a matching source tag:
-
-```sh
-git tag vx.y.z
-git push origin main --tags
-```
-
-To republish an existing source tag without moving it, run the `Release` workflow manually with the `tag` input set to the existing tag, for example `v0.1.2`.
-
-The workflow is idempotent. If the npm package version already exists, npm publish is skipped.
+Platform packages must be published before the root package so its exact
+optional dependencies already exist. The root and every platform package must
+use one explicitly selected version and one revision. This document does not
+select that version, authorize npm/GitHub mutation, or provide publication
+commands.

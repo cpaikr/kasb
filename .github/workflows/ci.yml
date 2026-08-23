@@ -40,11 +40,11 @@ jobs:
         run: bun run licenses:check
       - name: Typecheck
         run: bun run typecheck
-      - name: Test all implementations
+      - name: Test Rust and Node products
         run: bun run test
       - name: Run adversarial public-surface judge
         run: bun run conformance:judge
-      - name: Build all implementations
+      - name: Build Rust and Node products
         run: bun run build
       - name: Check Rust formatting
         run: cargo fmt --all --check

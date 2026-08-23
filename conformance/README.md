@@ -5,14 +5,13 @@ This directory is the language-neutral semantic compatibility boundary.
 committed expected outcomes. It contains no imports from a conformer.
 
 The conformer-neutral judge in `judge.ts` materializes fixture payloads and
-executes each public-surface adapter in a separate process. It does not import a
-conformer or give a runner the expected outcome. The transition currently has a
-complete TypeScript runner retained as the frozen compatibility oracle, a
-public Rust SDK runner, and a Rust-backed Node SDK runner for all six v1
-operations. The judge also builds the real Rust CLI twice: a fixture-enabled
-binary for black-box operation checks and a production binary proving that
-fixture support is absent. Direct and npm-launched CLI equivalence is exercised
-by the native packed-consumer gates.
+executes each public surface in a separate process. It does not import a
+conformer or give a runner the expected outcome. It independently exercises the
+public Rust SDK, Rust CLI, and Rust-backed Node SDK for all six v1 operations.
+The CLI gate builds the real Rust binary twice: a fixture-enabled binary for
+black-box operation checks and a production binary proving that fixture support
+is absent. Direct and npm-launched CLI equivalence is exercised by the native
+packed-consumer gates.
 
 Each conforming public-surface runner must:
 
@@ -73,4 +72,4 @@ prove that missing required standards, structure, section, paragraph, or Q&A
 search envelopes become the committed `source_changed` failures. Paragraph
 controls also reject multiple exact rows, while Q&A detail controls prove that
 an absent or null `facilityQna` member is `not_found`. These controls prevent a
-runner that merely accepts both implementations.
+runner that merely accepts every public surface.

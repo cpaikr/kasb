@@ -4,15 +4,19 @@ This directory holds internal evaluation artifacts for KASB capability ergonomic
 
 ## Typed tool eval track
 
-`typed-tools.ts` exposes internal `kasb_*` tool-like definitions backed directly by `packages/kasb-ts/src/app/agent-tools.ts` and the app operations:
+`typed-tools.ts` exposes internal `kasb_*` tool-like definitions mapped to the
+canonical Node toolset operations:
 
 - tool names are namespaced for agent use, such as `kasb_search_standards` and `kasb_get_section`
 - inputs use capability JSON field names such as `stdNum`, `indexDocumentId`, `paraNum`, and `docNumber`
-- schemas are the same JSON Schema exports used by the app layer
-- execution calls the same shared capability envelopes returned by app operations
+- schemas are the same JSON Schema exports used by the public Node toolset
+- production execution delegates through the Rust-backed Node SDK
 - CLI command names, stream behavior, and exit-code behavior remain covered by CLI tests instead
 
-Use these definitions for capability-level evals where subprocess and argv parsing would hide schema or result-shape problems.
+Scenario tests inject caller-owned fixture operations so orchestration remains
+deterministic and cannot become a second KASB conformer. Use the production
+definitions for capability-level evals where subprocess and argv parsing would
+hide schema or result-shape problems.
 
 ## Scenario eval track
 

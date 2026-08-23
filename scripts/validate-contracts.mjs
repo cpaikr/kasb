@@ -220,7 +220,7 @@ for (const relativePath of [
   "../README.md",
   "../VISION.md",
   "../docs/specs/kasb-standards-v1.md",
-  "../packages/kasb-ts/README.md",
+  "../packages/node/README.md",
 ]) {
   const text = await readText(relativePath);
   for (const path of [
@@ -268,6 +268,22 @@ for (const target of targets.targets || []) {
   } else {
     check(!Object.hasOwn(target, "buildContainer"), `${target.rustTarget} must not declare a Linux build container`);
   }
+}
+
+const canonicalPackage = JSON.parse(await readText("../packages/node/package.json"));
+check(canonicalPackage.name === "@sjunepark/kasb", "packages/node must own the canonical npm identity");
+check(canonicalPackage.private !== true, "the canonical npm package must not be private");
+check(canonicalPackage.publishConfig?.access === "public", "the canonical npm package must declare public scoped-package access");
+equal(Object.keys(canonicalPackage.bin ?? {}), ["kasb"], "the canonical package must expose only the kasb launcher");
+equal(Object.keys(canonicalPackage.exports ?? {}), [".", "./toolset", "./package.json"], "the canonical package export surface must stay narrow");
+check(!Object.hasOwn(canonicalPackage, "pi"), "the canonical package must not carry Pi registration metadata");
+const workspaceEntries = await readdir(new URL("../packages/", import.meta.url), { withFileTypes: true });
+check(!workspaceEntries.some((entry) => entry.name === "kasb-ts"), "the superseded TypeScript package must be absent after cutover");
+for (const target of targets.targets || []) {
+  const nativePackage = JSON.parse(await readText(`../${targets.nativePackageRoot}/${target.packageDirectory}/package.json`));
+  check(nativePackage.name === target.packageName, `${target.rustTarget} must use its declared package identity`);
+  check(nativePackage.private !== true, `${target.packageName} must not be private`);
+  check(nativePackage.publishConfig?.access === "public", `${target.packageName} must declare public scoped-package access`);
 }
 
 if (failures.length > 0) {

@@ -1,8 +1,7 @@
 {
-  "name": "@sjunepark/kasb-native-candidate",
+  "name": "@sjunepark/kasb",
   "version": "0.2.1",
-  "description": "Private cutover candidate for the Rust-backed KASB Node SDK and native CLI launcher.",
-  "private": true,
+  "description": "Read-only Rust-backed SDK and CLI for KASB standards and Q&A material.",
   "type": "module",
   "license": "Elastic-2.0",
   "repository": {
@@ -30,6 +29,9 @@
     "LICENSE.md",
     "THIRD_PARTY_LICENSES.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20.18.1"
   },
@@ -44,5 +46,10 @@
     "@sjunepark/kasb-linux-arm64-gnu": "0.2.1",
     "@sjunepark/kasb-darwin-arm64": "0.2.1",
     "@sjunepark/kasb-win32-x64-msvc": "0.2.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.1",
+    "effect": "^3.20.0",
+    "typescript": "^5.9.0"
   }
 }

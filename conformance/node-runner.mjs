@@ -12,7 +12,10 @@ try {
 
   const { resolveNativeTarget } = await import(resolve(repositoryRoot, "packages/node/dist/target.js"));
   const addon = require(resolveNativeTarget("addon").addonPath);
-  if (typeof addon.configureFixture !== "function") {
+  if (
+    typeof addon.configureFixture !== "function" ||
+    typeof addon.fixtureRequestStarted !== "function"
+  ) {
     throw new Error("production addon cannot run the Node conformance protocol");
   }
   addon.configureFixture(JSON.stringify({ routes: request.routes }));
@@ -38,7 +41,10 @@ try {
   try {
     const controller = request.abortAfterStart === true ? new AbortController() : undefined;
     const pending = operation(request.input, controller ? { signal: controller.signal } : undefined);
-    if (controller) setImmediate(() => controller.abort());
+    if (controller) {
+      await waitForFixtureRequestStart(addon);
+      controller.abort();
+    }
     const value = await pending;
     process.stdout.write(JSON.stringify({
       ok: true,
@@ -78,4 +84,12 @@ async function readStdin() {
   let input = "";
   for await (const chunk of process.stdin) input += chunk;
   return input;
+}
+
+async function waitForFixtureRequestStart(addon) {
+  const deadline = Date.now() + 5_000;
+  while (!addon.fixtureRequestStarted()) {
+    if (Date.now() >= deadline) throw new Error("fixture transport did not start before cancellation");
+    await new Promise((resolve) => setImmediate(resolve));
+  }
 }

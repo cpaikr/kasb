@@ -80,18 +80,45 @@ Delivery: Use the fewest sequential reviewable PRs practical. Run the repository
 
 ### Current in-scope result
 
-Phase 5: promote the validated Rust-backed Node product and native launcher to
-the canonical npm package, remove the TypeScript conformer, JavaScript CLI
-behavior, and Pi surface, and reconcile every current authority and final gate.
+Phase 5 cutover is implemented and passes the complete local validation and
+independent review gates: `packages/node` is the canonical npm product, neutral
+contracts and tests live with that facade, the TypeScript conformer, JavaScript
+CLI behavior, and Pi surface are removed, and publication automation is
+disabled. The current-revision four-target native CI run and Phase 5 PR
+lifecycle remain before the goal can be marked complete.
 
 ### Next in-scope action
 
-Inventory the canonical package and validation-path cutover, then replace the
-transition npm product with `packages/node` and remove `packages/kasb-ts` only
-as one reviewable slice that retains the passing Rust, Node, CLI, native,
-adversarial, live, and clean-consumer gates.
+Commit and push the reviewed cutover, run its four-target native and packed
+consumer CI, and complete the Phase 5 PR lifecycle; then record completion
+without publishing, selecting a version, or creating a release tag.
 
 ### Evidence and blockers
+
+- Phase 5 now promotes `packages/node` to `@sjunepark/kasb`, moves only the
+  neutral toolset/contract/schema surface into it, adds independent Rust SDK
+  conformance coverage, and runs deterministic eval orchestration through
+  caller-owned fixture operations rather than a second conformer. Root build,
+  test, typecheck, conformance, live, and native preparation paths no longer
+  depend on `packages/kasb-ts`.
+- The TypeScript transport/source/capability implementation, JavaScript CLI
+  implementation, Pi export/registration/tests, and obsolete Release Please
+  and tag-publish workflows are deleted. The npm JavaScript entrypoint that
+  remains is only the approved shell-free platform resolver and process
+  launcher.
+- The final cutover tree passes frozen installation; contract, declaration,
+  native metadata/workflow/glibc, and license checks; Node/eval typechecking;
+  63 deterministic Node tests with one live skip; eight eval tests whose six
+  operation outputs are checked against their advertised schemas; the complete
+  Rust workspace test/build suite; formatting; strict clippy; Rust 1.88; the
+  93-case adversarial public-surface judge; macOS ARM64 production native and
+  clean packed-consumer feasibility on Node 24; the bounded live traversal;
+  diff hygiene; and a 50-run cancellation-start stress regression.
+- Independent binding, launcher/package, and native-CI review reports no
+  remaining Bucket I or Bucket II finding. Review corrections enforce public
+  identity and Pi absence on extracted root artifacts, schema-valid eval
+  fixtures, the aggregate artifact-validator workflow step, and a judge-only
+  transport-start handshake that cannot compile into a release addon.
 
 - The user resumed the blocked goal on 2026-08-23 by approving all three Phase
   4 compatibility recommendations. Implementation and validation may proceed;
