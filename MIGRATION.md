@@ -1,6 +1,6 @@
 # Rust/Node Rewrite Decision
 
-Status: cutover implemented; final review and PR lifecycle in progress.
+Status: complete. Cutover merged by PR #19; publication remains disabled.
 
 Decision date: 2026-08-22.
 

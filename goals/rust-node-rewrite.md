@@ -1,6 +1,6 @@
 # Goal: Complete the KASB Rust/Node rewrite and cutover
 
-Status: active
+Status: complete
 Planning scope: ROADMAP.md
 
 ## Original contract
@@ -90,22 +90,20 @@ Delivery: Use the fewest sequential reviewable PRs practical. Run the repository
 
 ### Current in-scope result
 
-Phase 5 cutover is implemented and passes the complete local validation and
-independent review gates: `packages/node` is the canonical npm product, neutral
-contracts and tests live with that facade, the TypeScript conformer, JavaScript
-CLI behavior, and Pi surface are removed, and publication automation is
-disabled. The current-revision Linux GNU x64/ARM64 Blacksmith CI run and Phase
-5 PR lifecycle remain before the goal can be marked complete; macOS ARM64 and
-Windows x64 no longer gate continuous delivery by explicit user decision.
+The full rewrite and cutover are complete. `packages/node` is the canonical npm
+product, neutral contracts and tests live with that facade, the TypeScript
+conformer, JavaScript CLI behavior, and Pi surface are removed, and publication
+automation is disabled. Final-revision Linux GNU x64/ARM64 Blacksmith CI and the
+Phase 5 PR lifecycle passed; macOS ARM64 and Windows x64 remain supported but
+are not continuously tested by explicit user decision.
 
 ### Next in-scope action
 
-Run the current Phase 5 revision's Linux GNU x64/ARM64 native and packed
-consumer matrix on Blacksmith and complete PR #19's review and merge lifecycle;
-then record completion without publishing, selecting a version, or creating a
-release tag.
+None. Promotion to `main`, registry publication, version selection, release
+tags, and external KASB mutation remain outside this completed goal and require
+separate authorization.
 
-### Evidence and blockers
+### Evidence and execution history
 
 - Phase 5 now promotes `packages/node` to `@sjunepark/kasb`, moves only the
   neutral toolset/contract/schema surface into it, adds independent Rust SDK
@@ -156,6 +154,15 @@ release tag.
   were compiled before `packages/node/dist` existed. `contracts:check` now
   self-prepares through the package-owned Node build; a cold-output reproduction,
   targeted validation, and independent review pass before the required rerun.
+- Blacksmith run `32640681413` passed the corrected final revision: deterministic
+  validation, immutable root packaging, Linux GNU x64 and ARM64 native builds,
+  glibc 2.28 enforcement, Node 20.18.1 through 26 clean packed consumers,
+  direct CLI archives, and the aggregate continuous-CI artifact validator all
+  succeeded. PR #19 had no unresolved review threads, remained CodeRabbit-green,
+  and merged into `codex/rust-node-rewrite-integration` as merge commit
+  `133c153`, preserving all four Phase 5 commits. No publication, version
+  selection, release tag, default-branch promotion, or external KASB mutation
+  occurred.
 
 - The user resumed the blocked goal on 2026-08-23 by approving all three Phase
   4 compatibility recommendations. Implementation and validation may proceed;

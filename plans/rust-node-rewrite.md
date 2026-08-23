@@ -1,6 +1,6 @@
 # Rewrite KASB around a public Rust SDK, Node SDK, and Rust CLI
 
-Status: cutover implemented; final Linux Blacksmith CI and PR lifecycle in progress.
+Status: complete. Cutover merged by PR #19; publication remains disabled.
 
 ## Outcome
 
@@ -32,6 +32,11 @@ native-target, and live verification.
 - Phase 5 removed the TypeScript conformer, JavaScript CLI behavior, Pi export,
   Pi registration, and obsolete publication automation. Neutral public
   contracts, schemas, and toolset ergonomics now live with the Node facade.
+- Blacksmith run `32640681413` passed deterministic validation, immutable root
+  packaging, both continuous Linux native and Node 20 through 26 packed-consumer
+  matrices, and aggregate artifact validation at the final revision. PR #19
+  merged that revision into `codex/rust-node-rewrite-integration` as merge
+  commit `133c153`, preserving all reviewed commits.
 - Registry publication, version selection, release tags, and external KASB
   mutation remain outside the authorized work.
 
@@ -257,6 +262,5 @@ completion status.
 
 ## Next action
 
-Run PR #19's current revision through Linux GNU x64/ARM64 native and packed
-consumer CI on Blacksmith, then complete its review and merge lifecycle. Record
-the cutover as complete without publishing or selecting a release version.
+None within this rewrite. Promotion to `main`, registry publication, version
+selection, and release tagging require separate authorization.
