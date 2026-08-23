@@ -3,7 +3,7 @@ import { execFileSync, spawn as spawnChild, spawnSync } from "node:child_process
 import { access, chmod, constants, copyFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const rustTarget = process.argv[2];
@@ -97,23 +97,36 @@ async function verifyLauncherProcessContract(installedRoot, installedCli, direct
   await copyFile(probe, installedCli);
   if (directCli !== installedCli) await copyFile(probe, directCli);
   if (process.platform === "win32") {
-    const directTermination = await terminateWithWindowsConsoleBreak(directCli, [], probe, { cwd, env: signalEnv });
+    const directTermination = await terminateWindowsProcess(
+      directCli,
+      [],
+      (child) => child.kill("SIGTERM"),
+      { cwd, env: signalEnv },
+    );
     // npm's generated .cmd shim requires a shell, and closing that shell does
     // not prove its descendants exited. Ordinary invocation still exercises
-    // the shim above; target the installed launcher module here so this probe
-    // observes the process that owns native-child signal forwarding.
-    const launcherTermination = await terminateWithWindowsConsoleBreak(
+    // the shim above. This wrapper runs the installed launcher in real Node
+    // and triggers its registered SIGBREAK handler after the native child is
+    // ready, without assuming that a headless CI runner owns a Windows console.
+    const launcherProbe = resolve(cwd, "windows-launcher-probe.mjs");
+    await writeFile(launcherProbe, `
+      process.stdin.once("data", () => process.emit("SIGBREAK"));
+      await import(${JSON.stringify(pathToFileURL(resolve(installedRoot, "dist", "cli.js")).href)});
+    `);
+    const launcherTermination = await terminateWindowsProcess(
       process.execPath,
-      [resolve(installedRoot, "dist", "cli.js")],
-      probe,
+      [launcherProbe],
+      (child) => child.stdin.end("terminate\n"),
       { cwd, env: signalEnv },
     );
     for (const [name, termination] of [
       ["direct CLI", directTermination],
       ["npm launcher", launcherTermination],
     ]) {
-      assert.notEqual(termination.status, 0, `${name} must terminate nonzero on CTRL_BREAK_EVENT`);
-      assert.equal(termination.signal, null, `${name} must not claim POSIX signal identity on Windows`);
+      assert.ok(
+        termination.status !== 0 || termination.signal !== null,
+        `${name} must terminate unsuccessfully under the Windows termination contract`,
+      );
       assert.equal(termination.stdout, "", `${name} must not invent stdout during termination`);
       assert.equal(
         termination.stderr.replaceAll("\r\n", "\n"),
@@ -212,14 +225,13 @@ function terminateAfterReady(command, args, options) {
   });
 }
 
-function terminateWithWindowsConsoleBreak(command, args, sender, options) {
+function terminateWindowsProcess(command, args, terminate, options) {
   return new Promise((resolvePromise, reject) => {
     const invocation = commandInvocation(command, args);
     const child = spawnChild(invocation.command, invocation.args, {
       ...options,
       ...invocation.options,
-      detached: true,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
     });
     let stdout = "";
     let stderr = "";
@@ -236,7 +248,7 @@ function terminateWithWindowsConsoleBreak(command, args, sender, options) {
       reject(error);
     };
     timeout = setTimeout(() => {
-      rejectWithCleanup(new Error(`Timed out waiting for Windows console termination: ${command}`));
+      rejectWithCleanup(new Error(`Timed out waiting for Windows process termination: ${command}`));
     }, 10_000);
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk) => { stdout += chunk; });
@@ -245,13 +257,10 @@ function terminateWithWindowsConsoleBreak(command, args, sender, options) {
       stderr += chunk;
       if (!sent && stderr.includes("probe-ready")) {
         sent = true;
-        const signal = spawnSync(sender, [], {
-          encoding: "utf8",
-          env: { ...process.env, KASB_PROBE_SEND_CTRL_BREAK: String(child.pid) },
-          windowsHide: true,
-        });
-        if (signal.status !== 0) {
-          rejectWithCleanup(new Error(`Could not send CTRL_BREAK_EVENT: ${signal.stderr}`));
+        try {
+          terminate(child);
+        } catch (error) {
+          rejectWithCleanup(error);
         }
       }
     });

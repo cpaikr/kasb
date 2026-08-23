@@ -7,7 +7,11 @@ import { runtimeTarget, selectNativeTarget } from "../packages/node/src/runtime-
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const manifest = JSON.parse(await readFile(resolve(repositoryRoot, "native-targets.json"), "utf8"));
-const target = selectNativeTarget(manifest.targets, runtimeTarget());
+const target = selectNativeTarget(
+  manifest.targets,
+  runtimeTarget(),
+  manifest.minimumGlibcVersion,
+);
 if (!target) throw new Error("The current host is not in the KASB Node conformance matrix.");
 
 execFileSync("cargo", ["build", "--locked", "-p", "kasb-node", "--features", "feasibility-judge", "--lib"], {

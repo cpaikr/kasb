@@ -2,7 +2,12 @@ import { accessSync, constants, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
 
-import { runtimeTarget, selectNativeTarget } from "./runtime-target.js";
+import {
+  hasNativeTargetFamily,
+  runtimeMeetsGlibcFloor,
+  runtimeTarget,
+  selectNativeTarget,
+} from "./runtime-target.js";
 
 const require = createRequire(import.meta.url);
 let resolverConfiguration;
@@ -18,8 +23,24 @@ export class KasbNativeInstallError extends Error {
 export function resolveNativeTarget(requiredArtifact) {
   const { manifest, rootPackage } = loadResolverConfiguration();
   const runtime = runtimeTarget();
-  const target = selectNativeTarget(manifest.targets, runtime);
+  const target = selectNativeTarget(
+    manifest.targets,
+    runtime,
+    manifest.minimumGlibcVersion,
+  );
   if (!target) {
+    if (
+      hasNativeTargetFamily(manifest.targets, runtime) &&
+      !runtimeMeetsGlibcFloor(runtime, manifest.minimumGlibcVersion)
+    ) {
+      const detected = /^\d+(?:\.\d+)*$/u.test(runtime.glibcVersion ?? "")
+        ? runtime.glibcVersion
+        : "unknown";
+      throw new KasbNativeInstallError(
+        "unsupported_platform",
+        `The KASB package requires glibc ${manifest.minimumGlibcVersion} or newer; detected ${detected}. Use a system with glibc ${manifest.minimumGlibcVersion} or newer.`
+      );
+    }
     throw new KasbNativeInstallError(
       "unsupported_platform",
       `The KASB package does not support ${runtime.key}. Supported targets are ${manifest.targets.map(({ packageDirectory }) => packageDirectory).join(", ")}.`
@@ -143,6 +164,8 @@ function validTargetManifest(value) {
     && !Array.isArray(value)
     && Array.isArray(value.targets)
     && value.targets.length > 0
+    && typeof value.minimumGlibcVersion === "string"
+    && /^\d+(?:\.\d+)*$/u.test(value.minimumGlibcVersion)
     && value.targets.every((target) => target !== null
       && typeof target === "object"
       && !Array.isArray(target)

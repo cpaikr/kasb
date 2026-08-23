@@ -27,7 +27,7 @@ const manifest = JSON.parse(await readFile(join(repositoryRoot, "native-targets.
 const packageJson = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"));
 const npmCommand = process.platform === "win32" ? await resolveWindowsCommand("npm.cmd") : "npm";
 const host = runtimeTarget();
-const target = selectNativeTarget(manifest.targets, host);
+const target = selectNativeTarget(manifest.targets, host, manifest.minimumGlibcVersion);
 assert(target, `no feasibility target for ${host.key}`);
 assert.throws(
   () => assertTargetAlignment(manifest, {

@@ -84,7 +84,7 @@ packed-consumer gate passes.
 
 ### Next in-scope action
 
-Review, commit, and push the clean-checkout typecheck and Windows process-probe
+Commit and push the reviewed PR-feedback, cold-runner, and headless-Windows
 corrections to PR #18, rerun every deterministic and native consumer gate,
 promote support only from passing evidence, and complete the Phase 4 PR
 lifecycle. Only afterward begin the dependent canonical cutover.
@@ -209,3 +209,31 @@ lifecycle. Only afterward begin the dependent canonical cutover.
   closed one detached-tree cleanup path for Windows probe failures, then
   reported no remaining Bucket I or Bucket II findings. Windows and the full
   matrix remain unclaimed pending the clean rerun.
+- The third full native run, Actions run `32618511924`, passes the immutable
+  root package and complete macOS ARM64, Linux GNU x64, and Linux GNU ARM64
+  matrices. It confirms the clean-checkout Node typecheck fix. Two later gates
+  exposed clean-environment assumptions: the deterministic Bun suite started
+  twenty 30-second Rust conformance cases before cold-building their shared
+  example, and the headless Windows runner had no console for the native
+  `AttachConsole` sender. The local correction prebuilds the shared Rust
+  conformance example once, removes the unsafe console sender, exercises the
+  approved Windows forceful-termination contract directly, and triggers the
+  installed launcher's real Node `SIGBREAK` handler after its native child is
+  ready. The full 215-test deterministic TypeScript/eval suite, 13 Node tests,
+  Node typecheck, contract/native checks, macOS ARM64 packed consumer, Rust
+  formatting and strict binding clippy, and diff hygiene pass locally.
+- Initial Codex PR review found that a host below glibc 2.28 could select an
+  incompatible GNU package. The current feedback fix preserves Node's reported
+  glibc version, rejects missing, malformed, and below-floor versions before
+  addon or CLI resolution, emits an actionable sanitized diagnostic only for
+  an otherwise supported target family, and retains the generic unsupported
+  platform diagnostic for unsupported architectures. Real-Node addon and
+  launcher boundary tests cover glibc 2.27, exact 2.28 acceptance, and
+  unsupported-architecture precedence. The thread remains open until the fix
+  is reviewed, pushed, replied to, and resolved.
+- Independent repository-required review now passes the complete correction
+  cluster with no Bucket I or Bucket II findings. The final Windows review
+  correction treats any non-successful termination as valid instead of
+  requiring a null signal field, preserving forceful Windows termination
+  without promising POSIX signal identity. The remaining evidence gate is a
+  clean full native matrix at the pushed revision.
