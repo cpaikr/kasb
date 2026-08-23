@@ -18,7 +18,7 @@
     "test:evals": "bun test evals",
     "test:rust": "cargo test --workspace --locked",
     "test:live": "node scripts/prepare-node-addon.mjs && LIVE_KASB_TESTS=1 bun test packages/node/test/live",
-    "contracts:check": "node scripts/validate-contracts.mjs && node scripts/check-public-declarations.mjs && node scripts/generate-node-sdk-declarations.mjs --check",
+    "contracts:check": "bun run build:node && node scripts/validate-contracts.mjs && node scripts/check-public-declarations.mjs && node scripts/generate-node-sdk-declarations.mjs --check",
     "conformance:judge": "cargo build --locked -p kasb --example conformance_runner && node scripts/prepare-node-addon.mjs --judge && bun test conformance/judge.test.ts conformance/rust-sdk.test.ts conformance/cli-judge.test.ts conformance/node-sdk.test.ts",
     "native:feasibility": "node scripts/test-native-feasibility.mjs",
     "native:generate": "node scripts/generate-native-packages.mjs",

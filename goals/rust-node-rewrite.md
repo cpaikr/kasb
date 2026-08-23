@@ -150,6 +150,12 @@ release tag.
   bounded live, YAML, and diff-hygiene validation. Independent CI and
   documentation review reports no Bucket I or Bucket II finding; the actual
   Linux Blacksmith run remains the product-evidence gate.
+- Blacksmith run `32640118370` confirmed the organization integration, passed
+  the immutable root package, and started both native Linux architectures. Its
+  deterministic job exposed a clean-checkout dependency: declaration consumers
+  were compiled before `packages/node/dist` existed. `contracts:check` now
+  self-prepares through the package-owned Node build; a cold-output reproduction,
+  targeted validation, and independent review pass before the required rerun.
 
 - The user resumed the blocked goal on 2026-08-23 by approving all three Phase
   4 compatibility recommendations. Implementation and validation may proceed;
