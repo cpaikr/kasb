@@ -74,19 +74,22 @@ Delivery: Use the fewest sequential reviewable PRs practical. Run the repository
   malformed-source controls are integrated in the public Rust SDK by PR #16.
 - Phase 3: the first-class Rust `clap` CLI, all six commands, frozen machine
   behavior, and independent native-process judge are integrated by PR #17.
+- Phase 4: the asynchronous six-operation Node-API projection, thin Node
+  SDK/toolset, shell-free npm Rust CLI launcher, supported four-target native
+  packages, and same-revision direct CLI artifacts are integrated by PR #18.
 
 ### Current in-scope result
 
-Phase 4: build the complete asynchronous Node-API projection, thin Node
-SDK/toolset, exact-version native packages, and transparent npm Rust CLI
-launcher while preserving the TypeScript product until every replacement and
-packed-consumer gate passes.
+Phase 5: promote the validated Rust-backed Node product and native launcher to
+the canonical npm package, remove the TypeScript conformer, JavaScript CLI
+behavior, and Pi surface, and reconcile every current authority and final gate.
 
 ### Next in-scope action
 
-Validate the promoted four-target support claim, complete the Phase 4 PR
-lifecycle using the passing native and exact-artifact evidence, and only then
-begin the dependent canonical cutover.
+Inventory the canonical package and validation-path cutover, then replace the
+transition npm product with `packages/node` and remove `packages/kasb-ts` only
+as one reviewable slice that retains the passing Rust, Node, CLI, native,
+adversarial, live, and clean-consumer gates.
 
 ### Evidence and blockers
 
@@ -301,3 +304,11 @@ begin the dependent canonical cutover.
   download and unchanged aggregate validation, confirmed `supportClaim` is
   metadata-only at runtime, and found no Bucket I or Bucket II issue in the
   support promotion or current-versus-cutover documentation boundary.
+- PR #18 merged into `codex/rust-node-rewrite-integration` as merge commit
+  `e3b06ed`, preserving all eight reviewed commits. Its only final failing CI
+  statuses executed zero steps and carry GitHub's explicit Actions-budget
+  annotation; the exact preceding full-matrix artifacts and local promotion
+  checks provide the recorded product evidence. All review threads are
+  resolved, CodeRabbit passed or skipped under the repository label policy,
+  GitGuardian passed, and the merge completed without overriding a protected
+  branch requirement.
