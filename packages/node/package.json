@@ -37,7 +37,7 @@
     "build": "node scripts/build.mjs && bun scripts/build-toolset.ts",
     "prepack": "bun run build",
     "test": "bun run build && bun test test",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "bun run build && tsc --noEmit -p tsconfig.json"
   },
   "optionalDependencies": {
     "@sjunepark/kasb-linux-x64-gnu": "0.2.1",

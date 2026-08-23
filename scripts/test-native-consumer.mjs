@@ -73,14 +73,14 @@ try {
       assert.deepEqual(launched[field], direct[field], `npm launcher must preserve ${field} for ${args.join(" ")}`);
     }
   }
-  await verifyLauncherProcessContract(installedCli, directCli, launcher, temporary);
+  await verifyLauncherProcessContract(installedRoot, installedCli, directCli, launcher, temporary);
 
   console.log(`clean packed consumer passed ${rustTarget} on Node ${process.versions.node}`);
 } finally {
   await rm(temporary, { recursive: true, force: true });
 }
 
-async function verifyLauncherProcessContract(installedCli, directCli, launcher, cwd) {
+async function verifyLauncherProcessContract(installedRoot, installedCli, directCli, launcher, cwd) {
   const metadata = JSON.parse(exec("cargo", ["metadata", "--no-deps", "--format-version", "1"], { encoding: "utf8" }));
   const probe = resolve(
     metadata.target_directory,
@@ -97,8 +97,17 @@ async function verifyLauncherProcessContract(installedCli, directCli, launcher, 
   await copyFile(probe, installedCli);
   if (directCli !== installedCli) await copyFile(probe, directCli);
   if (process.platform === "win32") {
-    const directTermination = await terminateWithWindowsConsoleBreak(directCli, probe, { cwd, env: signalEnv });
-    const launcherTermination = await terminateWithWindowsConsoleBreak(launcher, probe, { cwd, env: signalEnv });
+    const directTermination = await terminateWithWindowsConsoleBreak(directCli, [], probe, { cwd, env: signalEnv });
+    // npm's generated .cmd shim requires a shell, and closing that shell does
+    // not prove its descendants exited. Ordinary invocation still exercises
+    // the shim above; target the installed launcher module here so this probe
+    // observes the process that owns native-child signal forwarding.
+    const launcherTermination = await terminateWithWindowsConsoleBreak(
+      process.execPath,
+      [resolve(installedRoot, "dist", "cli.js")],
+      probe,
+      { cwd, env: signalEnv },
+    );
     for (const [name, termination] of [
       ["direct CLI", directTermination],
       ["npm launcher", launcherTermination],
@@ -203,9 +212,9 @@ function terminateAfterReady(command, args, options) {
   });
 }
 
-function terminateWithWindowsConsoleBreak(command, sender, options) {
+function terminateWithWindowsConsoleBreak(command, args, sender, options) {
   return new Promise((resolvePromise, reject) => {
-    const invocation = commandInvocation(command, []);
+    const invocation = commandInvocation(command, args);
     const child = spawnChild(invocation.command, invocation.args, {
       ...options,
       ...invocation.options,
@@ -215,9 +224,19 @@ function terminateWithWindowsConsoleBreak(command, sender, options) {
     let stdout = "";
     let stderr = "";
     let sent = false;
-    const timeout = setTimeout(() => {
-      spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], { windowsHide: true });
-      reject(new Error(`Timed out waiting for Windows console termination: ${command}`));
+    let settled = false;
+    let timeout;
+    const rejectWithCleanup = (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (child.pid !== undefined) {
+        spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], { windowsHide: true });
+      }
+      reject(error);
+    };
+    timeout = setTimeout(() => {
+      rejectWithCleanup(new Error(`Timed out waiting for Windows console termination: ${command}`));
     }, 10_000);
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk) => { stdout += chunk; });
@@ -232,13 +251,14 @@ function terminateWithWindowsConsoleBreak(command, sender, options) {
           windowsHide: true,
         });
         if (signal.status !== 0) {
-          clearTimeout(timeout);
-          reject(new Error(`Could not send CTRL_BREAK_EVENT: ${signal.stderr}`));
+          rejectWithCleanup(new Error(`Could not send CTRL_BREAK_EVENT: ${signal.stderr}`));
         }
       }
     });
-    child.once("error", reject);
+    child.once("error", rejectWithCleanup);
     child.once("close", (status, signal) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timeout);
       resolvePromise({ status, signal, stdout, stderr });
     });

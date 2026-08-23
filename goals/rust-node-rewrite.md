@@ -84,10 +84,10 @@ packed-consumer gate passes.
 
 ### Next in-scope action
 
-Review, commit, and push the first full-matrix portability corrections to PR
-#18, rerun every deterministic and native consumer gate, promote support only
-from passing evidence, and complete the Phase 4 PR lifecycle. Only afterward
-begin the dependent canonical cutover.
+Review, commit, and push the clean-checkout typecheck and Windows process-probe
+corrections to PR #18, rerun every deterministic and native consumer gate,
+promote support only from passing evidence, and complete the Phase 4 PR
+lifecycle. Only afterward begin the dependent canonical cutover.
 
 ### Evidence and blockers
 
@@ -195,3 +195,17 @@ begin the dependent canonical cutover.
   fail-closed immutable-tarball allowlists, direct/npm equivalence ordering,
   CRLF-only freshness normalization, and workflow prerequisite enforcement;
   the remaining evidence requirement is the clean four-target CI rerun.
+- The second full native run, Actions run `32617272525`, passes the complete
+  macOS ARM64, Linux GNU x64, and Linux GNU ARM64 build, artifact, ABI-floor,
+  seven-version Node, direct-archive, and packed-consumer matrices. It exposed
+  two remaining gate defects: clean checkout typecheck ran before the Node
+  package generated its consumer-facing `dist` declarations, and the Windows
+  console-break probe targeted npm's generated `.cmd` shell shim, whose exit
+  does not prove descendant termination. The local correction makes Node
+  package typecheck self-preparing and targets the installed JavaScript
+  launcher for the Windows forwarding probe while retaining ordinary `.cmd`
+  invocation coverage. Node typecheck, native metadata, licenses, macOS ARM64
+  packed consumer, and diff hygiene pass locally. Independent review found and
+  closed one detached-tree cleanup path for Windows probe failures, then
+  reported no remaining Bucket I or Bucket II findings. Windows and the full
+  matrix remain unclaimed pending the clean rerun.
