@@ -84,10 +84,10 @@ packed-consumer gate passes.
 
 ### Next in-scope action
 
-Commit and push the reviewed PR-feedback, cold-runner, and headless-Windows
-corrections to PR #18, rerun every deterministic and native consumer gate,
-promote support only from passing evidence, and complete the Phase 4 PR
-lifecycle. Only afterward begin the dependent canonical cutover.
+Commit and push the reviewed Rust-component and Windows path-canonicalization
+corrections exposed by run `32619558167`, rerun every deterministic and native
+consumer gate, promote support only from passing evidence, and complete the
+Phase 4 PR lifecycle. Only afterward begin the dependent canonical cutover.
 
 ### Evidence and blockers
 
@@ -209,6 +209,11 @@ lifecycle. Only afterward begin the dependent canonical cutover.
   closed one detached-tree cleanup path for Windows probe failures, then
   reported no remaining Bucket I or Bucket II findings. Windows and the full
   matrix remain unclaimed pending the clean rerun.
+- Independent repository-required review passes both run `32619558167`
+  corrections with no Bucket I or Bucket II findings. Review confirms the
+  pinned Rust components satisfy the exact later gates and that canonicalizing
+  both existing working-directory paths preserves effective directory identity
+  without weakening the exact direct/npm process comparison.
 - The third full native run, Actions run `32618511924`, passes the immutable
   root package and complete macOS ARM64, Linux GNU x64, and Linux GNU ARM64
   matrices. It confirms the clean-checkout Node typecheck fix. Two later gates
@@ -229,11 +234,23 @@ lifecycle. Only afterward begin the dependent canonical cutover.
   an otherwise supported target family, and retains the generic unsupported
   platform diagnostic for unsupported architectures. Real-Node addon and
   launcher boundary tests cover glibc 2.27, exact 2.28 acceptance, and
-  unsupported-architecture precedence. The thread remains open until the fix
-  is reviewed, pushed, replied to, and resolved.
+  unsupported-architecture precedence. The fix was pushed in `db4de8e`, the
+  review thread received its commit-and-validation reply, and the thread is
+  resolved.
 - Independent repository-required review now passes the complete correction
   cluster with no Bucket I or Bucket II findings. The final Windows review
   correction treats any non-successful termination as valid instead of
   requiring a null signal field, preserving forceful Windows termination
   without promising POSIX signal identity. The remaining evidence gate is a
   clean full native matrix at the pushed revision.
+- The fourth full native run, Actions run `32619558167`, passes the immutable
+  root package, the cold typecheck and 215-test deterministic suite, the
+  123-case adversarial judge, all three Unix native target matrices, and every
+  Linux glibc floor and Node 20.18.1 through 26 consumer. It exposed two final
+  clean-runner prerequisites after reaching previously unopened gates: the
+  minimal Rust 1.88 deterministic install omitted `rustfmt` and `clippy`, and
+  Windows can report the inherited working directory through its equivalent
+  8.3 short-path alias. The current correction explicitly installs both Rust
+  components and compares real paths on both sides while retaining exact
+  direct/npm launcher equivalence. Windows target support and the aggregate
+  matrix remain unclaimed pending the clean rerun.

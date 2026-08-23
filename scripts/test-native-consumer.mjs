@@ -150,7 +150,7 @@ async function verifyLauncherProcessContract(installedRoot, installedCli, direct
   assert.equal(direct.status, 37);
   const observed = JSON.parse(direct.stdout);
   assert.deepEqual(observed.args, args);
-  assert.equal(observed.cwd, await realpath(cwd));
+  assert.equal(await realpath(observed.cwd), await realpath(cwd));
   assert.equal(observed.environment, env.KASB_PROBE_VALUE);
   assert.equal(observed.stdin, input);
 
