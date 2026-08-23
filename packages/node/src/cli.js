@@ -28,7 +28,7 @@ function launch(binary, args) {
     const handler = () => {
       if (child.exitCode !== null || child.signalCode !== null) return;
       try {
-        child.kill(signal);
+        child.kill(process.platform === "win32" ? "SIGTERM" : signal);
       } catch {
         // The child may have exited between the state check and signal delivery.
       }
@@ -58,7 +58,7 @@ function launch(binary, args) {
 
 function forwardedSignals() {
   return process.platform === "win32"
-    ? ["SIGINT", "SIGTERM", "SIGBREAK"]
+    ? ["SIGINT", "SIGBREAK"]
     : ["SIGHUP", "SIGINT", "SIGTERM", "SIGQUIT"];
 }
 
@@ -68,8 +68,9 @@ function cleanup(handlers) {
 
 function mirrorSignal(signal) {
   if (process.platform === "win32") {
-    // Inferred pending the later Windows native and packed-consumer gates.
-    process.exitCode = signal === "SIGINT" ? 130 : 143;
+    // Windows has no POSIX signal identity; Node models these as forceful
+    // termination. Preserve nonzero termination without inventing identity.
+    process.exitCode = 1;
     return;
   }
   try {

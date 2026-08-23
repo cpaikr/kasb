@@ -27,11 +27,33 @@
         "typescript": "^5.9.0",
       },
     },
+    "packages/native/darwin-arm64": {
+      "name": "@sjunepark/kasb-darwin-arm64",
+      "version": "0.2.1",
+    },
+    "packages/native/linux-arm64-gnu": {
+      "name": "@sjunepark/kasb-linux-arm64-gnu",
+      "version": "0.2.1",
+    },
+    "packages/native/linux-x64-gnu": {
+      "name": "@sjunepark/kasb-linux-x64-gnu",
+      "version": "0.2.1",
+    },
+    "packages/native/win32-x64-msvc": {
+      "name": "@sjunepark/kasb-win32-x64-msvc",
+      "version": "0.2.1",
+    },
     "packages/node": {
-      "name": "@sjunepark/kasb-native-feasibility",
-      "version": "0.0.0-feasibility",
+      "name": "@sjunepark/kasb-native-candidate",
+      "version": "0.2.1",
       "bin": {
         "kasb": "dist/cli.js",
+      },
+      "optionalDependencies": {
+        "@sjunepark/kasb-darwin-arm64": "0.2.1",
+        "@sjunepark/kasb-linux-arm64-gnu": "0.2.1",
+        "@sjunepark/kasb-linux-x64-gnu": "0.2.1",
+        "@sjunepark/kasb-win32-x64-msvc": "0.2.1",
       },
     },
   },
@@ -40,7 +62,15 @@
 
     "@sjunepark/kasb": ["@sjunepark/kasb@workspace:packages/kasb-ts"],
 
-    "@sjunepark/kasb-native-feasibility": ["@sjunepark/kasb-native-feasibility@workspace:packages/node"],
+    "@sjunepark/kasb-darwin-arm64": ["@sjunepark/kasb-darwin-arm64@workspace:packages/native/darwin-arm64"],
+
+    "@sjunepark/kasb-linux-arm64-gnu": ["@sjunepark/kasb-linux-arm64-gnu@workspace:packages/native/linux-arm64-gnu"],
+
+    "@sjunepark/kasb-linux-x64-gnu": ["@sjunepark/kasb-linux-x64-gnu@workspace:packages/native/linux-x64-gnu"],
+
+    "@sjunepark/kasb-native-candidate": ["@sjunepark/kasb-native-candidate@workspace:packages/node"],
+
+    "@sjunepark/kasb-win32-x64-msvc": ["@sjunepark/kasb-win32-x64-msvc@workspace:packages/native/win32-x64-msvc"],
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 

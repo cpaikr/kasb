@@ -7,12 +7,12 @@ committed expected outcomes. It contains no imports from a conformer.
 The conformer-neutral judge in `judge.ts` materializes fixture payloads and
 executes each public-surface adapter in a separate process. It does not import a
 conformer or give a runner the expected outcome. The transition currently has a
-complete TypeScript runner retained as the frozen compatibility oracle and a
-public Rust SDK runner for all six v1 operations. The judge also builds the real
-Rust CLI twice: a fixture-enabled binary for black-box operation checks and a
-production binary proving that fixture support is absent. The Rust-backed Node
-SDK adapter joins the same boundary in its implementation phase. The direct and
-npm-launched CLI paths must ultimately produce the same process contract.
+complete TypeScript runner retained as the frozen compatibility oracle, a
+public Rust SDK runner, and a Rust-backed Node SDK runner for all six v1
+operations. The judge also builds the real Rust CLI twice: a fixture-enabled
+binary for black-box operation checks and a production binary proving that
+fixture support is absent. Direct and npm-launched CLI equivalence is exercised
+by the native packed-consumer gates.
 
 Each conforming public-surface runner must:
 
@@ -50,6 +50,12 @@ failure transport, summary/raw projections, alias precedence, production
 feature isolation, and OS-native signal termination. Deliberate bad controls
 prove that exit, stderr, newline, and JSON drift are detected before the real
 binary is judged.
+
+`node-sdk.test.ts` stages a judge-only Node addon and invokes the public Node
+facade in a separate process. The addon routes every operation through the same
+Rust SDK entrypoints as production while failing closed on undeclared or
+multiply used fixture routes. Judge-only exports are forbidden in release
+builds.
 
 The harness wrapper is test protocol, not a public SDK envelope. The nested
 success value and failure fields are the public compatibility surface.

@@ -48,7 +48,18 @@ Delivery: Use the fewest sequential reviewable PRs practical. Run the repository
 
 ## Authorized amendments
 
-_None._
+- On 2026-08-23, the user approved all three recommended Phase 4
+  compatibility policies:
+  - contained native panics emit only the sanitized
+    `sjunepark.kasb.native` diagnostics-channel event
+    `{ "code": "binding_panic" }`, without panic details or unsolicited
+    stderr;
+  - Windows preserves the launcher process contract except that exact POSIX
+    signal identity is not promised because Node exposes forceful termination
+    semantics there; and
+  - Linux GNU x64 and ARM64 native packages require glibc 2.28, enforced for
+    both the Node addon and same-revision Rust CLI artifact before support is
+    promoted.
 
 ## Execution status
 
@@ -73,12 +84,16 @@ packed-consumer gate passes.
 
 ### Next in-scope action
 
-Create the Phase 4 branch from the integration tip, reconcile the feasibility
-proof and `../ytm` distribution pattern against the frozen Node/package
-surface, then implement and validate the complete Rust-backed Node product and
-claimed native package matrix as the next reviewable PR.
+Commit and open the completed Phase 4 candidate, run the full native CI matrix,
+promote support only from passing evidence, and complete the Phase 4 PR
+lifecycle. Only afterward begin the dependent canonical cutover.
 
 ### Evidence and blockers
+
+- The user resumed the blocked goal on 2026-08-23 by approving all three Phase
+  4 compatibility recommendations. Implementation and validation may proceed;
+  publication, release tags, version selection, and external KASB mutation
+  remain unauthorized.
 
 - Boundary check: phase 1 is included directly by the first named result and
   is the prerequisite for the remaining implementation phases.
@@ -128,5 +143,38 @@ claimed native package matrix as the next reviewable PR.
   Rust 1.88 workspace check, and diff hygiene. The opt-in live suite passes 208
   tests, and independent repository-required review reports no Bucket I or II
   finding with an explicit PASS.
-- No blocker is currently known. Registry publication, version selection,
-  release tags, and external KASB mutation remain unauthorized.
+- No independent implementation blocker is currently known. The contained
+  panic observability channel, Windows console-signal support statement, and
+  Linux GNU glibc floor are approved and being implemented. Registry
+  publication, version selection, release tags, and external KASB mutation
+  remain unauthorized.
+- Phase 4 now has an implemented six-operation asynchronous Node-API candidate,
+  root Node facade, frozen network-free toolset projection, generated four-target
+  native package matrix, shell-free launcher, Node public-surface judge, and
+  same-revision macOS ARM64 packed-consumer evidence. Support remains explicitly
+  unclaimed until the full native CI matrix passes.
+- Repository-required Phase 4 review corrections now pass independent
+  verification for binding safety, facade sanitization and class identity,
+  immutable artifact allowlists, extracted direct-archive execution,
+  per-target process evidence, action pinning, and documentation freshness.
+  Exact napi 3.12.2 includes the upstream AbortSignal memory-safety fix.
+- The post-policy repository-required review clean loop found and fixed four
+  safe gate gaps: cancellation-field coverage, sanitized resolver failures for
+  corrupted target metadata, parsed per-job native-workflow validation, and a
+  native Windows `CTRL_BREAK_EVENT` termination probe. Independent binding,
+  launcher, and native-CI reviewers report no remaining Bucket I or Bucket II
+  findings. Windows execution remains correctly unclaimed until native CI.
+- Current local evidence passes contract/declaration/native metadata freshness,
+  123 adversarial/conformance tests, nine Node package tests and typecheck,
+  including the real-Node cancellation and sanitized panic-diagnostic paths,
+  macOS ARM64 packed native and extracted direct-archive consumers on Node 24,
+  Rust 1.88, formatting and strict clippy, license and diff hygiene, the full
+  deterministic suite, and the 208-test opt-in live suite. The four-target,
+  seven-version CI matrix remains unrun and support remains `planned`.
+- Current Node documentation establishes that Windows does not have POSIX
+  signal semantics and Node emulates child termination; the approved launcher
+  contract therefore excludes exact signal identity there. The approved glibc
+  2.28 floor is now encoded in the native manifest, digest-pinned Linux build
+  containers, generated package docs, symbol-floor validator, and clean
+  consumer workflow. Linux support remains unclaimed until that CI evidence
+  passes.

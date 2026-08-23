@@ -16,13 +16,14 @@ The repository is executing a `../ytm`-shaped Rust/Node rewrite. See
   Rust SDK implementing all six v1 operations. The TypeScript implementation
   remains present as the executable cutover reference until later gates pass.
 - `fixtures/` and `conformance/` contain shared source evidence and serialized
-  compatibility cases. The process-isolated judge verifies both complete
-  TypeScript and Rust operation surfaces and rejects deliberate behavioral
-  corruption.
+  compatibility cases. The process-isolated judge verifies the TypeScript,
+  public Rust SDK, Rust CLI, and Rust-backed Node candidate surfaces and rejects
+  deliberate behavioral corruption.
 - `contracts/kasb/openapi.yaml` owns the supported provider wire facts; its
   source-adapter profile records only cross-response and decoding rules that
-  OpenAPI cannot express. The Node-API and native-launcher code in
-  this phase remains a private feasibility proof, not the cutover product.
+  OpenAPI cannot express. `crates/kasb-node`, `packages/node`, and
+  `packages/native` now contain the private Phase 4 cutover candidate under
+  validation; they are not yet the canonical or supported npm product.
 
 The current implementations remain intact until the replacement passes the
 approved cutover gates. See [MIGRATION.md](MIGRATION.md) for current status,
@@ -43,9 +44,14 @@ cargo fmt --all --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 ```
 
-`bun run native:feasibility` probes the current host. Phase 1 evidence covers
-macOS ARM64 only; the remaining planned targets stay unclaimed until their
-native build and packed-consumer gates pass.
+`bun run native:feasibility` probes the current host. The target matrix stays
+unclaimed until every native build, immutable packed-consumer, direct CLI
+archive, and review gate passes in CI.
+
+The candidate Linux GNU packages target glibc 2.28 or newer. The npm launcher
+preserves POSIX signal identity where the platform supports it; Windows uses
+Node's forceful termination semantics and does not claim exact POSIX signal
+identity.
 
 Use `bun packages/kasb-ts/src/cli.ts --help` for the current npm/source CLI and
 `node packages/kasb-ts/dist/cli.js --help` after building. The replacement Rust

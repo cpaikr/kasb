@@ -8,11 +8,14 @@ Decision date: 2026-08-22.
 
 The compatibility authorities and adversarial judge are integrated, the public
 Rust SDK implements all six approved operations, and the replacement Rust CLI
-is implemented and independently validated over that SDK. The TypeScript npm
-product remains the executable reference until the CLI PR review lifecycle and
-the asynchronous Node projection, native-package, packed-consumer, live, and
-final cutover gates pass. The Pi surface remains present only until that
-cutover. The scheduled phase and validation evidence are maintained in
+is integrated and independently validated over that SDK. An implemented
+Rust-backed Node candidate and generated native package matrix are now under
+Phase 4 validation. The contained-panic diagnostics channel, Windows signal
+exception, and Linux glibc 2.28 floor are approved; their native CI and review
+gates remain open. The TypeScript npm product remains the executable reference
+until the Node, native-package, packed-consumer, live, review, and final cutover
+gates pass. The Pi surface remains present only until that cutover. The
+scheduled phase and validation evidence are maintained in
 [plans/rust-node-rewrite.md](plans/rust-node-rewrite.md).
 
 ## Decision
@@ -66,6 +69,13 @@ contain both the Node-API addon and the exact Rust CLI binary for that release;
 the launcher resolves the correct package and forwards arguments, streams,
 signals, environment, working directory, and exit status without a shell. It
 does not download or compile artifacts during install or first use.
+
+The launcher preserves signal identity on platforms with POSIX signal
+semantics. On Windows, Node models the relevant child signals as forceful
+termination, so KASB preserves termination but does not promise exact POSIX
+signal identity. Linux GNU x64 and ARM64 packages require glibc 2.28 or newer.
+Both the addon and CLI must pass symbol-floor and clean-consumer gates on that
+runtime before either Linux target is promoted.
 
 KASB differs from `ytm` in one deliberate way: `crates/kasb` remains a supported
 public SDK rather than an internal core. Node-API is an additional projection of

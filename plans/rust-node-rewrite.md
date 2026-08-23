@@ -27,15 +27,13 @@ native-target, and live verification.
 - The former additive dual-SDK direction is superseded. The target is one Rust
   conformer with three supported public projections: the Rust SDK, Rust CLI,
   and Rust-backed Node SDK.
-- Delivery phases 1 and 2 are integrated. The frozen compatibility inventory,
-  OpenAPI authority and freshness checks, adversarial process judge, private
-  Node-API/native-launcher feasibility proof, and all six public Rust SDK
-  operations are complete. No cutover or native support beyond the proven
-  macOS ARM64 host check is claimed yet.
-- Delivery phase 3 is implemented, fully validated, and independently reviewed
-  on `codex/rust-node-rewrite-phase-3`; its PR lifecycle remains pending. The
-  native Rust CLI covers all six operations while the TypeScript npm executable
-  remains unchanged until later packaging and cutover gates pass.
+- Delivery phases 1 through 3 are integrated. The frozen compatibility
+  inventory, OpenAPI authority and freshness checks, adversarial process judge,
+  all six public Rust SDK operations, and the first-class Rust CLI are complete.
+- Delivery phase 4 has an implemented Rust-backed Node and native-package
+  candidate under validation. No cutover or native support beyond the proven
+  macOS ARM64 host check is claimed yet. The TypeScript npm executable remains
+  unchanged until the Node, packaging, review, and cutover gates pass.
 
 ## Decisions
 
@@ -86,6 +84,16 @@ native-target, and live verification.
 - Keep publishing, version selection, registry mutation, and changes to KASB
   external state outside the rewrite. Delivery may prepare releasable artifacts
   but cannot publish them without explicit authorization.
+- Publish only the sanitized `{ "code": "binding_panic" }` operator event on
+  `sjunepark.kasb.native` for a contained native panic. The caller receives the
+  public `internal_failure`, and no panic detail or unsolicited stderr crosses
+  the Node boundary; subscribers follow Node's requirement not to throw.
+- Preserve exact signal identity through the npm launcher where POSIX signal
+  semantics exist. On Windows, preserve termination and the remaining process
+  contract without claiming exact POSIX signal identity.
+- Require glibc 2.28 for Linux GNU x64 and ARM64 npm artifacts. Build on that
+  runtime, reject addon or CLI imports requiring newer glibc symbols, and run
+  clean packed consumers at the floor before promoting support.
 
 ## Delivery plan
 
@@ -240,7 +248,8 @@ native-target, and live verification.
 
 ## Next action
 
-Complete the Phase 3 PR review lifecycle for the first-class Rust `clap` CLI
-and its independent process judge. After integration, begin the dependent
-asynchronous Node-API, Node SDK, native-package, and npm-launcher phase on a
-fresh review branch.
+Complete Phase 4 validation and review for the asynchronous Node-API binding,
+Node SDK/toolset, immutable native and direct-CLI artifacts, clean consumers,
+and transparent npm launcher. After its PR lifecycle is complete, perform the
+dependent canonical cutover and retire the TypeScript conformer, JavaScript
+CLI behavior, and Pi surface.
