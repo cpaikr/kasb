@@ -5,15 +5,24 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const nativeDirectory = resolve(repositoryRoot, process.argv[2] ?? "dist/native");
-const rootDirectory = resolve(repositoryRoot, process.argv[3] ?? "dist/root");
-const cliDirectory = resolve(repositoryRoot, process.argv[4] ?? "dist/cli");
+const inputs = process.argv.slice(2);
+const ciOnly = inputs[0] === "--ci";
+if (ciOnly) inputs.shift();
+const nativeDirectory = resolve(repositoryRoot, inputs[0] ?? "dist/native");
+const rootDirectory = resolve(repositoryRoot, inputs[1] ?? "dist/root");
+const cliDirectory = resolve(repositoryRoot, inputs[2] ?? "dist/cli");
 const manifest = JSON.parse(await readFile(resolve(repositoryRoot, "native-targets.json"), "utf8"));
 const rootSource = JSON.parse(await readFile(resolve(repositoryRoot, manifest.rootPackage, "package.json"), "utf8"));
 const license = await readFile(resolve(repositoryRoot, "LICENSE.md"), "utf8");
 const notices = await readFile(resolve(repositoryRoot, "THIRD_PARTY_LICENSES.html"), "utf8");
 const nodeNotices = await readFile(resolve(repositoryRoot, manifest.rootPackage, "THIRD_PARTY_LICENSES.md"), "utf8");
-const expectedNative = new Map(manifest.targets.map((target) => [target.packageName, target]));
+const validatedTargets = ciOnly
+  ? manifest.targets.filter(({ continuousIntegration }) => continuousIntegration === true)
+  : manifest.targets;
+const expectedNative = new Map(validatedTargets.map((target) => [target.packageName, target]));
+
+assertPublicPackage(rootSource, "@sjunepark/kasb");
+assertNoPiMetadata(rootSource);
 
 const nativeTarballs = await tarballs(nativeDirectory);
 const rootTarballs = await tarballs(rootDirectory);
@@ -31,6 +40,7 @@ for (const tarball of nativeTarballs) {
   const pkg = packageJson(tarball);
   const target = expectedNative.get(pkg.name);
   if (!target) throw new Error(`Unexpected native package ${pkg.name}.`);
+  assertPublicPackage(pkg, target.packageName);
   if (seen.has(pkg.name)) throw new Error(`Duplicate native package ${pkg.name}.`);
   seen.add(pkg.name);
   if (pkg.version !== rootSource.version) throw new Error(`${pkg.name} has version skew.`);
@@ -83,7 +93,9 @@ for (const tarball of nativeTarballs) {
 
 const rootTarball = rootTarballs[0];
 const root = packageJson(rootTarball);
-if (root.name !== rootSource.name || root.version !== rootSource.version) throw new Error("Root package identity drifted.");
+assertPublicPackage(root, "@sjunepark/kasb");
+assertNoPiMetadata(root);
+if (root.version !== rootSource.version) throw new Error("Root package identity drifted.");
 const expectedOptional = Object.fromEntries(manifest.targets.map((target) => [target.packageName, rootSource.version]));
 if (JSON.stringify(root.optionalDependencies) !== JSON.stringify(expectedOptional)) throw new Error("Root optional dependencies drifted.");
 const rootEntries = listTarball(rootTarball);
@@ -116,7 +128,7 @@ if (!isExecutableMode(tarballMode(rootTarball, "package/dist/cli.js"))) {
   throw new Error("Root launcher is not executable in the npm tarball.");
 }
 
-console.log(`complete native artifact set passed for ${root.name}@${root.version}`);
+console.log(`${ciOnly ? "continuous-CI" : "complete"} native artifact set passed for ${root.name}@${root.version}`);
 
 async function tarballs(directory) {
   return (await readdir(directory, { withFileTypes: true }))
@@ -181,5 +193,17 @@ function isExecutableMode(mode) {
 function assertNoInstallHooks(pkg, name) {
   for (const hook of ["preinstall", "install", "postinstall"]) {
     if (Object.hasOwn(pkg.scripts ?? {}, hook)) throw new Error(`${name} must not define a ${hook} hook.`);
+  }
+}
+
+function assertPublicPackage(pkg, expectedName) {
+  if (pkg.name !== expectedName) throw new Error(`Expected public package ${expectedName}, received ${pkg.name}.`);
+  if (pkg.private === true) throw new Error(`${expectedName} must not be private.`);
+  if (pkg.publishConfig?.access !== "public") throw new Error(`${expectedName} must declare public scoped-package access.`);
+}
+
+function assertNoPiMetadata(pkg) {
+  if (Object.hasOwn(pkg.exports ?? {}, "./pi") || Object.hasOwn(pkg, "pi")) {
+    throw new Error("The canonical package must not expose Pi metadata.");
   }
 }

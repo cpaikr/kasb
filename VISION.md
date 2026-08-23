@@ -3,8 +3,8 @@
 ## Product
 
 - `name`: `kasb-standards`
-- `status`: Rust SDK complete; TypeScript transition product retained pending
-  cutover (see [MIGRATION.md](MIGRATION.md))
+- `status`: Rust/Node cutover implemented; final delivery gates in progress;
+  registry publication not performed
 - `domain`: Korean accounting standards and related interpretation material
   exposed through KASB public read surfaces
 - `users`: LLM agents, agent developers, researchers, and humans who need
@@ -51,8 +51,7 @@ The npm package provides:
 - a `kasb` JavaScript launcher for the packaged Rust CLI binary; and
 - machine-readable success and failure behavior.
 
-The Pi export and extension are removed at cutover and receive no replacement
-host adapter in this rewrite.
+The Pi export and extension are absent and receive no replacement host adapter.
 
 ## Principles
 
@@ -74,8 +73,9 @@ host adapter in this rewrite.
   payloads never cross public boundaries.
 - `bounded execution`: timeouts, response sizes, retries, concurrency,
   cancellation, and persona lifetime are explicit.
-- `verified distribution`: support claims require real native artifacts and
-  clean packed-consumer evidence.
+- `verified distribution`: initial support claims require real native artifacts
+  and clean packed-consumer evidence; the continuous-CI subset is explicit and
+  may be narrower when the accepted maintenance policy prioritizes compute cost.
 - `public-read first`: v1 remains read-only and unauthenticated unless provider
   evidence supports a later product decision.
 
@@ -127,14 +127,18 @@ The rewrite succeeds when:
   non-overlapping ownership;
 - the judge rejects controlled wrong behavior;
 - every claimed native target passes clean packed-consumer tests; and
-- the TypeScript conformer and Pi surface are absent after cutover.
+- the TypeScript conformer and Pi surface are absent.
+
+Linux GNU x64/ARM64 are the continuously tested native targets. macOS ARM64 and
+Windows x64 remain supported from recorded cutover evidence but are deliberately
+omitted from ongoing CI to reduce compute cost.
 
 ## Current State
 
-[MIGRATION.md](MIGRATION.md) owns authoritative transition status.
-[plans/rust-node-rewrite.md](plans/rust-node-rewrite.md) owns the approved
-sequence and exit gates. This document owns the enduring product scope and
-success criteria.
+[MIGRATION.md](MIGRATION.md) records the completed rewrite decision.
+[plans/rust-node-rewrite.md](plans/rust-node-rewrite.md) records its sequence
+and exit gates. This document owns the enduring product scope and success
+criteria.
 
 ## Later Product Questions
 

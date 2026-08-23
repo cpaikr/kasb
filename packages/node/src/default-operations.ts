@@ -2,32 +2,32 @@ import {
   searchStandardsInputJsonSchema,
   searchStandardsOperationName,
   searchStandardsResultJsonSchema,
-} from "../../kasb-ts/src/capabilities/search-standards/spec.ts";
+} from "./capabilities/search-standards/spec.ts";
 import {
   getStandardStructureInputJsonSchema,
   getStandardStructureOperationName,
   getStandardStructureResultJsonSchema,
-} from "../../kasb-ts/src/capabilities/get-standard-structure/spec.ts";
+} from "./capabilities/get-standard-structure/spec.ts";
 import {
   getSectionInputJsonSchema,
   getSectionOperationName,
   getSectionResultJsonSchema,
-} from "../../kasb-ts/src/capabilities/get-section/spec.ts";
+} from "./capabilities/get-section/spec.ts";
 import {
   getParagraphInputJsonSchema,
   getParagraphOperationName,
   getParagraphResultJsonSchema,
-} from "../../kasb-ts/src/capabilities/get-paragraph/spec.ts";
+} from "./capabilities/get-paragraph/spec.ts";
 import {
   searchQnaInputJsonSchema,
   searchQnaOperationName,
   searchQnaResultJsonSchema,
-} from "../../kasb-ts/src/capabilities/search-qna/spec.ts";
+} from "./capabilities/search-qna/spec.ts";
 import {
   getQnaInputJsonSchema,
   getQnaOperationName,
   getQnaResultJsonSchema,
-} from "../../kasb-ts/src/capabilities/get-qna/spec.ts";
+} from "./capabilities/get-qna/spec.ts";
 
 import {
   getParagraph,
@@ -38,44 +38,60 @@ import {
   searchStandards,
 } from "./native.js";
 
-export const defaultSearchStandardsOperation = {
+type NodeToolsetOperation = {
+  readonly name:
+    | "search-standards"
+    | "get-standard-structure"
+    | "get-section"
+    | "get-paragraph"
+    | "search-qna"
+    | "get-qna";
+  readonly inputJsonSchema: unknown;
+  readonly resultJsonSchema: unknown;
+  readonly execute: (
+    input: Record<string, unknown>,
+    context?: { readonly signal?: AbortSignal },
+  ) => Promise<unknown>;
+};
+
+export const defaultSearchStandardsOperation: NodeToolsetOperation = {
   name: searchStandardsOperationName,
   inputJsonSchema: searchStandardsInputJsonSchema,
   resultJsonSchema: searchStandardsResultJsonSchema,
-  execute: searchStandards,
+  execute: searchStandards as NodeToolsetOperation["execute"],
 };
 
-export const defaultGetStandardStructureOperation = {
+export const defaultGetStandardStructureOperation: NodeToolsetOperation = {
   name: getStandardStructureOperationName,
   inputJsonSchema: getStandardStructureInputJsonSchema,
   resultJsonSchema: getStandardStructureResultJsonSchema,
-  execute: getStandardStructure,
+  execute: getStandardStructure as NodeToolsetOperation["execute"],
 };
 
-export const defaultGetSectionOperation = {
+export const defaultGetSectionOperation: NodeToolsetOperation = {
   name: getSectionOperationName,
   inputJsonSchema: getSectionInputJsonSchema,
   resultJsonSchema: getSectionResultJsonSchema,
-  execute: getSection,
+  execute: getSection as NodeToolsetOperation["execute"],
 };
 
-export const defaultGetParagraphOperation = {
+export const defaultGetParagraphOperation: NodeToolsetOperation = {
   name: getParagraphOperationName,
   inputJsonSchema: getParagraphInputJsonSchema,
   resultJsonSchema: getParagraphResultJsonSchema,
-  execute: getParagraph,
+  execute: getParagraph as NodeToolsetOperation["execute"],
 };
 
-export const defaultSearchQnaOperation = {
+export const defaultSearchQnaOperation: NodeToolsetOperation = {
   name: searchQnaOperationName,
   inputJsonSchema: searchQnaInputJsonSchema,
   resultJsonSchema: searchQnaResultJsonSchema,
-  execute: searchQna,
+  execute: searchQna as NodeToolsetOperation["execute"],
 };
 
-export const defaultGetQnaOperation = {
+export const defaultGetQnaOperation: NodeToolsetOperation = {
   name: getQnaOperationName,
   inputJsonSchema: getQnaInputJsonSchema,
   resultJsonSchema: getQnaResultJsonSchema,
-  execute: getQna,
+  execute: getQna as NodeToolsetOperation["execute"],
 };

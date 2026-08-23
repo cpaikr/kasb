@@ -1,34 +1,53 @@
-# KASB Rust-backed Node candidate
+# @sjunepark/kasb
 
-This private cutover candidate contains the six-operation Node SDK, the
-network-free KASB toolset, and the transparent npm launcher for the packaged
-Rust `kasb` CLI. The SDK delegates KASB execution to the asynchronous Node-API
-binding; the launcher only selects the exact-version platform package and
-forwards the child process contract without a shell.
+Read-only KASB standards and Q&A access for Node.js and TypeScript hosts,
+backed by the public Rust SDK.
 
-The candidate intentionally uses a temporary package identity while the
-existing TypeScript product remains installed for comparison. It must not be
-published. Every native target and clean packed-consumer gate has passed; the
-canonical `@sjunepark/kasb` identity is still promoted only during the final
-cutover.
+The package provides:
 
-Supported-target claims are generated from `native-targets.json`. Linux GNU
-x64/ARM64, macOS ARM64, and Windows x64 passed native CI builds, the
-exact-artifact consumer matrix across the listed Node versions, direct CLI
-archives, and aggregate artifact validation. The Node engine floor remains
-`20.18.1`; the manifest separately records the listed versions with explicit
-native-consumer evidence.
+- six asynchronous SDK operations through Node-API;
+- `@sjunepark/kasb/toolset` for network-free discovery, schemas, validation,
+  execution, error serialization, structured recovery metadata, and
+  `AbortSignal` cancellation; and
+- the `kasb` executable as a transparent launcher for the packaged Rust CLI.
 
-Contained native panics surface to SDK callers only as the sanitized
-`internal_failure`. Operators may subscribe to the Node diagnostics channel
-`sjunepark.kasb.native`; the only panic event is the frozen payload
-`{ code: "binding_panic" }`. As required by Node's diagnostics-channel
-contract, subscribers must not throw. Panic details are never emitted through
-the event or unsolicited stderr.
+```ts
+import { searchStandards } from "@sjunepark/kasb";
+import { createKasbToolset } from "@sjunepark/kasb/toolset";
 
-Linux GNU x64 and ARM64 require glibc 2.28 or newer. The native gate builds and
-tests both the addon and same-revision CLI on that floor and rejects newer glibc
-symbol requirements. The launcher preserves POSIX signal identity where
-supported. Windows preserves the rest of the process contract and performs
-best-effort forceful child termination for console signals, but exact POSIX
-signal identity is not part of the Windows contract.
+const result = await searchStandards({ keyword: "리스" });
+
+const toolset = createKasbToolset();
+const help = toolset.getCommandHelp("search-standards");
+const validation = toolset.validateInput("search-standards", {
+  keyword: "리스",
+});
+```
+
+The SDK delegates every KASB request, decode, normalization rule, and domain
+failure to Rust. JavaScript owns only public ergonomics, network-free input
+validation, native target selection, and transparent process launch. The
+launcher does not download, compile, parse commands, render output, or provide
+a JavaScript fallback.
+
+Treat `kasb --help` and `kasb help <command>` as the CLI reference. Machine
+invocations emit one newline-terminated JSON document on stdout. The launcher
+forwards the native binary's arguments, environment, working directory,
+streams, termination, and exit behavior without a shell.
+
+Supported native targets are Linux GNU x64/ARM64, macOS ARM64, and Windows x64.
+Linux GNU requires glibc 2.28 or newer. POSIX targets preserve signal identity;
+Windows preserves termination without claiming POSIX signal identity.
+Continuous CI intentionally covers Linux GNU x64/ARM64 only. macOS ARM64 and
+Windows x64 retain their supported packages but are not continuously tested.
+
+Contained native panics reach callers only as `internal_failure`. Operators may
+subscribe to `sjunepark.kasb.native`; its only panic event is
+`{ code: "binding_panic" }`. Panic details and unsolicited stderr are never
+emitted.
+
+Node.js 20.18.1 or newer is required. Source development and tests use Bun.
+
+## License
+
+Elastic License 2.0. See [LICENSE.md](./LICENSE.md).

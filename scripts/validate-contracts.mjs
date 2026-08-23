@@ -220,7 +220,7 @@ for (const relativePath of [
   "../README.md",
   "../VISION.md",
   "../docs/specs/kasb-standards-v1.md",
-  "../packages/kasb-ts/README.md",
+  "../packages/node/README.md",
 ]) {
   const text = await readText(relativePath);
   for (const path of [
@@ -246,6 +246,16 @@ equal(
   ],
   "supported native target matrix must remain explicit",
 );
+equal(
+  targets.targets?.filter(({ continuousIntegration }) => continuousIntegration === true).map(({ rustTarget }) => rustTarget),
+  ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"],
+  "continuous native CI must cover exactly the two Linux GNU targets",
+);
+equal(
+  targets.targets?.filter(({ continuousIntegration }) => continuousIntegration === false).map(({ rustTarget }) => rustTarget),
+  ["aarch64-apple-darwin", "x86_64-pc-windows-msvc"],
+  "macOS ARM64 and Windows x64 must remain explicit supported targets omitted from continuous CI",
+);
 check(
   new Set(targets.targets?.map(({ packageName }) => packageName)).size === targets.targets?.length,
   "every native target must have a unique package",
@@ -255,10 +265,12 @@ check(
   "every native target must have a unique runtime key",
 );
 for (const target of targets.targets || []) {
+  check(typeof target.continuousIntegration === "boolean", `${target.rustTarget} must declare continuousIntegration`);
   check(target.packageName?.startsWith("@sjunepark/kasb-"), `${target.rustTarget} package must use the KASB scope`);
   check(target.addonFile?.endsWith(".node"), `${target.rustTarget} must name a Node-API artifact`);
   check(target.cliFile === (target.npmPlatform === "win32" ? "kasb.exe" : "kasb"), `${target.rustTarget} must name the native CLI consistently`);
   if (target.libc === "glibc") {
+    check(target.runner?.startsWith("blacksmith-") === true, `${target.rustTarget} continuous CI must use Blacksmith`);
     check(
       typeof target.buildContainer === "string" &&
         target.buildContainer.includes("manylinux_2_28") &&
@@ -266,8 +278,25 @@ for (const target of targets.targets || []) {
       `${target.rustTarget} must use a digest-pinned manylinux_2_28 build container`,
     );
   } else {
+    check(!Object.hasOwn(target, "runner"), `${target.rustTarget} omitted from continuous CI must not declare a runner`);
     check(!Object.hasOwn(target, "buildContainer"), `${target.rustTarget} must not declare a Linux build container`);
   }
+}
+
+const canonicalPackage = JSON.parse(await readText("../packages/node/package.json"));
+check(canonicalPackage.name === "@sjunepark/kasb", "packages/node must own the canonical npm identity");
+check(canonicalPackage.private !== true, "the canonical npm package must not be private");
+check(canonicalPackage.publishConfig?.access === "public", "the canonical npm package must declare public scoped-package access");
+equal(Object.keys(canonicalPackage.bin ?? {}), ["kasb"], "the canonical package must expose only the kasb launcher");
+equal(Object.keys(canonicalPackage.exports ?? {}), [".", "./toolset", "./package.json"], "the canonical package export surface must stay narrow");
+check(!Object.hasOwn(canonicalPackage, "pi"), "the canonical package must not carry Pi registration metadata");
+const workspaceEntries = await readdir(new URL("../packages/", import.meta.url), { withFileTypes: true });
+check(!workspaceEntries.some((entry) => entry.name === "kasb-ts"), "the superseded TypeScript package must be absent after cutover");
+for (const target of targets.targets || []) {
+  const nativePackage = JSON.parse(await readText(`../${targets.nativePackageRoot}/${target.packageDirectory}/package.json`));
+  check(nativePackage.name === target.packageName, `${target.rustTarget} must use its declared package identity`);
+  check(nativePackage.private !== true, `${target.packageName} must not be private`);
+  check(nativePackage.publishConfig?.access === "public", `${target.packageName} must declare public scoped-package access`);
 }
 
 if (failures.length > 0) {

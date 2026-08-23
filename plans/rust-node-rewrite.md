@@ -1,5 +1,7 @@
 # Rewrite KASB around a public Rust SDK, Node SDK, and Rust CLI
 
+Status: cutover implemented; final Linux Blacksmith CI and PR lifecycle in progress.
+
 ## Outcome
 
 KASB becomes a read-only product with one public Rust SDK owning all KASB HTTP,
@@ -13,28 +15,25 @@ native-target, and live verification.
 
 ## Current state
 
-- `main` contains the validated TypeScript implementation of all six v1
-  operations and the completed Rust `get-paragraph` vertical pilot.
-- `crates/kasb` already supplies public Rust request/result types, typed
-  failures, validation, `wreq` persona transport, cancellation, fixture tests,
-  and shared conformance for the pilot.
-- `packages/kasb-ts` currently owns the npm package, CLI, neutral toolset, Pi
-  adapter, all six source adapters, and the TypeScript conformance runner.
-- `fixtures/` and `conformance/` provide reusable source evidence and serialized
-  expectations, including deliberate known-bad controls.
-- The completed pilot goal is recorded in
-  `goals/rust-migration-foundation-pilot.md`; it does not authorize this rewrite.
-- The former additive dual-SDK direction is superseded. The target is one Rust
-  conformer with three supported public projections: the Rust SDK, Rust CLI,
-  and Rust-backed Node SDK.
-- Delivery phases 1 through 3 are integrated. The frozen compatibility
-  inventory, OpenAPI authority and freshness checks, adversarial process judge,
-  all six public Rust SDK operations, and the first-class Rust CLI are complete.
-- Delivery phase 4 has an implemented Rust-backed Node and native-package
-  candidate. Linux GNU x64/ARM64, macOS ARM64, and Windows x64 have passed
-  native builds, same-revision direct archives, exact packed consumers, and
-  aggregate artifact validation. The TypeScript npm executable remains
-  unchanged until the Phase 4 PR lifecycle and canonical cutover pass.
+- Phases 1 through 4 are integrated: frozen compatibility authorities,
+  adversarial judge, all six public Rust SDK operations, the Rust CLI, the
+  asynchronous Node-API projection, the Node SDK/toolset, transparent npm
+  launcher, and four-target native artifact matrix are complete.
+- The canonical npm package is `packages/node` under `@sjunepark/kasb`.
+  `packages/native` contains the exact-version platform manifests; each
+  artifact contains the addon and same-revision Rust CLI.
+- Linux GNU x64/ARM64, macOS ARM64, and Windows x64 passed native builds,
+  direct archives, exact packed consumers, and aggregate validation.
+- The private repository is owned by `cpaikr/kasb`, while npm package identity
+  remains under `@sjunepark/*`.
+- Continuous CI intentionally covers Linux GNU x64/ARM64 only on Blacksmith to
+  reduce compute cost. macOS ARM64 and Windows x64 remain supported from the
+  recorded Phase 4 evidence but are not continuously tested.
+- Phase 5 removed the TypeScript conformer, JavaScript CLI behavior, Pi export,
+  Pi registration, and obsolete publication automation. Neutral public
+  contracts, schemas, and toolset ergonomics now live with the Node facade.
+- Registry publication, version selection, release tags, and external KASB
+  mutation remain outside the authorized work.
 
 ## Decisions
 
@@ -50,9 +49,9 @@ native-target, and live verification.
   operation names, camelCase JSON inputs, machine-readable success/failure
   behavior, and current Node runtime floor unless evidence requires a reviewed
   breaking change. The npm executable is a launcher, not a JavaScript CLI.
-- Remove the `./pi` export, Pi extension entrypoint, registration metadata, and
-  Pi-specific tests and documentation at cutover. Do not replace them with MCP
-  or another host adapter in this rewrite.
+- The cutover removes the `./pi` export, Pi extension entrypoint, registration
+  metadata, and Pi-specific tests and documentation. Do not replace them with
+  MCP or another host adapter.
 - Make `contracts/kasb/openapi.yaml` the sole repository authority for the
   supported KASB HTTP wire surface. Keep `docs/specs/kasb-standards-v1.md` as the
   public semantic contract and `docs/research/kasb-standard-source-map.md` as
@@ -79,7 +78,7 @@ native-target, and live verification.
   availability is provider evidence, not contract authority.
 - Keep the frozen JavaScript UTF-16 summary limits. The Rust CLI must back up
   to a complete Unicode scalar boundary and remain Unicode-scalar-valid. Only
-  the transition TypeScript CLI may emit an escaped lone surrogate at that
+  the predecessor TypeScript CLI could emit an escaped lone surrogate at that
   pathological boundary; the intentional replacement difference is covered by
   the CLI process judge.
 - Keep publishing, version selection, registry mutation, and changes to KASB
@@ -95,8 +94,16 @@ native-target, and live verification.
 - Require glibc 2.28 for Linux GNU x64 and ARM64 npm artifacts. Build on that
   runtime, reject addon or CLI imports requiring newer glibc symbols, and run
   clean packed consumers at the floor before promoting support.
+- Keep the four supported npm targets, but continuously validate only Linux GNU
+  x64/ARM64 on Blacksmith. macOS ARM64 and Windows x64 retain their recorded
+  support evidence without ongoing CI; the workflow must state that this
+  deliberate omission reduces compute cost.
 
 ## Delivery plan
+
+The following phases are the approved prospective plan retained as an execution
+record. The current-state section above and the gate evidence below determine
+completion status.
 
 ### 1. Freeze the baseline and target authorities
 
@@ -226,9 +233,10 @@ native-target, and live verification.
   active product, package, tests, and documentation.
 - The public-surface judge covers all approved operations and proves it detects
   controlled incorrect behavior.
-- Every claimed native target builds and passes direct CLI and clean packed npm
-  consumer tests; generated declarations, loaders, launchers, manifests, and
-  package contents are fresh.
+- Every claimed native target has recorded native-build, direct-CLI, and clean
+  packed-consumer evidence. The current revision's continuous CI covers Linux
+  GNU x64/ARM64; generated declarations, loaders, launchers, manifests, and the
+  continuously tested artifact subset are fresh.
 - Deterministic validation, bounded live checks, repository review, and
   delivery review pass, with planning and current documentation reconciled.
 - No registry publication, release tag, or external provider mutation occurs.
@@ -249,8 +257,6 @@ native-target, and live verification.
 
 ## Next action
 
-Complete the Phase 4 PR lifecycle with the validated asynchronous Node-API
-binding, Node SDK/toolset, immutable native and direct-CLI artifacts, clean
-consumers, and transparent npm launcher. Then perform the dependent canonical
-cutover and retire the TypeScript conformer, JavaScript CLI behavior, and Pi
-surface.
+Run PR #19's current revision through Linux GNU x64/ARM64 native and packed
+consumer CI on Blacksmith, then complete its review and merge lifecycle. Record
+the cutover as complete without publishing or selecting a release version.

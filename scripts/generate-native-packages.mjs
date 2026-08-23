@@ -22,7 +22,6 @@ for (const target of manifest.targets) {
     name: target.packageName,
     version: rootPackage.version,
     description: `Native KASB Node addon and Rust CLI for ${target.npmPlatform}-${target.npmArch}.`,
-    private: true,
     main: target.addonFile,
     files: [target.addonFile, target.cliFile, "LICENSE.md", "THIRD_PARTY_LICENSES.html"],
     os: [target.npmPlatform],
@@ -31,10 +30,11 @@ for (const target of manifest.targets) {
     engines: { node: `>=${manifest.minimumNodeVersion}` },
     repository: {
       type: "git",
-      url: "git+https://github.com/sjunepark/kasb.git",
+      url: "git+https://github.com/cpaikr/kasb.git",
       directory: `${manifest.nativePackageRoot}/${target.packageDirectory}`,
     },
     license: rootPackage.license ?? "Elastic-2.0",
+    publishConfig: { access: "public" },
   };
   outputs.set(resolve(directory, "package.json"), `${JSON.stringify(nativePackage, null, 2)}\n`);
   outputs.set(

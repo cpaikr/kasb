@@ -1,6 +1,6 @@
 # KASB v1 compatibility baseline
 
-Status: frozen replacement inventory
+Status: frozen and implemented replacement inventory
 
 This inventory records the executable compatibility surface that the Rust/Node
 replacement must preserve, intentionally extend, or intentionally retire. The
@@ -12,9 +12,8 @@ transport behavior.
 
 - Preserve npm identity `@sjunepark/kasb`, executable `kasb`, Node floor
   `>=20.18.1`, and the `./toolset` export.
-- The current package has no `.` export. The replacement adds a root Node SDK
-  export because a Rust-backed Node SDK is an included product result; this is
-  additive and does not move toolset discovery or validation onto the network.
+- The predecessor package had no `.` export. The cutover added a root Node SDK
+  export; toolset discovery and validation remain network-free.
 - Preserve the documented toolset operation names, help/discovery, closed JSON
   input validation, execution context with `AbortSignal`, stable validation
   failures, execution error serialization, helper formatters, and the custom
@@ -38,9 +37,8 @@ transport behavior.
   `execute`, and `serializeError`. Toolset validation codes remain
   `missing_parameter`, `invalid_parameter`, `unknown_parameter`, and
   `invalid_request`, separate from capability failure codes.
-- Retire `./pi`, `pi.extensions`, the Pi extension entrypoint, and Pi-specific
-  runtime types only at final cutover. This is the approved breaking package
-  change.
+- `./pi`, `pi.extensions`, the Pi extension entrypoint, and Pi-specific runtime
+  types were retired at final cutover as the approved breaking package change.
 - Generated declarations, built facade files, target resolution, and packed
   file lists must have named canonical inputs and freshness checks.
 
@@ -73,7 +71,7 @@ the CLI keeps `--limit` as the `rows` alias.
 Caller cancellation is distinct execution control. The Node SDK/toolset
 projects it as a `KasbToolsetError` with `code: "aborted"`,
 `recoverable: false`, `retryable: true`, and the canonical `operationName`; it
-must not copy the lower-level TypeScript fetch quirk that classified abort as
+does not copy the predecessor TypeScript fetch quirk that classified abort as
 `source_unavailable`.
 `get-qna` continues to allow `source_metadata_incomplete`, although the current
 fixture path emits no warning.
@@ -103,8 +101,8 @@ fixture path emits no warning.
   operating system terminates it. The later npm launcher must forward the
   signal contract unchanged.
 - `kasb help <unknown>` follows the normative parse-failure contract above.
-  The transition CLI's silent exit for that one shape is a known TypeScript
-  transport defect, not replacement behavior.
+  The predecessor CLI's silent exit for that one shape was a known TypeScript
+  transport defect, not preserved behavior.
 - `structured` remains the default. `summary` replaces only `result` with the
   approved compact projection. `raw` may remain equal to `structured` until a
   richer already-public result exists; it never exposes raw provider payloads.
@@ -114,8 +112,8 @@ fixture path emits no warning.
   frozen JavaScript UTF-16 unit limits, but if the boundary falls between an
   astral scalar's surrogate pair, the Rust CLI must back up to the preceding
   complete scalar before appending the ellipsis and must remain
-  Unicode-scalar-valid. Only the transition TypeScript CLI can emit an escaped
-  lone surrogate in this pathological case.
+  Unicode-scalar-valid. The retired TypeScript CLI could emit an escaped lone
+  surrogate in this pathological case.
 
 The exact command/flag matrix is:
 
@@ -130,7 +128,7 @@ The exact command/flag matrix is:
 
 ## Distribution and validation
 
-The npm executable becomes a shell-free resolver/launcher only. It forwards
+The npm executable is a shell-free resolver/launcher only. It forwards
 arguments, environment, working directory, standard streams, signals, and the
 child exit status without parsing commands or rendering output. Each
 exact-version native package contains the Node addon and same-revision Rust CLI

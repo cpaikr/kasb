@@ -4,7 +4,7 @@
 
 - `name`: `kasb-standards`
 - `owner`: repo-local spec
-- `status`: implemented semantic contract; Rust/Node rewrite in progress
+- `status`: implemented semantic contract
 - `domain`: Korean accounting standards access
 - `users`: LLM agents, agent developers, researchers, and humans using an SDK or the CLI
 
@@ -25,8 +25,8 @@ This product provides the six v1 operations through a public Rust SDK, a Rust
 `clap` CLI over that SDK, and a Rust-backed Node SDK/toolset. Rust owns the KASB
 transport and capability implementation; Node projects the same semantic
 results through an asynchronous Node-API boundary. The npm executable only
-launches the packaged Rust CLI. The current TypeScript implementation remains
-executable reference evidence until the approved rewrite cuts over.
+launches the packaged Rust CLI. No TypeScript conformer or JavaScript CLI
+implementation remains.
 
 This document owns public semantic behavior.
 `contracts/kasb/openapi.yaml` owns supported HTTP wire facts, while
@@ -59,7 +59,7 @@ Out of scope:
 - database persistence or background ingestion
 - Pi, MCP, or another host-specific adapter
 - a second CLI behavior implementation in JavaScript
-- a second TypeScript KASB transport or capability conformer after cutover
+- a second TypeScript KASB transport or capability conformer
 
 ## 4. Domain Model
 

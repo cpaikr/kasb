@@ -16,7 +16,8 @@
       "packageDirectory": "linux-x64-gnu",
       "addonFile": "kasb.linux-x64-gnu.node",
       "cliFile": "kasb",
-      "runner": "ubuntu-24.04",
+      "continuousIntegration": true,
+      "runner": "blacksmith-2vcpu-ubuntu-2404",
       "buildContainer": "quay.io/pypa/manylinux_2_28_x86_64:2026.08.15-1@sha256:0c87ccb5996dab6c3b7612ee4fda7b80c4ab3c44a86c2541e4a872afdf4f131b"
     },
     {
@@ -28,7 +29,8 @@
       "packageDirectory": "linux-arm64-gnu",
       "addonFile": "kasb.linux-arm64-gnu.node",
       "cliFile": "kasb",
-      "runner": "ubuntu-24.04-arm",
+      "continuousIntegration": true,
+      "runner": "blacksmith-2vcpu-ubuntu-2404-arm",
       "buildContainer": "quay.io/pypa/manylinux_2_28_aarch64:2026.08.15-1@sha256:561427136aabf3787bffb294b3515748241e0962d1527ae28bea1e076bfb9d99"
     },
     {
@@ -39,7 +41,7 @@
       "packageDirectory": "darwin-arm64",
       "addonFile": "kasb.darwin-arm64.node",
       "cliFile": "kasb",
-      "runner": "macos-15"
+      "continuousIntegration": false
     },
     {
       "rustTarget": "x86_64-pc-windows-msvc",
@@ -49,7 +51,7 @@
       "packageDirectory": "win32-x64-msvc",
       "addonFile": "kasb.win32-x64-msvc.node",
       "cliFile": "kasb.exe",
-      "runner": "windows-2025"
+      "continuousIntegration": false
     }
   ],
   "notClaimed": [

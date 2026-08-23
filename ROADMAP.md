@@ -2,6 +2,10 @@
 
 ## Current
 
+_None._
+
+## Completed
+
 [Rewrite KASB around a public Rust SDK, Node SDK, and Rust CLI](plans/rust-node-rewrite.md)
 
 ## Plans

@@ -54,7 +54,7 @@ None under this goal. Migration phase 5 requires separate authorization.
   known-bad controls, and the complete v1 translation inventory are implemented
   locally. Independent review and PR findings were applied; the latest complete
   validation passes with 183 tests and one opt-in live test skipped.
-- Foundation [PR #12](https://github.com/sjunepark/kasb/pull/12) merged as
+- Foundation [PR #12](https://github.com/cpaikr/kasb/pull/12) merged as
   `ecf8da5` after all seven review threads were resolved. Its final validation
   passed 178 tests with one opt-in live test skipped, typecheck, build, and
   diff checks.
@@ -76,7 +76,7 @@ None under this goal. Migration phase 5 requires separate authorization.
   for request-construction validation, automatic transport retries, empty
   parent identifiers, Unicode-digit normalization, and ECMAScript trimming.
   Root validation and packaged-crate verification pass after those fixes.
-- Implementation [PR #13](https://github.com/sjunepark/kasb/pull/13) merged as
+- Implementation [PR #13](https://github.com/cpaikr/kasb/pull/13) merged as
   `07d1ee5` after all ten posted review threads were fixed, replied to, and
   resolved. CodeRabbit and GitGuardian passed on the final head; the full local
   validation and packaged-crate verification also passed.

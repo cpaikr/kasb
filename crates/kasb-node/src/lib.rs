@@ -13,7 +13,13 @@ use std::{
 };
 
 #[cfg(feature = "feasibility-judge")]
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use futures_util::FutureExt;
 #[cfg(feature = "feasibility-judge")]
@@ -38,6 +44,9 @@ type SharedClient = KasbClient<PersonaClient, SystemClock>;
 
 #[cfg(feature = "feasibility-judge")]
 type FixtureRoutes = Arc<HashMap<String, FixtureResponse>>;
+
+#[cfg(feature = "feasibility-judge")]
+static FIXTURE_REQUEST_STARTED: AtomicBool = AtomicBool::new(false);
 
 enum Operation {
     Invalid,
@@ -152,7 +161,14 @@ fn configure_fixture(configuration_json: String) -> napi::Result<()> {
         .lock()
         .map_err(|_| napi::Error::from_reason("fixture configuration lock failed"))?
         .replace(Arc::new(routes));
+    FIXTURE_REQUEST_STARTED.store(false, Ordering::Release);
     Ok(())
+}
+
+#[cfg(feature = "feasibility-judge")]
+#[napi(js_name = "fixtureRequestStarted")]
+fn fixture_request_started() -> bool {
+    FIXTURE_REQUEST_STARTED.load(Ordering::Acquire)
 }
 
 #[cfg(feature = "feasibility-judge")]
@@ -482,6 +498,7 @@ impl HttpTransport for ConfiguredFixtureTransport {
         let response = self.routes.get(url).cloned();
         if let Ok(mut requests) = self.requests.lock() {
             requests.push(url.to_owned());
+            FIXTURE_REQUEST_STARTED.store(true, Ordering::Release);
         }
         async move {
             let fixture = response.ok_or_else(|| {

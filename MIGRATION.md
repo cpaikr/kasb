@@ -1,124 +1,100 @@
 # Rust/Node Rewrite Decision
 
-Status: approved; implementation in progress.
+Status: cutover implemented; final review and PR lifecycle in progress.
 
 Decision date: 2026-08-22.
 
-## Current transition state
+## Completed state
 
-The compatibility authorities and adversarial judge are integrated, the public
-Rust SDK implements all six approved operations, and the replacement Rust CLI
-is integrated and independently validated over that SDK. An implemented
-Rust-backed Node candidate and generated native package matrix have passed the
-Phase 4 replacement gates. The contained-panic diagnostics channel, Windows
-signal exception, Linux glibc 2.28 floor, all four native builds, packed
-consumers, and exact aggregate artifacts are validated; Phase 4 integration and
-the final canonical cutover remain. The TypeScript npm product remains the
-executable reference until that cutover. The Pi surface remains present only
-until then. The
-scheduled phase and validation evidence are maintained in
+The canonical product is the public Rust SDK, the Rust `clap` CLI, and the
+Rust-backed Node SDK/toolset. npm `kasb` resolves an exact-version platform
+package and transparently launches its same-revision Rust CLI binary. The
+TypeScript conformer, JavaScript CLI implementation, and Pi surface are
+removed.
+
+Linux GNU x64/ARM64, macOS ARM64, and Windows x64 passed their native build,
+artifact, direct-CLI, and clean-consumer gates. Linux GNU targets require glibc
+2.28. Windows preserves the launcher process contract without promising POSIX
+signal identity. Continuous CI now validates only Linux GNU x64/ARM64 on
+Blacksmith to reduce compute cost; macOS ARM64 and Windows x64 remain supported
+from their recorded cutover evidence but are not continuously tested. Contained
+native panics expose only a public
+`internal_failure` and the sanitized `sjunepark.kasb.native`
+`{ "code": "binding_panic" }` diagnostics event.
+
+The phase history and detailed validation evidence are maintained in
 [plans/rust-node-rewrite.md](plans/rust-node-rewrite.md).
 
 ## Decision
 
-Replace the additive dual-conformer direction with one public Rust SDK that owns
-all KASB HTTP and domain behavior. Build a separate Rust `clap` CLI over that
-SDK, and expose the SDK to Node through a narrow asynchronous Node-API binding
-and thin Node facade. Keep npm installation of `kasb` as a transparent launcher
-for the packaged Rust CLI binary.
+One public Rust SDK owns all KASB HTTP, decoding, normalization, and domain
+behavior. A separate Rust `clap` CLI uses that SDK. A narrow asynchronous
+Node-API binding and thin JavaScript facade expose the SDK to Node. The npm
+executable is a shell-free platform resolver and process launcher, not another
+CLI implementation.
 
-Retain:
+Retained:
 
 - the public `kasb` Rust crate;
-- the npm package identity;
-- the Rust `kasb` CLI, including npm installation through a thin launcher;
-- the Node SDK;
+- the npm `@sjunepark/kasb` identity and `kasb` executable;
+- the Rust CLI and Rust-backed Node SDK;
 - `@sjunepark/kasb/toolset`;
-- approved v1 operation and serialized semantics; and
+- approved v1 operations and serialized semantics; and
 - independently authored fixtures and conformance evidence.
 
-Retire at cutover:
+Retired:
 
-- the TypeScript KASB HTTP, source-decoding, normalization, and capability
-  conformer;
-- the TypeScript/JavaScript CLI parser, renderer, and command behavior; and
-- the Pi export, extension entrypoint, registration metadata, tests, and active
-  documentation.
+- TypeScript KASB HTTP, source decoding, normalization, and capability
+  execution;
+- TypeScript/JavaScript CLI parsing, rendering, and command behavior; and
+- the Pi export, entrypoint, registration metadata, tests, and active docs.
 
-No replacement Pi, MCP, or host-specific adapter is part of the rewrite.
+No Pi, MCP, or replacement host adapter is part of this decision.
 
-## Why the direction changed
+## Rationale
 
-The completed `get-paragraph` pilot proved that the public Rust crate can own
-the real KASB path with typed failures, cancellation, source normalization, and
-the pinned `wreq` persona. Keeping a second TypeScript conformer would duplicate
-wire and source rules and preserve two places for source drift.
+The Rust pilot proved typed failures, cancellation, source normalization, and
+the pinned `wreq` persona on the real KASB path. Keeping a second TypeScript
+conformer would duplicate wire and source rules. OpenAPI therefore remains the
+sole repository authority for supported wire facts, while the v1 spec owns
+public semantics and provider research and fixtures remain independent
+evidence.
 
-The replacement follows the proven `../ytm` shape and the accepted `../mytech`
-preferences:
+The platform packages contain the Node addon and exact same-revision Rust CLI.
+The launcher forwards arguments, environment, working directory, standard
+streams, termination, and exit status without downloading, compiling, parsing
+commands, or rendering KASB output. On Windows, Node exposes forceful
+termination rather than POSIX signal identity. Both Linux GNU artifacts are
+built and checked against the glibc 2.28 floor.
 
-- Rust is the default external HTTP protocol implementation;
-- a Node product over Rust uses a narrow asynchronous Node-API binding;
-- OpenAPI is the sole repository authority for supported wire behavior;
-- project-owned contracts and errors cross boundaries;
-- derived artifacts have named canonical inputs and freshness checks; and
-- verification follows the actual path from contract and provider evidence to
-  packed consumer behavior.
-
-The npm launcher is deliberately not another CLI transport. Platform packages
-contain both the Node-API addon and the exact Rust CLI binary for that release;
-the launcher resolves the correct package and forwards arguments, streams,
-signals, environment, working directory, and exit status without a shell. It
-does not download or compile artifacts during install or first use.
-
-The launcher preserves signal identity on platforms with POSIX signal
-semantics. On Windows, Node models the relevant child signals as forceful
-termination, so KASB preserves termination but does not promise exact POSIX
-signal identity. Linux GNU x64 and ARM64 packages require glibc 2.28 or newer.
-Both the addon and CLI must pass symbol-floor and clean-consumer gates on that
-runtime before either Linux target is promoted.
-
-KASB differs from `ytm` in one deliberate way: `crates/kasb` remains a supported
-public SDK rather than an internal core. Node-API is an additional projection of
-that SDK, not its owner.
+KASB deliberately keeps `crates/kasb` as a supported public SDK rather than an
+internal Node implementation detail.
 
 ## Superseded direction
 
-Migration phases 1–4 from the former additive plan are complete and remain
-useful evidence:
+The former additive dual-conformer plan is superseded. Its language-neutral
+cases, package migration, translation rules, and vertical-pilot evidence remain
+under `docs/plans/rust-migration/` and
+`goals/rust-migration-foundation-pilot.md`; they are historical, not current
+authority.
 
-- language-neutral conformance cases and known-bad controls;
-- the TypeScript package move and Rust workspace;
-- the Rust translation rulebook and parity record; and
-- the validated `get-paragraph` vertical pilot.
-
-The former phase 5 instruction to add five capabilities while keeping an
-independent TypeScript conformer is superseded. Historical evidence remains in
-`docs/plans/rust-migration/` and
-`goals/rust-migration-foundation-pilot.md`; those files do not define current
-work or authority.
-
-## Current authorities
+## Authorities
 
 - Product scope: [VISION.md](VISION.md)
-- Current and target boundaries: [ARCHITECTURE.md](ARCHITECTURE.md)
-- Public capability semantics: [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md)
+- Current boundaries: [ARCHITECTURE.md](ARCHITECTURE.md)
+- Public semantics: [docs/specs/kasb-standards-v1.md](docs/specs/kasb-standards-v1.md)
 - Provider evidence: [docs/research/kasb-standard-source-map.md](docs/research/kasb-standard-source-map.md)
-- Scheduled execution and exit gates: [plans/rust-node-rewrite.md](plans/rust-node-rewrite.md)
+- Completed execution and gates: [plans/rust-node-rewrite.md](plans/rust-node-rewrite.md)
 - Project order: [ROADMAP.md](ROADMAP.md)
 
 ## Constraints
 
-- Do not remove the current TypeScript path before the replacement passes the
-  independent cutover gates.
 - Do not generate the Rust conformer from OpenAPI.
 - Do not expose `wreq`, Node-API, provider payload, or panic details through
   unrelated public boundaries.
-- Do not parse commands, render KASB output, or implement fallback behavior in
-  the npm launcher.
-- Do not raise the Node runtime floor or change public semantics without
-  evidence and explicit review.
-- Do not claim native npm support without native build and clean-consumer
-  verification.
-- Do not publish, tag a release, or mutate KASB external state without separate
-  authorization.
+- Do not add command parsing, rendering, downloads, compilation, or fallback
+  behavior to the npm launcher.
+- Do not change public semantics or native support claims without evidence and
+  explicit review.
+- Do not publish, select a version, create a release tag, or mutate KASB
+  external state without separate authorization.

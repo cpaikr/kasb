@@ -8,7 +8,7 @@ Use the local Open Creo toolset skill before implementation. Apply its neutral t
 
 ## Scope
 
-- Review `packages/kasb-ts/src/toolset.ts` validation failure types and constructors against `tool-surface-spec` guidance.
+- Review `packages/node/src/toolset.ts` validation failure types and constructors against `tool-surface-spec` guidance.
 - Confirm every caller-repairable validation failure carries:
   - `recoverable: true`;
   - human-readable `recoveryHint`;

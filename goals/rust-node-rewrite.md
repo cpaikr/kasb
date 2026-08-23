@@ -60,6 +60,16 @@ Delivery: Use the fewest sequential reviewable PRs practical. Run the repository
   - Linux GNU x64 and ARM64 native packages require glibc 2.28, enforced for
     both the Node addon and same-revision Rust CLI artifact before support is
     promoted.
+- On 2026-08-23, the user approved the delivery and maintenance amendment:
+  - transfer the still-private repository to `cpaikr/kasb`, preserve PR #19,
+    update repository metadata and the local remote, and close obsolete Release
+    Please PR #11;
+  - retain npm identities under `@sjunepark/*`; and
+  - retain macOS ARM64 and Windows x64 as supported packages but deliberately
+    omit them from continuous CI to reduce compute cost. Continuous native CI
+    now covers Linux GNU x64/ARM64 on Blacksmith, and the workflow records the
+    accepted omission. The earlier four-target evidence remains the support
+    basis for the two non-continuous targets.
 
 ## Execution status
 
@@ -80,18 +90,72 @@ Delivery: Use the fewest sequential reviewable PRs practical. Run the repository
 
 ### Current in-scope result
 
-Phase 5: promote the validated Rust-backed Node product and native launcher to
-the canonical npm package, remove the TypeScript conformer, JavaScript CLI
-behavior, and Pi surface, and reconcile every current authority and final gate.
+Phase 5 cutover is implemented and passes the complete local validation and
+independent review gates: `packages/node` is the canonical npm product, neutral
+contracts and tests live with that facade, the TypeScript conformer, JavaScript
+CLI behavior, and Pi surface are removed, and publication automation is
+disabled. The current-revision Linux GNU x64/ARM64 Blacksmith CI run and Phase
+5 PR lifecycle remain before the goal can be marked complete; macOS ARM64 and
+Windows x64 no longer gate continuous delivery by explicit user decision.
 
 ### Next in-scope action
 
-Inventory the canonical package and validation-path cutover, then replace the
-transition npm product with `packages/node` and remove `packages/kasb-ts` only
-as one reviewable slice that retains the passing Rust, Node, CLI, native,
-adversarial, live, and clean-consumer gates.
+Run the current Phase 5 revision's Linux GNU x64/ARM64 native and packed
+consumer matrix on Blacksmith and complete PR #19's review and merge lifecycle;
+then record completion without publishing, selecting a version, or creating a
+release tag.
 
 ### Evidence and blockers
+
+- Phase 5 now promotes `packages/node` to `@sjunepark/kasb`, moves only the
+  neutral toolset/contract/schema surface into it, adds independent Rust SDK
+  conformance coverage, and runs deterministic eval orchestration through
+  caller-owned fixture operations rather than a second conformer. Root build,
+  test, typecheck, conformance, live, and native preparation paths no longer
+  depend on `packages/kasb-ts`.
+- The TypeScript transport/source/capability implementation, JavaScript CLI
+  implementation, Pi export/registration/tests, and obsolete Release Please
+  and tag-publish workflows are deleted. The npm JavaScript entrypoint that
+  remains is only the approved shell-free platform resolver and process
+  launcher.
+- The final cutover tree passes frozen installation; contract, declaration,
+  native metadata/workflow/glibc, and license checks; Node/eval typechecking;
+  63 deterministic Node tests with one live skip; eight eval tests whose six
+  operation outputs are checked against their advertised schemas; the complete
+  Rust workspace test/build suite; formatting; strict clippy; Rust 1.88; the
+  93-case adversarial public-surface judge; macOS ARM64 production native and
+  clean packed-consumer feasibility on Node 24; the bounded live traversal;
+  diff hygiene; and a 50-run cancellation-start stress regression.
+- Independent binding, launcher/package, and native-CI review reports no
+  remaining Bucket I or Bucket II finding. Review corrections enforce public
+  identity and Pi absence on extracted root artifacts, schema-valid eval
+  fixtures, the aggregate artifact-validator workflow step, and a judge-only
+  transport-start handshake that cannot compile into a release addon.
+- The reviewed Phase 5 cutover is committed as `7f74506` and opened as PR #19
+  against `codex/rust-node-rewrite-integration`. CodeRabbit and GitGuardian
+  report success. Actions run `32625886321` executed zero workflow steps:
+  GitHub annotated both entry jobs with “The job was not started because an
+  Actions budget is preventing further use,” so the dependent four-target and
+  aggregate jobs were skipped. This external capacity event is not product
+  evidence; the current-revision native CI and PR merge gates remain open.
+- The repository transfer to private `cpaikr/kasb` completed without changing
+  npm scope or losing PR #19. Obsolete Release Please PR #11 is closed and the
+  local `origin` follows the organization repository. The CI amendment replaces
+  GitHub-hosted Linux runners with Blacksmith and makes Linux GNU x64/ARM64 the
+  explicit continuous subset; supported macOS ARM64 and Windows x64 artifacts
+  remain outside ongoing CI under the authorized compute-cost exception.
+- The transfer/CI amendment passes frozen installation; contract, declaration,
+  native metadata/workflow, glibc, license, typecheck, test, build, formatting,
+  strict clippy, Rust 1.88, 93-case adversarial judge, host-native feasibility,
+  bounded live, YAML, and diff-hygiene validation. Independent CI and
+  documentation review reports no Bucket I or Bucket II finding; the actual
+  Linux Blacksmith run remains the product-evidence gate.
+- Blacksmith run `32640118370` confirmed the organization integration, passed
+  the immutable root package, and started both native Linux architectures. Its
+  deterministic job exposed a clean-checkout dependency: declaration consumers
+  were compiled before `packages/node/dist` existed. `contracts:check` now
+  self-prepares through the package-owned Node build; a cold-output reproduction,
+  targeted validation, and independent review pass before the required rerun.
 
 - The user resumed the blocked goal on 2026-08-23 by approving all three Phase
   4 compatibility recommendations. Implementation and validation may proceed;
