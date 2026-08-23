@@ -19,8 +19,22 @@ const linuxJob = jobs["native-linux"];
 const nativeJob = jobs.native;
 const artifactJob = jobs["artifact-set"];
 
-const linuxTargets = manifest.targets.filter(({ libc }) => libc === "glibc");
-const otherTargets = manifest.targets.filter(({ libc }) => libc !== "glibc");
+const ciTargets = manifest.targets.filter(({ continuousIntegration }) => continuousIntegration === true);
+const omittedTargets = manifest.targets.filter(({ continuousIntegration }) => continuousIntegration === false);
+const linuxTargets = ciTargets.filter(({ libc }) => libc === "glibc");
+const otherTargets = ciTargets.filter(({ libc }) => libc !== "glibc");
+check(
+  manifest.targets.every(({ continuousIntegration }) => typeof continuousIntegration === "boolean"),
+  "every native target must declare whether it participates in continuous integration",
+);
+check(
+  sameValue(omittedTargets.map(({ rustTarget }) => rustTarget), ["aarch64-apple-darwin", "x86_64-pc-windows-msvc"]),
+  "macOS ARM64 and Windows x64 must be the explicit continuous-CI omissions",
+);
+check(
+  workflowText.includes("omitted from continuous CI to reduce compute cost"),
+  "the CI workflow must document why macOS and Windows are omitted",
+);
 check(
   hasRun(deterministicJob, "cargo install cargo-about --version 0.9.2 --locked --features cli"),
   "deterministic validation must install the cargo-about CLI feature",
@@ -38,17 +52,22 @@ check(
   }))),
   "native-linux must own the exact GNU/Linux target tuples",
 );
-check(
-  sameValue(matrix(nativeJob), otherTargets.map((target) => ({
-    rust_target: target.rustTarget,
-    runner: target.runner,
-    package_directory: target.packageDirectory,
-  }))),
-  "native must own the exact non-Linux target tuples",
-);
+if (otherTargets.length === 0) {
+  check(nativeJob === undefined, "CI-omitted non-Linux targets must not have a native job");
+} else {
+  check(
+    sameValue(matrix(nativeJob), otherTargets.map((target) => ({
+      rust_target: target.rustTarget,
+      runner: target.runner,
+      package_directory: target.packageDirectory,
+    }))),
+    "native must own the exact continuously tested non-Linux target tuples",
+  );
+}
 check(linuxJob?.container?.image === "${{ matrix.build_container }}", "native-linux must use its target build container");
 
-for (const [name, job] of [["native-linux", linuxJob], ["native", nativeJob]]) {
+const nativeJobs = [["native-linux", linuxJob], ...(nativeJob ? [["native", nativeJob]] : [])];
+for (const [name, job] of nativeJobs) {
   check(job?.needs === "root-package", `${name} must consume the immutable root package`);
   assertConsumerMatrix(name, job);
   for (const command of [
@@ -65,12 +84,15 @@ check(
   "native-linux must enforce the glibc floor",
 );
 check(
-  !hasRun(nativeJob, "node scripts/validate-glibc-floor.mjs ${{ matrix.rust_target }}"),
+  !nativeJob || !hasRun(nativeJob, "node scripts/validate-glibc-floor.mjs ${{ matrix.rust_target }}"),
   "non-Linux targets must not run the glibc floor gate",
 );
 check(
-  sameValue([...(artifactJob?.needs ?? [])].sort(), ["native", "native-linux", "root-package"].sort()),
-  "artifact-set must depend on the root and both native jobs",
+  sameValue(
+    [...(artifactJob?.needs ?? [])].sort(),
+    ["native-linux", ...(nativeJob ? ["native"] : []), "root-package"].sort(),
+  ),
+  "artifact-set must depend on the root and every continuously tested native job",
 );
 for (const expected of ["native-*", "cli-*", "root-package"]) {
   check(
@@ -80,10 +102,16 @@ for (const expected of ["native-*", "cli-*", "root-package"]) {
 }
 check(
   (artifactJob?.steps ?? []).some(
-    (step) => typeof step?.run === "string" && step.run.trim() === "node scripts/validate-release-artifacts.mjs",
+    (step) => typeof step?.run === "string" && step.run.trim() === "node scripts/validate-release-artifacts.mjs --ci",
   ),
-  "artifact-set must run the aggregate release-artifact validator",
+  "artifact-set must run the continuous-CI artifact validator",
 );
+for (const [name, job] of [["deterministic", deterministicJob], ["root-package", jobs["root-package"]], ["artifact-set", artifactJob]]) {
+  check(
+    typeof job?.["runs-on"] === "string" && job["runs-on"].startsWith("blacksmith-"),
+    `${name} must run on Blacksmith`,
+  );
+}
 
 for (const [jobName, job] of Object.entries(jobs)) {
   for (const step of job?.steps ?? []) {

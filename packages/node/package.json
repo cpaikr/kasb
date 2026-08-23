@@ -6,7 +6,7 @@
   "license": "Elastic-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sjunepark/kasb.git",
+    "url": "git+https://github.com/cpaikr/kasb.git",
     "directory": "packages/node"
   },
   "bin": {

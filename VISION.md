@@ -73,8 +73,9 @@ The Pi export and extension are absent and receive no replacement host adapter.
   payloads never cross public boundaries.
 - `bounded execution`: timeouts, response sizes, retries, concurrency,
   cancellation, and persona lifetime are explicit.
-- `verified distribution`: support claims require real native artifacts and
-  clean packed-consumer evidence.
+- `verified distribution`: initial support claims require real native artifacts
+  and clean packed-consumer evidence; the continuous-CI subset is explicit and
+  may be narrower when the accepted maintenance policy prioritizes compute cost.
 - `public-read first`: v1 remains read-only and unauthenticated unless provider
   evidence supports a later product decision.
 
@@ -127,6 +128,10 @@ The rewrite succeeds when:
 - the judge rejects controlled wrong behavior;
 - every claimed native target passes clean packed-consumer tests; and
 - the TypeScript conformer and Pi surface are absent.
+
+Linux GNU x64/ARM64 are the continuously tested native targets. macOS ARM64 and
+Windows x64 remain supported from recorded cutover evidence but are deliberately
+omitted from ongoing CI to reduce compute cost.
 
 ## Current State
 

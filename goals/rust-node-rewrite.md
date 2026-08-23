@@ -60,6 +60,16 @@ Delivery: Use the fewest sequential reviewable PRs practical. Run the repository
   - Linux GNU x64 and ARM64 native packages require glibc 2.28, enforced for
     both the Node addon and same-revision Rust CLI artifact before support is
     promoted.
+- On 2026-08-23, the user approved the delivery and maintenance amendment:
+  - transfer the still-private repository to `cpaikr/kasb`, preserve PR #19,
+    update repository metadata and the local remote, and close obsolete Release
+    Please PR #11;
+  - retain npm identities under `@sjunepark/*`; and
+  - retain macOS ARM64 and Windows x64 as supported packages but deliberately
+    omit them from continuous CI to reduce compute cost. Continuous native CI
+    now covers Linux GNU x64/ARM64 on Blacksmith, and the workflow records the
+    accepted omission. The earlier four-target evidence remains the support
+    basis for the two non-continuous targets.
 
 ## Execution status
 
@@ -84,15 +94,16 @@ Phase 5 cutover is implemented and passes the complete local validation and
 independent review gates: `packages/node` is the canonical npm product, neutral
 contracts and tests live with that facade, the TypeScript conformer, JavaScript
 CLI behavior, and Pi surface are removed, and publication automation is
-disabled. The current-revision four-target native CI run and Phase 5 PR
-lifecycle remain before the goal can be marked complete.
+disabled. The current-revision Linux GNU x64/ARM64 Blacksmith CI run and Phase
+5 PR lifecycle remain before the goal can be marked complete; macOS ARM64 and
+Windows x64 no longer gate continuous delivery by explicit user decision.
 
 ### Next in-scope action
 
-Restore GitHub Actions capacity, rerun the current Phase 5 revision's
-four-target native and packed-consumer CI, and complete PR #19's review and
-merge lifecycle; then record completion without publishing, selecting a
-version, or creating a release tag.
+Run the current Phase 5 revision's Linux GNU x64/ARM64 native and packed
+consumer matrix on Blacksmith and complete PR #19's review and merge lifecycle;
+then record completion without publishing, selecting a version, or creating a
+release tag.
 
 ### Evidence and blockers
 
@@ -127,6 +138,18 @@ version, or creating a release tag.
   Actions budget is preventing further use,” so the dependent four-target and
   aggregate jobs were skipped. This external capacity event is not product
   evidence; the current-revision native CI and PR merge gates remain open.
+- The repository transfer to private `cpaikr/kasb` completed without changing
+  npm scope or losing PR #19. Obsolete Release Please PR #11 is closed and the
+  local `origin` follows the organization repository. The CI amendment replaces
+  GitHub-hosted Linux runners with Blacksmith and makes Linux GNU x64/ARM64 the
+  explicit continuous subset; supported macOS ARM64 and Windows x64 artifacts
+  remain outside ongoing CI under the authorized compute-cost exception.
+- The transfer/CI amendment passes frozen installation; contract, declaration,
+  native metadata/workflow, glibc, license, typecheck, test, build, formatting,
+  strict clippy, Rust 1.88, 93-case adversarial judge, host-native feasibility,
+  bounded live, YAML, and diff-hygiene validation. Independent CI and
+  documentation review reports no Bucket I or Bucket II finding; the actual
+  Linux Blacksmith run remains the product-evidence gate.
 
 - The user resumed the blocked goal on 2026-08-23 by approving all three Phase
   4 compatibility recommendations. Implementation and validation may proceed;

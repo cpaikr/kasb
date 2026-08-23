@@ -21,9 +21,15 @@ One revision produces:
 - direct Rust CLI archives built from those same binaries.
 
 `native-targets.json` owns package names, target triples, compatibility floors,
-and support claims. Linux GNU artifacts require glibc 2.28. Generated manifests
-and loaders must remain fresh, and the aggregate artifact validator requires
-the exact immutable artifact set.
+support claims, and continuous-CI participation. Linux GNU artifacts require
+glibc 2.28. Generated manifests and loaders must remain fresh. Continuous CI
+validates the exact Linux artifact subset on Blacksmith; the default aggregate
+validator still requires all four supported targets for any future release.
+
+macOS ARM64 and Windows x64 are deliberately omitted from continuous CI to
+reduce compute cost. They remain supported from the recorded cutover evidence,
+but a future publication still requires fresh native evidence for every target
+included in that release.
 
 ## Required evidence before any future publication
 

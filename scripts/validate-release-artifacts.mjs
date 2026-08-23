@@ -5,15 +5,21 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const nativeDirectory = resolve(repositoryRoot, process.argv[2] ?? "dist/native");
-const rootDirectory = resolve(repositoryRoot, process.argv[3] ?? "dist/root");
-const cliDirectory = resolve(repositoryRoot, process.argv[4] ?? "dist/cli");
+const inputs = process.argv.slice(2);
+const ciOnly = inputs[0] === "--ci";
+if (ciOnly) inputs.shift();
+const nativeDirectory = resolve(repositoryRoot, inputs[0] ?? "dist/native");
+const rootDirectory = resolve(repositoryRoot, inputs[1] ?? "dist/root");
+const cliDirectory = resolve(repositoryRoot, inputs[2] ?? "dist/cli");
 const manifest = JSON.parse(await readFile(resolve(repositoryRoot, "native-targets.json"), "utf8"));
 const rootSource = JSON.parse(await readFile(resolve(repositoryRoot, manifest.rootPackage, "package.json"), "utf8"));
 const license = await readFile(resolve(repositoryRoot, "LICENSE.md"), "utf8");
 const notices = await readFile(resolve(repositoryRoot, "THIRD_PARTY_LICENSES.html"), "utf8");
 const nodeNotices = await readFile(resolve(repositoryRoot, manifest.rootPackage, "THIRD_PARTY_LICENSES.md"), "utf8");
-const expectedNative = new Map(manifest.targets.map((target) => [target.packageName, target]));
+const validatedTargets = ciOnly
+  ? manifest.targets.filter(({ continuousIntegration }) => continuousIntegration === true)
+  : manifest.targets;
+const expectedNative = new Map(validatedTargets.map((target) => [target.packageName, target]));
 
 assertPublicPackage(rootSource, "@sjunepark/kasb");
 assertNoPiMetadata(rootSource);
@@ -122,7 +128,7 @@ if (!isExecutableMode(tarballMode(rootTarball, "package/dist/cli.js"))) {
   throw new Error("Root launcher is not executable in the npm tarball.");
 }
 
-console.log(`complete native artifact set passed for ${root.name}@${root.version}`);
+console.log(`${ciOnly ? "continuous-CI" : "complete"} native artifact set passed for ${root.name}@${root.version}`);
 
 async function tarballs(directory) {
   return (await readdir(directory, { withFileTypes: true }))

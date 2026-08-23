@@ -15,7 +15,10 @@ removed.
 Linux GNU x64/ARM64, macOS ARM64, and Windows x64 passed their native build,
 artifact, direct-CLI, and clean-consumer gates. Linux GNU targets require glibc
 2.28. Windows preserves the launcher process contract without promising POSIX
-signal identity. Contained native panics expose only a public
+signal identity. Continuous CI now validates only Linux GNU x64/ARM64 on
+Blacksmith to reduce compute cost; macOS ARM64 and Windows x64 remain supported
+from their recorded cutover evidence but are not continuously tested. Contained
+native panics expose only a public
 `internal_failure` and the sanitized `sjunepark.kasb.native`
 `{ "code": "binding_panic" }` diagnostics event.
 

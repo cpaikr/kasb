@@ -23,7 +23,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sjunepark/kasb.git",
+    "url": "git+https://github.com/cpaikr/kasb.git",
     "directory": "packages/native/linux-x64-gnu"
   },
   "license": "Elastic-2.0",

@@ -1,6 +1,6 @@
 # Rewrite KASB around a public Rust SDK, Node SDK, and Rust CLI
 
-Status: cutover implemented; final native CI blocked by GitHub Actions budget.
+Status: cutover implemented; final Linux Blacksmith CI and PR lifecycle in progress.
 
 ## Outcome
 
@@ -24,6 +24,11 @@ native-target, and live verification.
   artifact contains the addon and same-revision Rust CLI.
 - Linux GNU x64/ARM64, macOS ARM64, and Windows x64 passed native builds,
   direct archives, exact packed consumers, and aggregate validation.
+- The private repository is owned by `cpaikr/kasb`, while npm package identity
+  remains under `@sjunepark/*`.
+- Continuous CI intentionally covers Linux GNU x64/ARM64 only on Blacksmith to
+  reduce compute cost. macOS ARM64 and Windows x64 remain supported from the
+  recorded Phase 4 evidence but are not continuously tested.
 - Phase 5 removed the TypeScript conformer, JavaScript CLI behavior, Pi export,
   Pi registration, and obsolete publication automation. Neutral public
   contracts, schemas, and toolset ergonomics now live with the Node facade.
@@ -89,6 +94,10 @@ native-target, and live verification.
 - Require glibc 2.28 for Linux GNU x64 and ARM64 npm artifacts. Build on that
   runtime, reject addon or CLI imports requiring newer glibc symbols, and run
   clean packed consumers at the floor before promoting support.
+- Keep the four supported npm targets, but continuously validate only Linux GNU
+  x64/ARM64 on Blacksmith. macOS ARM64 and Windows x64 retain their recorded
+  support evidence without ongoing CI; the workflow must state that this
+  deliberate omission reduces compute cost.
 
 ## Delivery plan
 
@@ -224,9 +233,10 @@ completion status.
   active product, package, tests, and documentation.
 - The public-surface judge covers all approved operations and proves it detects
   controlled incorrect behavior.
-- Every claimed native target builds and passes direct CLI and clean packed npm
-  consumer tests; generated declarations, loaders, launchers, manifests, and
-  package contents are fresh.
+- Every claimed native target has recorded native-build, direct-CLI, and clean
+  packed-consumer evidence. The current revision's continuous CI covers Linux
+  GNU x64/ARM64; generated declarations, loaders, launchers, manifests, and the
+  continuously tested artifact subset are fresh.
 - Deterministic validation, bounded live checks, repository review, and
   delivery review pass, with planning and current documentation reconciled.
 - No registry publication, release tag, or external provider mutation occurs.
@@ -247,7 +257,6 @@ completion status.
 
 ## Next action
 
-Restore GitHub Actions capacity, rerun PR #19's current revision through the
-four-target native and packed-consumer CI, and complete its review and merge
-lifecycle; then record the cutover as complete without publishing or selecting
-a release version.
+Run PR #19's current revision through Linux GNU x64/ARM64 native and packed
+consumer CI on Blacksmith, then complete its review and merge lifecycle. Record
+the cutover as complete without publishing or selecting a release version.

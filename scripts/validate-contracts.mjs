@@ -246,6 +246,16 @@ equal(
   ],
   "supported native target matrix must remain explicit",
 );
+equal(
+  targets.targets?.filter(({ continuousIntegration }) => continuousIntegration === true).map(({ rustTarget }) => rustTarget),
+  ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"],
+  "continuous native CI must cover exactly the two Linux GNU targets",
+);
+equal(
+  targets.targets?.filter(({ continuousIntegration }) => continuousIntegration === false).map(({ rustTarget }) => rustTarget),
+  ["aarch64-apple-darwin", "x86_64-pc-windows-msvc"],
+  "macOS ARM64 and Windows x64 must remain explicit supported targets omitted from continuous CI",
+);
 check(
   new Set(targets.targets?.map(({ packageName }) => packageName)).size === targets.targets?.length,
   "every native target must have a unique package",
@@ -255,10 +265,12 @@ check(
   "every native target must have a unique runtime key",
 );
 for (const target of targets.targets || []) {
+  check(typeof target.continuousIntegration === "boolean", `${target.rustTarget} must declare continuousIntegration`);
   check(target.packageName?.startsWith("@sjunepark/kasb-"), `${target.rustTarget} package must use the KASB scope`);
   check(target.addonFile?.endsWith(".node"), `${target.rustTarget} must name a Node-API artifact`);
   check(target.cliFile === (target.npmPlatform === "win32" ? "kasb.exe" : "kasb"), `${target.rustTarget} must name the native CLI consistently`);
   if (target.libc === "glibc") {
+    check(target.runner?.startsWith("blacksmith-") === true, `${target.rustTarget} continuous CI must use Blacksmith`);
     check(
       typeof target.buildContainer === "string" &&
         target.buildContainer.includes("manylinux_2_28") &&
@@ -266,6 +278,7 @@ for (const target of targets.targets || []) {
       `${target.rustTarget} must use a digest-pinned manylinux_2_28 build container`,
     );
   } else {
+    check(!Object.hasOwn(target, "runner"), `${target.rustTarget} omitted from continuous CI must not declare a runner`);
     check(!Object.hasOwn(target, "buildContainer"), `${target.rustTarget} must not declare a Linux build container`);
   }
 }

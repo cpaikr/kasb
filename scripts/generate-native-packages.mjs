@@ -30,7 +30,7 @@ for (const target of manifest.targets) {
     engines: { node: `>=${manifest.minimumNodeVersion}` },
     repository: {
       type: "git",
-      url: "git+https://github.com/sjunepark/kasb.git",
+      url: "git+https://github.com/cpaikr/kasb.git",
       directory: `${manifest.nativePackageRoot}/${target.packageDirectory}`,
     },
     license: rootPackage.license ?? "Elastic-2.0",
