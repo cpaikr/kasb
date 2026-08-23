@@ -84,11 +84,10 @@ packed-consumer gate passes.
 
 ### Next in-scope action
 
-Commit and push the independently reviewed launcher signal-registration and
-probe-cleanup correction exposed by run `32620270180`, rerun every deterministic
-and native consumer gate, promote support only from passing evidence, and
-complete the Phase 4 PR lifecycle. Only afterward begin the dependent canonical
-cutover.
+Commit and push the independently reviewed cross-platform text-canonicalization
+correction exposed by run `32621109003`, rerun every deterministic and native
+consumer gate, promote support only from passing evidence, and complete the
+Phase 4 PR lifecycle. Only afterward begin the dependent canonical cutover.
 
 ### Evidence and blockers
 
@@ -275,3 +274,16 @@ cutover.
   finding. macOS ARM64 native feasibility, all 13 Node tests, Node typechecking,
   contract and native metadata checks, Rust formatting, syntax checks, and diff
   hygiene pass locally. Support remains unclaimed pending a fully clean rerun.
+- The sixth full native run, Actions run `32621109003`, passes deterministic
+  validation and all four complete native target jobs, including both Linux
+  glibc floors, all Node 20.18.1 through 26 packed consumers, direct CLI
+  archives, and the repaired Linux ARM64 signal path. The final aggregate job
+  downloaded every immutable artifact and found that Windows checkout had
+  converted the packaged license to CRLF while the Linux checkout authority
+  remained LF; byte inspection shows exactly 55 CRLF substitutions in both the
+  Windows npm package and direct CLI archive and no content difference. The
+  current correction adds a repository checkout invariant keeping all tracked
+  text LF across artifact-producing operating systems. Independent review
+  reports no Bucket I or Bucket II finding and confirms generated native
+  binaries remain outside the tracked-text rule. Support remains unclaimed
+  pending a clean aggregate rerun from the corrected revision.

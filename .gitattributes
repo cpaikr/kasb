@@ -1,0 +1,3 @@
+# Native packages and direct CLI archives are assembled on multiple operating
+# systems and compared byte-for-byte. Keep tracked text canonical across them.
+* text=auto eol=lf
