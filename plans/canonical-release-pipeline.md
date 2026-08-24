@@ -54,6 +54,9 @@ artifact set.
 - npm uses short-lived trusted publishing. Publish native platform packages
   first and the exact-version root `@sjunepark/kasb` package last; report any
   partial publication truthfully.
+- A strict retry treats an occupied npm package identity as resumable only when
+  the registry tarball is byte-for-byte the validated candidate. It skips exact
+  matches, publishes only missing packages, and fails closed on any mismatch.
 - crates.io publication is not silently inferred from the public Rust SDK.
   Rust crate versions remain compatible with the product release, while adding
   a crates.io channel requires an explicit distribution decision.
@@ -81,7 +84,8 @@ artifact set.
   on every supported target.
 - Publish the staged GitHub Release and then the validated npm tarballs through
   protected release jobs with least-privilege permissions and explicit failure
-  reporting.
+  reporting. After publishing the GitHub Release and before npm publication,
+  verify that GitHub reports the release and its tag as immutable.
 - Update release operator documentation with trusted-publisher setup,
   environment protection, recovery boundaries, and the separately authorized
   first-release procedure.
@@ -99,8 +103,9 @@ artifact set.
   and clean-consumer installation.
 - Failure injection covers an incomplete target matrix, failed deterministic
   gates, upload interruption, duplicate versions, native-package partial npm
-  publication, root-package failure, and safe rerun behavior without moving a
-  published tag or replacing an immutable asset.
+  publication, exact-match resume, occupied-package mismatch, root-package
+  failure, and safe rerun behavior without moving a published tag or replacing
+  an immutable asset.
 - The release workflow carries only the permissions needed by each job and uses
   trusted publishing rather than retained npm tokens.
 - The existing deterministic and continuous Linux validation remains green and
@@ -117,16 +122,18 @@ artifact set.
   substituted by explicit synthetic rehearsal inputs.
 - Protected GitHub and npm publication jobs consume the validated candidate
   without rebuilding, declare least-privilege permissions, use npm trusted
-  publishing, preserve immutable tag/asset rules, and cannot run from the
-  non-publishing rehearsal path.
+  publishing, verify GitHub release immutability before npm publication,
+  preserve immutable tag/asset rules, and cannot run from the non-publishing
+  rehearsal path.
 - Deterministic failure injection proves incomplete matrices, failed gates,
-  interrupted uploads, occupied identities, partial npm publication, root
-  failure, and safe reruns are detected and reported without moving tags or
-  replacing immutable assets.
+  interrupted uploads, non-immutable releases, occupied identities, partial npm
+  publication, exact-match resume, occupied-package mismatch, root failure, and
+  safe reruns are detected and reported without moving tags or replacing
+  immutable assets.
 - Operator documentation identifies public repository visibility, protected
-  environment configuration, and npm trusted-publisher registration as
-  externally authorized first-release prerequisites and gives verification
-  steps without performing them.
+  environment configuration, repository release immutability, and npm
+  trusted-publisher registration as externally authorized first-release
+  prerequisites and gives verification steps without performing them.
 - The non-publishing four-target rehearsal passes on the exact candidate
   workflow, existing continuous validation remains green, repository-required
   review passes, the implementation PR is merged, and planning records the

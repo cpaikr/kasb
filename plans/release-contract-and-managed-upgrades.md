@@ -31,7 +31,9 @@ binary without runtime addon downloads.
 ## Decisions
 
 - Publicly accessible GitHub Releases are the canonical standalone CLI source.
-  Tags and published assets are immutable; corrections use a new version.
+  Repository release immutability must lock the associated tag and assets after
+  publication; installers and upgrades reject release metadata that is not
+  marked immutable, and corrections use a new version.
 - `cpaikr/kasb` is the single canonical source and release repository. This
   work binds artifacts, installers, receipts, provenance, and upgrade discovery
   to that identity without changing its visibility; public visibility remains
@@ -72,8 +74,8 @@ binary without runtime addon downloads.
 - Extend the target model and generators for versioned archives, a checksum
   manifest, shell and PowerShell installers, and a versioned receipt schema.
 - Define bounded GitHub Release discovery and download behavior, including
-  redirects, timeouts, response sizes, unsupported targets, missing assets, and
-  rate-limit or network failures.
+  redirects, timeouts, response sizes, immutable-release verification,
+  unsupported targets, missing assets, and rate-limit or network failures.
 - Implement `upgrade --check` and `upgrade` with explicit structured failures,
   same-filesystem staging, digest verification, rollback, and truthful recovery
   state.
@@ -114,7 +116,8 @@ binary without runtime addon downloads.
   identity and digest checks.
 - `kasb --version`, `kasb upgrade --check`, and recoverable `kasb upgrade`
   satisfy the managed/unmanaged, rollback, Windows replacement, network-bound,
-  and ordinary-command isolation contracts in deterministic tests.
+  immutable-release, and ordinary-command isolation contracts in deterministic
+  tests.
 - Architecture, product, CLI, and release documentation describe the same
   standalone/npm ownership boundary, current private-host prerequisite, and
   separately authorized production release.

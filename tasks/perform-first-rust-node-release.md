@@ -2,9 +2,10 @@
 
 ## Outcome
 
-The completed Rust SDK, Rust CLI, Node SDK, native packages, standalone
-installers, and managed-upgrade path are published under one new version through
-the canonical GitHub Release and its npm projection.
+The completed Rust CLI, Node SDK, native packages, standalone installers, and
+managed-upgrade path are published under one new version through the canonical
+GitHub Release and its npm projection. The public Rust SDK source is versioned
+by the same tag; crates.io remains a separate distribution decision.
 
 ## Current state
 
@@ -18,8 +19,8 @@ GitHub Releases, and registry publication.
 ## Next action
 
 After both scheduled release plans pass review and exhaustive dry-run
-validation, request explicit authorization to make `cpaikr/kasb` public,
-configure and verify protected release environments and npm trusted publishing,
-select the new version, create its tag, and perform real GitHub/npm publication.
-Do not mutate any of those external settings or release identities before that
-approval.
+validation, request explicit authorization to make `cpaikr/kasb` public, enable
+and verify repository release immutability, configure and verify protected
+release environments and npm trusted publishing, select the new version, create
+its tag, and perform real GitHub/npm publication. Do not mutate any of those
+external settings or release identities before that approval.
