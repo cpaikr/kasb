@@ -27,6 +27,9 @@ runs:
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
       with:
         node-version: 24
+    - name: Pin packaging npm 11.6.2
+      shell: bash
+      run: npm install --global npm@11.6.2
     - name: Set up Rust 1.88 target
       uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
       with:
@@ -54,6 +57,11 @@ runs:
       with:
         name: ${{ inputs.root_artifact }}
         path: dist/root
+    - name: Exercise exact standalone candidate installation and upgrade contract
+      shell: bash
+      run: |
+        set -euo pipefail
+        node scripts/test-release-candidate-consumer.mjs "${{ inputs.rust_target }}" dist/cli
     - name: Exercise clean consumers on Node 20.18.1 through 26
       shell: bash
       run: |
@@ -68,21 +76,15 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        mkdir -p dist/provenance/fragments
-        jq -n \
-          --arg repository "$GITHUB_REPOSITORY" \
-          --arg commit "${{ inputs.candidate_sha }}" \
-          --arg sourceRef "${{ inputs.candidate_ref }}" \
-          --arg version "$(node -p "require('./packages/node/package.json').version")" \
-          --arg target "${{ inputs.rust_target }}" \
-          --arg rust "$(rustc --version)" \
-          --arg node "$(node --version)" \
-          --arg runner "${{ inputs.declared_runner }}" \
-          --arg runnerOs "$RUNNER_OS" \
-          --arg runnerArch "$RUNNER_ARCH" \
-          --arg buildImage "${{ inputs.build_image }}" \
-          '{schemaVersion:1,repository:$repository,version:$version,sourceRef:$sourceRef,commit:$commit,target:$target,rust:$rust,node:$node,runner:{label:$runner,os:$runnerOs,arch:$runnerArch},buildImage:(if $buildImage == "" then null else $buildImage end)}' \
-          > "dist/provenance/fragments/${{ inputs.rust_target }}.json"
+        node scripts/write-release-target-provenance.mjs \
+          --repository "$GITHUB_REPOSITORY" \
+          --commit "${{ inputs.candidate_sha }}" \
+          --ref "${{ inputs.candidate_ref }}" \
+          --target "${{ inputs.rust_target }}" \
+          --rust "$(rustc --version)" \
+          --npm "$(npm --version)" \
+          --runner "${{ inputs.declared_runner }}" \
+          --build-image "${{ inputs.build_image }}"
     - name: Upload allowlisted validated target artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
       with:

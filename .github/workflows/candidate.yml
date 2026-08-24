@@ -143,7 +143,7 @@ jobs:
       - name: Test products and installer contracts
         env:
           KASB_REQUIRE_POWERSHELL_TESTS: "1"
-        run: bun run test
+        run: bun run test && bun run test:release-pipeline
       - name: Run adversarial conformance
         run: bun run conformance:judge
       - name: Build all products
@@ -171,6 +171,8 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
+      - name: Pin packaging npm 11.6.2
+        run: npm install --global npm@11.6.2
       - name: Build and pack once
         run: |
           bun install --frozen-lockfile
@@ -299,21 +301,23 @@ jobs:
           cp installers/install.sh installers/install.ps1 dist/installers/
           version=$(node -p "require('./packages/node/package.json').version")
           expected_targets=$(jq -c '[.targets[].rustTarget] | sort' native-targets.json)
+          expected_toolchain=$(jq -c '.release.toolchain' native-targets.json)
           jq -se \
             --arg repository "$GITHUB_REPOSITORY" \
             --arg version "$version" \
             --arg sourceRef "${{ needs.metadata.outputs.ref }}" \
             --arg commit "$CANDIDATE_SHA" \
             --argjson expectedTargets "$expected_targets" \
-            'length == 4 and ([.[].target] | unique | sort) == $expectedTargets and all(.[]; .schemaVersion == 1 and .repository == $repository and .version == $version and .sourceRef == $sourceRef and .commit == $commit and (.runner.label | length > 0) and (.runner.os | length > 0) and (.runner.arch | length > 0))' \
+            --argjson expectedToolchain "$expected_toolchain" \
+            'length == 4 and ([.[].target.rustTarget] | unique | sort) == $expectedTargets and all(.[]; .schemaVersion == 1 and .repository == $repository and .version == $version and .sourceRef == $sourceRef and .commit == $commit and .toolchain == $expectedToolchain and (.target.runner.label | length > 0) and (.target.runner.os | length > 0) and (.target.runner.arch | length > 0))' \
             dist/provenance/fragments/*.json >/dev/null
           jq -s --arg repository "$GITHUB_REPOSITORY" --arg commit "$CANDIDATE_SHA" \
             --arg version "$version" --arg sourceRef "${{ needs.metadata.outputs.ref }}" \
-            '{schemaVersion:1,repository:$repository,version:$version,sourceRef:$sourceRef,commit:$commit,targets:sort_by(.target)}' \
+            '{schemaVersion:1,repository:$repository,version:$version,sourceRef:$sourceRef,commit:$commit,toolchain:.[0].toolchain,targets:(map(.target) | sort_by(.rustTarget))}' \
             dist/provenance/fragments/*.json > dist/provenance/provenance.json
           node scripts/write-release-checksums.mjs --candidate
-          node scripts/validate-release-artifacts.mjs
-          node scripts/write-release-candidate-manifest.mjs --sha "$CANDIDATE_SHA"
+          node scripts/validate-release-artifacts.mjs --candidate
+          node scripts/write-release-candidate-manifest.mjs --sha "$CANDIDATE_SHA" --output dist/release/artifact-manifest.json
       - name: Reconcile post-build candidate metadata
         shell: bash
         env:
@@ -324,7 +328,7 @@ jobs:
           set -euo pipefail
           state=fixtures/release/publication-vacant.json
           [[ "$MODE" == rehearsal ]] || state=dist/release/state/publication-state.json
-          node scripts/validate-release-candidate.mjs --mode "$MODE" --ref "$CANDIDATE_REF" --sha "$CANDIDATE_SHA" --publication-state "$state" --artifact-manifest dist/release/artifact-manifest.json --output dist/release/candidate-metadata.json
+          node scripts/validate-release-candidate.mjs --mode "$MODE" --ref "$CANDIDATE_REF" --sha "$CANDIDATE_SHA" --publication-state "$state" --artifact-manifest dist/release/artifact-manifest.json --output dist/release/candidate.json
       - name: Upload validated candidate
         id: upload
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -339,6 +343,6 @@ jobs:
             dist/installers/install.ps1
             dist/provenance/provenance.json
             dist/release/artifact-manifest.json
-            dist/release/candidate-metadata.json
+            dist/release/candidate.json
           if-no-files-found: error
           retention-days: 7

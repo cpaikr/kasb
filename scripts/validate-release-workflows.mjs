@@ -9,6 +9,7 @@ const manifest = JSON.parse(await readFile(resolve(root, "native-targets.json"),
 const candidateText = await readFile(resolve(root, ".github/workflows/candidate.yml"), "utf8");
 const releaseText = await readFile(resolve(root, ".github/workflows/release.yml"), "utf8");
 const actionText = await readFile(resolve(root, ".github/actions/build-release-target/action.yml"), "utf8");
+const candidateConsumerText = await readFile(resolve(root, "scripts/test-release-candidate-consumer.mjs"), "utf8");
 const candidate = parse("candidate.yml", candidateText);
 const release = parse("release.yml", releaseText);
 const action = parse("build-release-target/action.yml", actionText);
@@ -46,6 +47,7 @@ for (const command of [
   "bun run licenses:check",
   "bun run typecheck",
   "bun run test",
+  "bun run test:release-pipeline",
   "bun run conformance:judge",
   "bun run build",
   "cargo fmt --all --check",
@@ -56,16 +58,39 @@ for (const command of [
   "cargo build --locked --release --target",
   "node scripts/assemble-native-package.mjs",
   "node scripts/assemble-cli-archive.mjs",
+  "node scripts/test-release-candidate-consumer.mjs",
   "node scripts/test-native-consumer.mjs",
+  "node scripts/write-release-target-provenance.mjs",
 ]) check(actionText.includes(command), `target builder is missing ${command}`);
+check(!actionText.includes("jq "), "cross-platform target provenance must not assume jq is installed");
+check(actionText.includes("npm install --global npm@11.6.2"), "target packaging must pin the manifest-owned npm version");
+check(hasRun(jobs["root-package"], "npm install --global npm@11.6.2"), "root packaging must pin the manifest-owned npm version");
 for (const version of manifest.validationNodeVersions) check(actionText.includes(version), `target builder is missing Node ${version} consumer coverage`);
 check(actionText.includes("dist/native/*.tgz") && actionText.includes("dist/cli/*.tar.gz"), "target upload must allowlist native and standalone artifacts");
 check(!actionText.includes("dist/**"), "target upload must not use a broad dist glob");
 
 check(hasRun(jobs.aggregate, "node scripts/write-release-checksums.mjs --candidate"), "aggregate must checksum every publishable candidate asset");
-check(hasRun(jobs.aggregate, "node scripts/validate-release-artifacts.mjs"), "aggregate must independently validate all four target artifacts");
-check(hasRun(jobs.aggregate, "node scripts/write-release-candidate-manifest.mjs"), "aggregate must emit a hashed candidate manifest");
-check(hasRun(jobs.aggregate, "--artifact-manifest dist/release/artifact-manifest.json"), "aggregate must reconcile candidate metadata after artifacts exist");
+check(hasRun(jobs.aggregate, "node scripts/validate-release-artifacts.mjs --candidate"), "aggregate must independently validate the complete candidate asset set");
+check(actionText.includes('node scripts/test-release-candidate-consumer.mjs "${{ inputs.rust_target }}" dist/cli'), "every target runner must exercise its exact standalone archive without rebuilding");
+for (const evidence of [
+  'process.platform === "win32"',
+  '"powershell.exe"',
+  '"installers/install.ps1"',
+  '"installers/install.sh"',
+  "contract.release.receiptFile",
+  'installedExecutableBytes, exactExecutableBytes',
+  '["upgrade", "--check"]',
+  "KASB_UPGRADE_TEST_LATEST_URL",
+]) check(candidateConsumerText.includes(evidence), `exact candidate consumer is missing ${evidence}`);
+check(!/\b(?:cargo build|npm pack|bun run build)\b/u.test(candidateConsumerText), "exact candidate consumer must never rebuild its input archive");
+check(hasRun(
+  jobs.aggregate,
+  "node scripts/write-release-candidate-manifest.mjs --sha \"$CANDIDATE_SHA\" --output dist/release/artifact-manifest.json",
+), "aggregate must emit the raw hashed artifact manifest at its canonical path");
+check(hasRun(
+  jobs.aggregate,
+  "--artifact-manifest dist/release/artifact-manifest.json --output dist/release/candidate.json",
+), "aggregate must reconcile proof-bearing candidate metadata at the publication planner's canonical path");
 const aggregateUpload = (jobs.aggregate?.steps ?? []).find(({ id }) => id === "upload");
 const candidatePaths = String(aggregateUpload?.with?.path ?? "").trim().split(/\r?\n/u).sort();
 check(equal(candidatePaths, [
@@ -76,7 +101,7 @@ check(equal(candidatePaths, [
   "dist/native/*.tgz",
   "dist/provenance/provenance.json",
   "dist/release/artifact-manifest.json",
-  "dist/release/candidate-metadata.json",
+  "dist/release/candidate.json",
   "dist/root/*.tgz",
 ].sort()), "final candidate upload must use the exact allowlisted artifact paths");
 
@@ -96,9 +121,15 @@ for (const name of ["github-release", "npm-release"]) {
   check(hasInput(releaseJobs[name], "artifact-ids"), `${name} must consume the immutable candidate artifact by ID`);
   check(!hasAnyRun(releaseJobs[name], /\b(?:cargo build|npm pack|bun run build)\b/u), `${name} must never rebuild candidate artifacts`);
 }
+for (const job of [releaseJobs["github-release"], releaseJobs["npm-release"]]) {
+  check(hasRun(job, "plan-github-publication.mjs") || hasRun(job, "plan-npm-publication.mjs"), "publication jobs must invoke a canonical planner");
+  check(!hasRun(job, "--candidate"), "publication planners must consume the uploaded canonical dist/release/candidate.json receipt");
+}
+check(releaseText.includes("path: dist"), "publication must download the candidate artifact so dist/release/candidate.json retains its canonical path");
 check(hasRun(releaseJobs["github-release"], "--phase verify"), "GitHub publication must verify immutable exact release state");
 check(hasRun(releaseJobs["npm-release"], "--phase verify"), "npm publication must reverify GitHub state before registry mutation");
 check(hasRun(releaseJobs["npm-release"], "npm publish"), "npm publication must use trusted npm publish");
+check(releaseText.includes("if ! npm publish") && releaseText.includes("capture-release-publication-state.mjs") && releaseText.includes("plan-npm-publication.mjs"), "npm publish races must recapture and replan exact registry state");
 check(hasRun(releaseJobs["npm-release"], "publication-report.json"), "npm publication must always record machine-readable partial state");
 check((releaseJobs["npm-release"]?.steps ?? []).some((step) => step?.if === "always()" && step?.uses?.startsWith("actions/upload-artifact@")), "publication report must upload even after partial failure");
 check(releaseText.includes("candidate_artifact_digest"), "publication must intentionally record the server-computed candidate digest");

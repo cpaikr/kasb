@@ -257,12 +257,23 @@ jobs:
         run: |
           set +e
           mkdir -p dist/release
-          node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
-          capture_status=$?
-          node scripts/plan-github-publication.mjs --state dist/release/publication-state.json --phase verify
-          github_status=$?
-          node scripts/plan-npm-publication.mjs --state dist/release/publication-state.json
-          npm_status=$?
+          printf '%s\n' '{"schemaVersion":1,"ok":false,"channel":"github","error":{"code":"not_run","message":"GitHub verification did not run"}}' > dist/release/github-publication-plan.json
+          printf '%s\n' '{"schemaVersion":1,"ok":false,"channel":"npm","error":{"code":"not_run","message":"npm verification did not run"}}' > dist/release/npm-publication-plan.json
+          capture_status=127
+          github_status=127
+          npm_status=127
+          if [[ -f scripts/capture-release-publication-state.mjs ]]; then
+            node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
+            capture_status=$?
+          fi
+          if [[ -f scripts/plan-github-publication.mjs ]]; then
+            node scripts/plan-github-publication.mjs --state dist/release/publication-state.json --phase verify
+            github_status=$?
+          fi
+          if [[ -f scripts/plan-npm-publication.mjs ]]; then
+            node scripts/plan-npm-publication.mjs --state dist/release/publication-state.json
+            npm_status=$?
+          fi
           jq -n \
             --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
             --argjson captureStatus "$capture_status" \
