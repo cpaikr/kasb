@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::future::Future;
 use std::io::{Read, Write};
@@ -41,6 +42,7 @@ struct ReleasePolicy {
     tag_prefix: String,
     archive_prefix: String,
     archive_extension: String,
+    archive_entries: Vec<String>,
     checksum_asset: String,
     receipt_file: String,
     receipt_schema_version: u32,
@@ -326,6 +328,7 @@ async fn execute_upgrade_cancellable<S: ReleaseSource>(
     let executable = executable_from_archive(
         &archive,
         &target.executable_name,
+        &target.archive_entries,
         manifest.release.archive_limit_bytes as u64,
     )?;
     check_cancellation(cancellation)?;
@@ -866,8 +869,26 @@ fn is_sha256(value: &str) -> bool {
 fn executable_from_archive(
     archive: &[u8],
     executable_name: &str,
+    expected_entries: &[String],
     executable_limit: u64,
 ) -> Result<Vec<u8>, UpgradeError> {
+    let invalid_entry_set = || {
+        UpgradeError::new(
+            "upgrade_archive_invalid",
+            "The release archive does not match the canonical entry set.",
+        )
+    };
+    let expected_entry_count = expected_entries.len();
+    let expected_entries = expected_entries
+        .iter()
+        .map(PathBuf::from)
+        .collect::<HashSet<_>>();
+    if expected_entries.is_empty() || expected_entries.len() != expected_entry_count {
+        return Err(invalid_entry_set());
+    }
+    if !expected_entries.contains(Path::new(executable_name)) {
+        return Err(invalid_entry_set());
+    }
     let decoder = GzDecoder::new(archive).take(
         executable_limit
             .saturating_add(ARCHIVE_EXPANSION_OVERHEAD)
@@ -875,7 +896,7 @@ fn executable_from_archive(
     );
     let mut tar = tar::Archive::new(decoder);
     let mut found = None;
-    let mut entry_count = 0usize;
+    let mut observed_entries = HashSet::new();
     let mut expanded_bytes = 0u64;
     for entry in tar.entries().map_err(|_| {
         UpgradeError::new(
@@ -883,13 +904,6 @@ fn executable_from_archive(
             "The release archive cannot be read.",
         )
     })? {
-        entry_count += 1;
-        if entry_count > 16 {
-            return Err(UpgradeError::new(
-                "upgrade_archive_invalid",
-                "The release archive contains too many entries.",
-            ));
-        }
         let mut entry = entry.map_err(|_| {
             UpgradeError::new(
                 "upgrade_archive_invalid",
@@ -903,13 +917,19 @@ fn executable_from_archive(
                 "The expanded release archive exceeds its size limit.",
             ));
         }
-        let path = entry.path().map_err(|_| {
-            UpgradeError::new(
-                "upgrade_archive_invalid",
-                "The release archive contains an invalid path.",
-            )
-        })?;
-        if path.as_ref() != Path::new(executable_name) {
+        let path = entry
+            .path()
+            .map_err(|_| {
+                UpgradeError::new(
+                    "upgrade_archive_invalid",
+                    "The release archive contains an invalid path.",
+                )
+            })?
+            .into_owned();
+        if !expected_entries.contains(&path) || !observed_entries.insert(path.clone()) {
+            return Err(invalid_entry_set());
+        }
+        if path != Path::new(executable_name) {
             continue;
         }
         if found.is_some()
@@ -931,6 +951,9 @@ fn executable_from_archive(
         })?;
         found = Some(bytes);
     }
+    if observed_entries != expected_entries {
+        return Err(invalid_entry_set());
+    }
     found.ok_or_else(|| {
         UpgradeError::new(
             "upgrade_archive_invalid",
@@ -942,6 +965,7 @@ fn executable_from_archive(
 struct TargetIdentity {
     release_target: String,
     executable_name: String,
+    archive_entries: Vec<String>,
 }
 
 fn current_target(manifest: &ReleaseManifest) -> Result<TargetIdentity, UpgradeError> {
@@ -974,6 +998,18 @@ fn current_target(manifest: &ReleaseManifest) -> Result<TargetIdentity, UpgradeE
         .map(|target| TargetIdentity {
             release_target: target.package_directory.clone(),
             executable_name: target.cli_file.clone(),
+            archive_entries: manifest
+                .release
+                .archive_entries
+                .iter()
+                .map(|entry| {
+                    if entry == "{executable}" {
+                        target.cli_file.clone()
+                    } else {
+                        entry.clone()
+                    }
+                })
+                .collect(),
         })
         .ok_or_else(|| {
             UpgradeError::new(
@@ -1939,6 +1975,14 @@ mod tests {
         TargetIdentity {
             release_target: "linux-x64-gnu".to_owned(),
             executable_name: "kasb".to_owned(),
+            archive_entries: [
+                "kasb",
+                "LICENSE.md",
+                "README.md",
+                "THIRD_PARTY_LICENSES.html",
+            ]
+            .map(str::to_owned)
+            .to_vec(),
         }
     }
 
@@ -1971,6 +2015,15 @@ mod tests {
             builder
                 .append_data(&mut header, "kasb", Cursor::new(executable))
                 .unwrap();
+            for name in ["LICENSE.md", "README.md", "THIRD_PARTY_LICENSES.html"] {
+                let mut header = tar::Header::new_gnu();
+                header.set_size(1);
+                header.set_mode(0o644);
+                header.set_cksum();
+                builder
+                    .append_data(&mut header, name, Cursor::new(b"x"))
+                    .unwrap();
+            }
             builder.finish().unwrap();
         }
         encoded
@@ -2057,6 +2110,13 @@ mod tests {
 
     #[test]
     fn archive_extraction_requires_exactly_one_regular_executable() {
+        let expected_entries = [
+            "kasb",
+            "LICENSE.md",
+            "README.md",
+            "THIRD_PARTY_LICENSES.html",
+        ]
+        .map(str::to_owned);
         let mut encoded = Vec::new();
         {
             let encoder =
@@ -2070,10 +2130,19 @@ mod tests {
             builder
                 .append_data(&mut header, "kasb", Cursor::new(bytes))
                 .unwrap();
+            for name in ["LICENSE.md", "README.md", "THIRD_PARTY_LICENSES.html"] {
+                let mut header = tar::Header::new_gnu();
+                header.set_size(1);
+                header.set_mode(0o644);
+                header.set_cksum();
+                builder
+                    .append_data(&mut header, name, Cursor::new(b"x"))
+                    .unwrap();
+            }
             builder.finish().unwrap();
         }
         assert_eq!(
-            executable_from_archive(&encoded, "kasb", 1024).unwrap(),
+            executable_from_archive(&encoded, "kasb", &expected_entries, 1024).unwrap(),
             b"binary"
         );
 
@@ -2082,7 +2151,7 @@ mod tests {
             let encoder =
                 flate2::write::GzEncoder::new(&mut encoded, flate2::Compression::default());
             let mut builder = tar::Builder::new(encoder);
-            for name in ["kasb", "unexpected"] {
+            for name in ["kasb", "LICENSE.md", "README.md", "unexpected"] {
                 let mut header = tar::Header::new_gnu();
                 header.set_size(1);
                 header.set_mode(0o755);
@@ -2093,10 +2162,7 @@ mod tests {
             }
             builder.finish().unwrap();
         }
-        assert_eq!(
-            executable_from_archive(&encoded, "kasb", 1024).unwrap(),
-            b"x"
-        );
+        assert!(executable_from_archive(&encoded, "kasb", &expected_entries, 1024).is_err());
 
         let mut encoded = Vec::new();
         {
@@ -2114,7 +2180,7 @@ mod tests {
             }
             builder.finish().unwrap();
         }
-        assert!(executable_from_archive(&encoded, "kasb", 1024).is_err());
+        assert!(executable_from_archive(&encoded, "kasb", &expected_entries, 1024).is_err());
 
         let mut encoded = Vec::new();
         {
@@ -2131,7 +2197,7 @@ mod tests {
                 .unwrap();
             builder.finish().unwrap();
         }
-        assert!(executable_from_archive(&encoded, "kasb", 1024).is_err());
+        assert!(executable_from_archive(&encoded, "kasb", &expected_entries, 1024).is_err());
 
         let mut encoded = Vec::new();
         {
@@ -2147,7 +2213,7 @@ mod tests {
                 .unwrap();
             builder.finish().unwrap();
         }
-        assert!(executable_from_archive(&encoded, "kasb", 1024).is_err());
+        assert!(executable_from_archive(&encoded, "kasb", &expected_entries, 1024).is_err());
     }
 
     #[test]
