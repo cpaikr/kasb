@@ -53,8 +53,11 @@ for (const evidence of [".targets[]", ".releaseRunner", ".buildContainer", ".val
   check(metadataRun.includes(evidence), `metadata must derive ${evidence} from native-targets.json`);
 }
 const authority = (jobs.metadata?.steps ?? []).find(({ id }) => id === "authority");
+const authorityRun = String(authority?.run ?? "");
+const matrixGuardIndex = authorityRun.indexOf("validate-release-contract.mjs --release-matrix-only");
+const matrixOutputIndex = authorityRun.indexOf("linux_matrix=");
 check(
-  String(authority?.run).indexOf("validate-release-contract.mjs --release-matrix-only") < String(authority?.run).indexOf("linux_matrix="),
+  matrixGuardIndex !== -1 && matrixOutputIndex !== -1 && matrixGuardIndex < matrixOutputIndex,
   "metadata must reject noncanonical target scheduling before emitting any runner matrix",
 );
 check(String(jobs["native-linux"]?.strategy?.matrix).includes("needs.metadata.outputs.linux_matrix"), "Linux matrix must be metadata-derived");
@@ -68,7 +71,10 @@ check(
   String((jobs["native-consumers"]?.steps ?? []).find(({ uses }) => String(uses).startsWith("actions/setup-node@"))?.with?.["node-version"]).includes("matrix.node_version"),
   "isolated clean-consumer jobs must select the manifest-authorized Node runtime through setup-node",
 );
-check(hasRun(jobs["native-consumers"], "20.18.1|21|22|23|24|25|26"), "clean consumers must allowlist exactly Node 20.18.1 and majors 21 through 26");
+check(
+  hasRun(jobs["native-consumers"], manifest.validationNodeVersions.join("|")),
+  "clean consumers must allowlist exactly the manifest-authorized Node versions",
+);
 
 for (const command of ["bun run contracts:check", "bun run native:check", "bun run licenses:check", "bun run typecheck", "bun run test", "bun run test:release-pipeline", "bun run conformance:judge", "bun run build", "cargo fmt --all --check", "cargo clippy --locked --workspace --all-targets -- -D warnings"]) {
   check(hasRun(jobs.deterministic, command), `deterministic candidate gate is missing ${command}`);

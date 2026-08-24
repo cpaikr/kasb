@@ -382,7 +382,7 @@ jobs:
           jq -s --arg repository "$GITHUB_REPOSITORY" --arg commit "$CANDIDATE_SHA" \
             --arg version "$version" --arg sourceRef "$CANDIDATE_REF" \
             --slurpfile manifest native-targets.json \
-            '{schemaVersion:1,repository:$repository,version:$version,sourceRef:$sourceRef,commit:$commit,toolchain:.[0].toolchain,targets:([$manifest[0].targets[].rustTarget as $target | .[] | .target | select(.rustTarget == $target)])}' \
+            '{schemaVersion:1,repository:$repository,version:$version,sourceRef:$sourceRef,commit:$commit,toolchain:$manifest[0].release.toolchain,targets:([$manifest[0].targets[].rustTarget as $target | .[] | .target | select(.rustTarget == $target)])}' \
             dist/provenance/fragments/*.json > dist/provenance/provenance.json
           node scripts/write-release-checksums.mjs --candidate
           node scripts/validate-release-artifacts.mjs --candidate

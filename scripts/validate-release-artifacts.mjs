@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { checksummedReleaseAssetNames, loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
+import { candidateAssetDirectory, checksummedReleaseAssetNames, loadReleaseContract, removeFlag, repositoryRoot } from "./release-contract.mjs";
 
 const inputs = process.argv.slice(2);
 const ciOnly = removeFlag(inputs, "--ci");
@@ -51,12 +51,13 @@ if (JSON.stringify([...checksums.keys()].sort()) !== JSON.stringify([...expected
 }
 if (candidate) {
   for (const name of [manifest.release.shellInstallerAsset, manifest.release.powershellInstallerAsset]) {
-    const bytes = await readFile(resolve(repositoryRoot, "dist/installers", name));
+    const bytes = await readFile(resolve(repositoryRoot, candidateAssetDirectory(contract, name), name));
     if (checksums.get(name) !== hash(bytes)) throw new Error(`${name} checksum differs from ${manifest.release.checksumAsset}.`);
   }
-  const provenance = await readFile(resolve(repositoryRoot, "dist/provenance", manifest.release.provenanceAsset));
-  if (checksums.get(manifest.release.provenanceAsset) !== hash(provenance)) {
-    throw new Error(`${manifest.release.provenanceAsset} checksum differs from ${manifest.release.checksumAsset}.`);
+  const provenanceName = manifest.release.provenanceAsset;
+  const provenance = await readFile(resolve(repositoryRoot, candidateAssetDirectory(contract, provenanceName), provenanceName));
+  if (checksums.get(provenanceName) !== hash(provenance)) {
+    throw new Error(`${provenanceName} checksum differs from ${manifest.release.checksumAsset}.`);
   }
 }
 
@@ -234,11 +235,4 @@ function assertNoPiMetadata(pkg) {
   if (Object.hasOwn(pkg.exports ?? {}, "./pi") || Object.hasOwn(pkg, "pi")) {
     throw new Error("The canonical package must not expose Pi metadata.");
   }
-}
-
-function removeFlag(inputs, flag) {
-  const index = inputs.indexOf(flag);
-  if (index === -1) return false;
-  inputs.splice(index, 1);
-  return true;
 }

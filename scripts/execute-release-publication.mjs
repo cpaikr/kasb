@@ -6,12 +6,23 @@ import { basename, dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 
 import { executeGitHubPublication, executeNpmPublication } from "./release-publication.mjs";
-import { loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
+import { loadReleaseContract, releaseAssetNames, repositoryRoot } from "./release-contract.mjs";
 
 const contract = await loadReleaseContract();
 const metadataCommandLimits = {
   maxOutputBytes: contract.release.metadataLimitBytes,
   timeoutMs: contract.release.requestTimeoutSeconds * 1000,
+};
+const archiveCommandLimits = {
+  maxOutputBytes: contract.release.metadataLimitBytes,
+  timeoutMs: contract.release.archiveRequestTimeoutSeconds * 1000,
+};
+const stateCaptureCommandLimits = {
+  maxOutputBytes: contract.release.metadataLimitBytes,
+  timeoutMs: (
+    releaseAssetNames(contract).length * contract.release.archiveRequestTimeoutSeconds
+    + 10 * contract.release.requestTimeoutSeconds
+  ) * 1000,
 };
 
 if (process.argv[2] === "--self-test") await selfTest();
@@ -61,7 +72,7 @@ function githubAdapter(candidate, runCommand = command, policyToken = required(p
           "--commit", candidate.commit,
           "--output", outputPath,
           "--github-only", "true",
-        ], { ...metadataCommandLimits, env: { ...process.env, GH_TOKEN: policyToken } });
+        ], { ...stateCaptureCommandLimits, env: { ...process.env, GH_TOKEN: policyToken } });
         return JSON.parse(await readFile(outputPath, "utf8")).github;
       } finally { await rm(directory, { recursive: true, force: true }); }
     },
@@ -72,7 +83,7 @@ function githubAdapter(candidate, runCommand = command, policyToken = required(p
       await withPrivateCandidateFile(bytes, name, (path) => runCommand(
         "gh",
         ["release", "upload", candidate.canonicalTag, path, "--repo", candidate.repository],
-        metadataCommandLimits,
+        archiveCommandLimits,
       ));
     },
     async publishDraft({ tag }) {
@@ -160,7 +171,12 @@ function command(executable, args, {
   });
 }
 
-function commandToFile(executable, args, path, { maxBytes, timeoutMs, stallTimeoutMs }) {
+function commandToFile(executable, args, path, {
+  maxBytes,
+  maxOutputBytes = contract.release.metadataLimitBytes,
+  timeoutMs,
+  stallTimeoutMs,
+}) {
   return new Promise((resolvePromise, reject) => {
     const output = createWriteStream(path, { flags: "wx", mode: 0o600 });
     const child = spawn(executable, args, { cwd: repositoryRoot, env: process.env });
@@ -191,7 +207,7 @@ function commandToFile(executable, args, path, { maxBytes, timeoutMs, stallTimeo
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
-      if (Buffer.byteLength(stderr) > contract.release.metadataLimitBytes) fail(new Error(`${executable} download diagnostics exceed their bound`));
+      if (Buffer.byteLength(stderr) > maxOutputBytes) fail(new Error(`${executable} download diagnostics exceed their bound`));
     });
     child.stdout.on("data", (chunk) => {
       bytes += chunk.length;
@@ -263,7 +279,7 @@ async function selfTest() {
   const githubCalls = [];
   let uploadedPath;
   const github = githubAdapter(liveCandidate, async (executable, args, options) => {
-    githubCalls.push({ executable, args });
+    githubCalls.push({ executable, args, options });
     if (executable === process.execPath) {
       assert.equal(options.env.GH_TOKEN, "policy-token");
       const outputPath = args[args.indexOf("--output") + 1];
@@ -276,6 +292,11 @@ async function selfTest() {
     return { stdout: "", stderr: "", notFound: false };
   }, "policy-token");
   assert.deepEqual(await github.readState(), { state: "vacant" });
+  assert.equal(
+    githubCalls[0].options.timeoutMs,
+    (releaseAssetNames(contract).length * contract.release.archiveRequestTimeoutSeconds
+      + 10 * contract.release.requestTimeoutSeconds) * 1000,
+  );
   await github.createDraft({ tag: liveCandidate.canonicalTag, targetSha: liveCandidate.commit });
   await github.uploadAsset({ name: "install.sh", bytes: expected });
   await assert.rejects(readFile(uploadedPath), /ENOENT/u);
@@ -285,6 +306,25 @@ async function selfTest() {
     ["gh", ["release", "upload", "v0.3.0", uploadedPath, "--repo", "cpaikr/kasb"]],
     ["gh", ["release", "edit", "v0.3.0", "--repo", "cpaikr/kasb", "--draft=false", "--latest"]],
   ]);
+  assert.equal(
+    githubCalls.find(({ args }) => args[1] === "upload").options.timeoutMs,
+    contract.release.archiveRequestTimeoutSeconds * 1000,
+  );
+
+  const boundedDownloadDirectory = await mkdtemp(join(tmpdir(), "kasb-download-bound-test-"));
+  try {
+    await assert.rejects(
+      commandToFile(
+        process.execPath,
+        ["-e", "process.stderr.write('12345')"],
+        join(boundedDownloadDirectory, "download.tgz"),
+        { maxBytes: 1024, maxOutputBytes: 4, timeoutMs: 1000, stallTimeoutMs: 1000 },
+      ),
+      /diagnostics exceed their bound/u,
+    );
+  } finally {
+    await rm(boundedDownloadDirectory, { recursive: true, force: true });
+  }
 
   const registryBytes = Buffer.from("exact registry tarball bytes\n");
   const npmCalls = [];

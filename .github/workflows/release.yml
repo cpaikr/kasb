@@ -91,6 +91,7 @@ jobs:
     timeout-minutes: 60
     environment: github-release
     permissions:
+      # Create and finalize the canonical GitHub Release for this tag.
       contents: write
     outputs:
       receipt_artifact_id: ${{ steps.receipt.outputs.artifact-id }}
@@ -189,6 +190,7 @@ jobs:
     environment: npm-release
     permissions:
       contents: read
+      # Mint the OIDC token required by npm trusted publishing.
       id-token: write
     steps:
       - name: Seed truthful npm publication receipt

@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { appendFile, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { canonicalCandidateIdentity, requiredCandidateGates, validateArtifactManifest, validateCandidateVersion, validatePrebuildPublicationState, validatePublicationStateSource } from "./release-candidate-contract.mjs";
-import { scanCandidateText, scanText, validateCandidateProvenance } from "./release-candidate-inspection.mjs";
+import { gzipSync } from "node:zlib";
+import { scanCandidateText, scanTarContents, scanText, validateCandidateProvenance } from "./release-candidate-inspection.mjs";
 import { checksummedReleaseAssetNames, loadReleaseContract, releaseAssetNames, repositoryRoot } from "./release-contract.mjs";
 
 const sha = "a".repeat(40);
@@ -141,10 +142,18 @@ try {
   await assert.rejects(scanCandidateText({ githubAssets: manifest.githubAssets, npmPackages: manifest.npmPackages }), /README\.md is empty/u);
   await standaloneFixture(identity.targets[0], "fixture README\n", resolve(repositoryRoot, archiveAsset.file));
 
+  const trailingArchive = join(directory, "trailing-member.tar.gz");
+  await standaloneFixture(identity.targets[0], "fixture README\n", trailingArchive);
+  await appendFile(trailingArchive, gzipSync(Buffer.alloc(32 * 1024)));
+  await assert.rejects(
+    scanTarContents(trailingArchive, "trailing fixture", 1024, 1024, 4),
+    /bounded decompressed archive size/u,
+  );
+
   for (const script of ["scripts/write-release-checksums.mjs", "scripts/validate-release-artifacts.mjs"]) {
-    const reversedFlags = spawnSync(process.execPath, [resolve(repositoryRoot, script), "--candidate", "--ci"], { encoding: "utf8" });
-    assert.notEqual(reversedFlags.status, 0);
-    assert.match(reversedFlags.stderr, /mutually exclusive/u);
+    const absolutePathInvocation = spawnSync(process.execPath, [resolve(repositoryRoot, script), "--candidate", "--ci"], { encoding: "utf8" });
+    assert.notEqual(absolutePathInvocation.status, 0);
+    assert.match(absolutePathInvocation.stderr, /mutually exclusive/u);
   }
 
   const temporaryAwsKey = `ASIA${"A".repeat(16)}`;

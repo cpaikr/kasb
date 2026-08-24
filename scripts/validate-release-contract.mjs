@@ -30,6 +30,13 @@ const bunLockText = await readFile(resolve(repositoryRoot, "bun.lock"), "utf8");
 const bunLock = JSON.parse(bunLockText.replace(/,\s*([}\]])/gu, "$1"));
 check(bunLock.workspaces?.[contract.manifest.rootPackage]?.version === contract.version, "bun.lock root workspace version differs from Cargo workspace");
 check(sameEntries(bunLock.workspaces?.[contract.manifest.rootPackage]?.optionalDependencies, expectedOptional), "bun.lock root optional dependency versions differ from Cargo workspace");
+const vacantPublication = JSON.parse(await readFile(resolve(repositoryRoot, "fixtures/release/publication-vacant.json"), "utf8"));
+const expectedVacantPackages = [...contract.targets.map(({ packageName }) => packageName), root.name].sort();
+const actualVacantPackages = (vacantPublication.npm?.packages ?? []).map(({ name }) => name).sort();
+check(
+  JSON.stringify(actualVacantPackages) === JSON.stringify(expectedVacantPackages),
+  "vacant publication fixture must cover exactly the canonical native and root npm packages",
+);
 
 const targetKeys = new Set();
 const assets = new Set();

@@ -639,7 +639,8 @@ fn clear_completed_replacements(statuses: Vec<PathBuf>) -> Result<(), UpgradeErr
 }
 
 struct GithubReleaseSource {
-    client: wreq::Client,
+    metadata_client: wreq::Client,
+    download_client: wreq::Client,
     latest_url: String,
     metadata_limit: usize,
     metadata_timeout: Duration,
@@ -657,18 +658,25 @@ impl GithubReleaseSource {
                 policy.repository
             )
         });
-        let client = wreq::Client::builder()
-            .https_only(latest_url.starts_with("https://"))
-            .timeout(Duration::from_secs(policy.request_timeout_seconds))
-            .connect_timeout(Duration::from_secs(policy.connect_timeout_seconds))
-            .redirect(wreq::redirect::Policy::limited(policy.redirect_limit))
-            .retry(wreq::retry::Policy::never())
-            .build()
-            .map_err(|_| {
-                UpgradeError::network("Could not initialize bounded release transport.")
-            })?;
+        let build_client = |https_only| {
+            wreq::Client::builder()
+                .https_only(https_only)
+                .timeout(Duration::from_secs(policy.request_timeout_seconds))
+                .connect_timeout(Duration::from_secs(policy.connect_timeout_seconds))
+                .redirect(wreq::redirect::Policy::limited(policy.redirect_limit))
+                .retry(wreq::retry::Policy::never())
+                .build()
+                .map_err(|_| {
+                    UpgradeError::network("Could not initialize bounded release transport.")
+                })
+        };
+        let metadata_client = build_client(latest_url.starts_with("https://"))?;
+        // Test metadata may come from the loopback HTTP fixture, but canonical
+        // release artifacts and every redirect target must remain HTTPS-only.
+        let download_client = build_client(true)?;
         Ok(Self {
-            client,
+            metadata_client,
+            download_client,
             latest_url,
             metadata_limit: policy.metadata_limit_bytes,
             metadata_timeout: Duration::from_secs(policy.request_timeout_seconds),
@@ -679,12 +687,12 @@ impl GithubReleaseSource {
 
     async fn get(
         &self,
+        client: &wreq::Client,
         url: &str,
         limit: usize,
         timeout: Duration,
     ) -> Result<Vec<u8>, UpgradeError> {
-        let response = self
-            .client
+        let response = client
             .get(url)
             .header(ACCEPT, "application/vnd.github+json")
             .header(USER_AGENT, format!("kasb/{VERSION}"))
@@ -792,7 +800,12 @@ pub(crate) fn release_transport_constructions() -> usize {
 impl ReleaseSource for GithubReleaseSource {
     async fn latest(&self) -> Result<Release, UpgradeError> {
         let bytes = self
-            .get(&self.latest_url, self.metadata_limit, self.metadata_timeout)
+            .get(
+                &self.metadata_client,
+                &self.latest_url,
+                self.metadata_limit,
+                self.metadata_timeout,
+            )
             .await?;
         serde_json::from_slice(&bytes).map_err(|_| {
             UpgradeError::new(
@@ -812,7 +825,13 @@ impl ReleaseSource for GithubReleaseSource {
             DownloadKind::Metadata => self.metadata_timeout,
             DownloadKind::Archive => self.archive_timeout,
         };
-        self.get(&asset.browser_download_url, limit, timeout).await
+        self.get(
+            &self.download_client,
+            &asset.browser_download_url,
+            limit,
+            timeout,
+        )
+        .await
     }
 }
 

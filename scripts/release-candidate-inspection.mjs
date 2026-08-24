@@ -1,7 +1,8 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { basename, resolve } from "node:path";
+import { createGunzip } from "node:zlib";
 
 import { loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
 
@@ -108,15 +109,14 @@ async function scanTar(path, label, release) {
     throw new Error(`${label} exceeds its bounded archive entry count`);
   }
   const seen = new Set();
-  const aggregate = { bytes: 0, limit: release.archiveLimitBytes * 2 };
   for (const entry of entries) {
     if (entry.startsWith("-") || seen.has(entry)) {
       throw new Error(`${label} contains an invalid or duplicate archive entry`);
     }
     seen.add(entry);
     scanText(entry, `${label}:archive entry name`);
-    await scanTarEntry(path, entry, `${label}:${entry}`, release.archiveLimitBytes, aggregate);
   }
+  await scanTarContents(path, label, release.archiveLimitBytes, release.archiveLimitBytes * 2, entries.length);
 }
 
 function listTar(path, limit) {
@@ -127,42 +127,102 @@ function listTar(path, limit) {
   return result.stdout.toString("utf8").split(/\r?\n/u).filter(Boolean);
 }
 
-async function scanTarEntry(path, entry, label, limit, aggregate) {
-  const child = spawn("tar", ["-xOzf", path, entry], { stdio: ["ignore", "pipe", "pipe"] });
-  const completion = waitForChild(child);
-  const diagnostics = [];
-  let diagnosticsBytes = 0;
-  child.stderr.on("data", (chunk) => {
-    if (diagnosticsBytes >= 64 * 1024) return;
-    const bounded = chunk.subarray(0, 64 * 1024 - diagnosticsBytes);
-    diagnostics.push(bounded);
-    diagnosticsBytes += bounded.length;
-  });
-  try {
-    const bytes = await scanReadable(child.stdout, label, limit, aggregate);
-    if (bytes === 0) throw new Error(`${label} is empty`);
-  } catch (error) {
-    child.kill("SIGKILL");
-    await completion.catch(() => {});
-    throw error;
+export async function scanTarContents(path, label, entryLimit, aggregateLimit, entryCount) {
+  if (!Number.isSafeInteger(entryCount) || entryCount <= 0 || entryCount > archiveEntryLimit) {
+    throw new Error(`${label} has an invalid bounded archive entry count`);
   }
-  const status = await completion;
-  if (status !== 0) {
-    const detail = Buffer.concat(diagnostics, diagnosticsBytes).toString("utf8").trim();
-    throw new Error(`could not inspect archive entry ${label}${detail ? `: ${detail}` : ""}`);
+  const stream = createReadStream(path).pipe(createGunzip());
+  let buffer = Buffer.alloc(0);
+  let contentRemaining = 0;
+  let paddingRemaining = 0;
+  let aggregateBytes = 0;
+  let scanner;
+  let reachedEnd = false;
+  let decompressedBytes = 0;
+  // Bound headers, per-entry padding, two EOF blocks, and one conventional
+  // 10 KiB tar record without exempting concatenated gzip members.
+  const decompressedLimit = aggregateLimit + (2 * entryCount + 20) * 512;
+  for await (const chunk of stream) {
+    decompressedBytes += chunk.length;
+    if (decompressedBytes > decompressedLimit) throw new Error(`${label} exceeds its bounded decompressed archive size`);
+    if (reachedEnd) continue;
+    buffer = buffer.length === 0 ? chunk : Buffer.concat([buffer, chunk]);
+    while (buffer.length > 0 && !reachedEnd) {
+      if (contentRemaining > 0) {
+        const length = Math.min(contentRemaining, buffer.length);
+        const content = buffer.subarray(0, length);
+        buffer = buffer.subarray(length);
+        contentRemaining -= length;
+        aggregateBytes += length;
+        if (aggregateBytes > aggregateLimit) throw new Error(`${label} exceeds its bounded expanded archive size`);
+        scanner.push(content);
+        if (contentRemaining === 0) scanner.finish();
+        continue;
+      }
+      if (paddingRemaining > 0) {
+        const length = Math.min(paddingRemaining, buffer.length);
+        buffer = buffer.subarray(length);
+        paddingRemaining -= length;
+        continue;
+      }
+      if (buffer.length < 512) break;
+      const header = buffer.subarray(0, 512);
+      buffer = buffer.subarray(512);
+      if (header.every((byte) => byte === 0)) {
+        reachedEnd = true;
+        continue;
+      }
+      const size = tarEntrySize(header, label);
+      if (size > entryLimit) throw new Error(`${label} contains an entry larger than its bounded inspection size`);
+      const entry = tarEntryName(header);
+      scanText(entry, `${label}:archive entry name`);
+      const type = header[156];
+      if (size === 0 && (type === 0 || type === 48 || type === 55)) throw new Error(`${label}:${entry} is empty`);
+      scanner = markerScanner(`${label}:${entry}`);
+      contentRemaining = size;
+      paddingRemaining = (512 - (size % 512)) % 512;
+      if (contentRemaining === 0) scanner.finish();
+    }
+  }
+  if (!reachedEnd || contentRemaining !== 0 || paddingRemaining !== 0) {
+    throw new Error(`could not inspect the complete tar stream in ${label}`);
   }
 }
 
-async function scanReadable(readable, label, limit, aggregate = undefined) {
+function tarEntrySize(header, label) {
+  const field = header.subarray(124, 136);
+  let size;
+  if ((field[0] & 0x80) !== 0) {
+    if ((field[0] & 0x40) !== 0) throw new Error(`${label} contains a negative tar entry size`);
+    let value = BigInt(field[0] & 0x3f);
+    for (const byte of field.subarray(1)) value = (value << 8n) | BigInt(byte);
+    if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error(`${label} contains an unbounded tar entry size`);
+    size = Number(value);
+  } else {
+    const octal = field.toString("ascii").replace(/\0.*$/u, "").trim();
+    if (!/^[0-7]+$/u.test(octal)) throw new Error(`${label} contains an invalid tar entry size`);
+    size = Number.parseInt(octal, 8);
+  }
+  return size;
+}
+
+function tarEntryName(header) {
+  const name = tarString(header.subarray(0, 100));
+  const prefix = tarString(header.subarray(345, 500));
+  return prefix ? `${prefix}/${name}` : name;
+}
+
+function tarString(bytes) {
+  const end = bytes.indexOf(0);
+  return bytes.subarray(0, end === -1 ? bytes.length : end).toString("utf8");
+}
+
+async function scanReadable(readable, label, limit) {
   const scanner = markerScanner(label);
   let bytes = 0;
   for await (const chunk of readable) {
     bytes += chunk.length;
     if (bytes > limit) throw new Error(`${label} exceeds its bounded inspection size`);
-    if (aggregate) {
-      aggregate.bytes += chunk.length;
-      if (aggregate.bytes > aggregate.limit) throw new Error(`${basename(label.split(":", 1)[0])} exceeds its bounded expanded archive size`);
-    }
     scanner.push(chunk);
   }
   scanner.finish();
@@ -190,13 +250,6 @@ function markerScanner(label) {
 
 function forbiddenMarker(label) {
   throw new Error(`${label} contains a forbidden secret or private-key marker`);
-}
-
-function waitForChild(child) {
-  return new Promise((resolve, reject) => {
-    child.once("error", reject);
-    child.once("close", resolve);
-  });
 }
 
 function exactKeys(value, keys, label) {

@@ -17,6 +17,7 @@ let candidate = { ...identity, phase: "identity" };
 if (options.artifactManifest) {
   const manifest = JSON.parse(await readFile(resolve(repositoryRoot, options.artifactManifest), "utf8"));
   candidate = await validateArtifactManifest(identity, manifest);
+  candidate.publicationStateSource = publicationState.source;
   const { validatePublicationStateSnapshot } = await import("./release-publication-contract.mjs");
   validatePublicationStateSnapshot(candidate, publicationState);
 } else {
@@ -73,9 +74,9 @@ function assertGeneratedState(skip) {
     const result = command("node", args);
     if (result.status !== 0) throw new Error(result.stderr.trim() || result.stdout.trim() || `${args[0]} failed`);
   }
-  for (const args of [["diff", "--quiet"], ["diff", "--cached", "--quiet"]]) {
-    if (command("git", args).status !== 0) throw new Error("candidate checkout has tracked changes");
-  }
+  const status = command("git", ["status", "--porcelain=v1", "--untracked-files=all", "--", ".", ":(exclude)dist/**"]);
+  if (status.status !== 0) throw new Error(status.stderr.trim() || "candidate checkout state could not be inspected");
+  if (status.stdout.trim()) throw new Error("candidate checkout has generated or uncommitted changes outside dist/");
 }
 
 function hydratePublicationState(value, identity) {

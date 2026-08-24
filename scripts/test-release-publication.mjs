@@ -368,7 +368,16 @@ async function testGuardedExecutionAdapters() {
   staleGithub.readState = async () => structuredClone(permanentlyVacant);
   await assert.rejects(executeGitHubPublication(strict, staleGithub), hasCode("github_staging_iteration_limit"));
 
-  const immutableReceipt = await executeGitHubPublication(strict, githubAdapter(strict, built.files));
+  const batchedGithub = githubAdapter(strict, built.files);
+  const immutableReceipt = await executeGitHubPublication(strict, batchedGithub);
+  assert.equal(batchedGithub.readStateCalls, 5, "GitHub staging must upload all pending assets after one state read");
+
+  const failedFinalization = githubAdapter(strict, built.files, { failPublishDraft: true });
+  await assert.rejects(executeGitHubPublication(strict, failedFinalization), (error) => {
+    assert.match(error.message, /injected finalize failure/u);
+    assert.equal(error.receipt.operations.at(-1).status, "failed");
+    return true;
+  });
   const allVacant = npmAdapter(built.files);
   const npmReceipt = await executeNpmPublication(strict, immutableReceipt, allVacant);
   assert.equal(npmReceipt.ok, true);
@@ -392,6 +401,12 @@ async function testGuardedExecutionAdapters() {
   });
   rootFailure.failRoot = false;
   assert.equal((await executeNpmPublication(strict, immutableReceipt, rootFailure)).ok, true);
+
+  const silentlyMissingNative = npmAdapter(built.files, { dropPublishIdentity: identity(strict.npmPackages[0]) });
+  await assert.rejects(
+    executeNpmPublication(strict, immutableReceipt, silentlyMissingNative),
+    hasCode("npm_root_blocked"),
+  );
 
   const raced = npmAdapter(built.files, { raceIdentity: identity(strict.npmPackages[0]), raceBytes: "exact", ambiguousFailure: true });
   const raceReceipt = await executeNpmPublication(strict, immutableReceipt, raced);
@@ -484,9 +499,12 @@ function githubAdapter(candidate, files, options = {}) {
     failAfterUpload: options.failAfterUpload,
     failBeforeUpload: options.failBeforeUpload,
     doubleFailureAfterUpload: options.doubleFailureAfterUpload,
+    failPublishDraft: options.failPublishDraft,
     failNextRead: false,
+    readStateCalls: 0,
     uploads: 0,
     async readState() {
+      this.readStateCalls += 1;
       if (this.failNextRead) {
         this.failNextRead = false;
         throw new Error("injected GitHub reconciliation failure");
@@ -509,6 +527,7 @@ function githubAdapter(candidate, files, options = {}) {
       if (this.uploads === this.failAfterUpload) throw new Error("injected upload interruption");
     },
     async publishDraft() {
+      if (this.failPublishDraft) throw new Error("injected finalize failure");
       this.state.release.draft = false;
       this.state.release.immutable = true;
     },
@@ -536,6 +555,7 @@ function npmAdapter(files, options = {}) {
     raceBytes: options.raceBytes,
     ambiguousFailure: options.ambiguousFailure,
     doubleFailureIdentity: options.doubleFailureIdentity,
+    dropPublishIdentity: options.dropPublishIdentity,
     failNextInspectIdentity: undefined,
     async readCandidateFile(path) { return this.files.get(path); },
     async inspectPackage(pkg) {
@@ -549,6 +569,10 @@ function npmAdapter(files, options = {}) {
     },
     async publishPackage(pkg) {
       const key = identity(pkg);
+      if (this.dropPublishIdentity === key) {
+        this.dropPublishIdentity = undefined;
+        return;
+      }
       if (this.doubleFailureIdentity === key) {
         this.doubleFailureIdentity = undefined;
         this.registry.set(key, pkg.bytes);

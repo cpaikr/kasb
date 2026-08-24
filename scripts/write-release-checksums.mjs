@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { candidateAssetDirectory, checksummedReleaseAssetNames, loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
+import { candidateAssetDirectory, checksummedReleaseAssetNames, loadReleaseContract, removeFlag, repositoryRoot } from "./release-contract.mjs";
 
 const contract = await loadReleaseContract();
 const inputs = process.argv.slice(2);
@@ -25,10 +25,3 @@ for (const name of names) {
 await mkdir(directory, { recursive: true });
 await writeFile(resolve(directory, contract.release.checksumAsset), `${lines.join("\n")}\n`);
 console.log(`wrote ${contract.release.checksumAsset} for ${candidate ? "publishable candidate asset" : ciOnly ? "continuous-CI target" : "complete target"} set (${lines.length} entries)`);
-
-function removeFlag(inputs, flag) {
-  const index = inputs.indexOf(flag);
-  if (index === -1) return false;
-  inputs.splice(index, 1);
-  return true;
-}

@@ -54,12 +54,15 @@ export function releaseAssetNames(contract) {
   ];
 }
 
-export function internalCandidateAssetNames(contract) {
-  return [contract.release.candidateReceiptFile];
-}
-
 export function checksummedReleaseAssetNames(contract) {
   return releaseAssetNames(contract).filter((name) => name !== contract.release.checksumAsset);
+}
+
+export function removeFlag(inputs, flag) {
+  const index = inputs.indexOf(flag);
+  if (index === -1) return false;
+  inputs.splice(index, 1);
+  return true;
 }
 
 export function candidateAssetDirectory(contract, name) {

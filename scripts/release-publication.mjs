@@ -21,8 +21,9 @@ export async function executeGitHubPublication(candidateInput, adapter) {
       const state = await adapter.readState();
       const plan = planGitHubPublication(candidate, state, "stage");
       if (plan.actions.length === 0) break;
-      const [action] = plan.actions;
-      if (action.type === "createDraft") {
+      const [firstAction] = plan.actions;
+      if (firstAction.type === "createDraft") {
+        const action = firstAction;
         const operation = pendingOperation(receipt, { type: "createDraft", tag: action.tag });
         try {
           await adapter.createDraft({ tag: action.tag, targetSha: action.targetSha });
@@ -50,33 +51,35 @@ export async function executeGitHubPublication(candidateInput, adapter) {
         }
         continue;
       }
-      if (action.type !== "uploadAsset") fail("github_unexpected_action", `unexpected GitHub action ${action.type}`);
-      const artifact = candidate.githubAssets.find(({ name }) => name === action.name);
-      const bytes = await verifiedCandidateBytes(adapter, artifact);
-      const operation = pendingOperation(receipt, { type: "uploadAsset", name: artifact.name, sha256: artifact.sha256 });
-      try {
-        await adapter.uploadAsset({ ...artifact, bytes });
-        operation.status = "completed";
-      } catch (error) {
-        let state;
+      for (const action of plan.actions) {
+        if (action.type !== "uploadAsset") fail("github_unexpected_action", `unexpected GitHub action ${action.type}`);
+        const artifact = candidate.githubAssets.find(({ name }) => name === action.name);
+        const bytes = await verifiedCandidateBytes(adapter, artifact);
+        const operation = pendingOperation(receipt, { type: "uploadAsset", name: artifact.name, sha256: artifact.sha256 });
         try {
-          state = await adapter.readState();
-        } catch {
-          operation.status = "outcomeUnknown";
-          throw error;
+          await adapter.uploadAsset({ ...artifact, bytes });
+          operation.status = "completed";
+        } catch (error) {
+          let state;
+          try {
+            state = await adapter.readState();
+          } catch {
+            operation.status = "outcomeUnknown";
+            throw error;
+          }
+          let raced;
+          try {
+            raced = planGitHubPublication(candidate, state, "stage");
+          } catch (reconciliationError) {
+            operation.status = "failed";
+            throw reconciliationError;
+          }
+          if (raced.actions.some(({ type, name }) => type === "uploadAsset" && name === artifact.name)) {
+            operation.status = "failed";
+            throw error;
+          }
+          operation.status = "skippedExactRace";
         }
-        let raced;
-        try {
-          raced = planGitHubPublication(candidate, state, "stage");
-        } catch (reconciliationError) {
-          operation.status = "failed";
-          throw reconciliationError;
-        }
-        if (raced.actions.some(({ type, name }) => type === "uploadAsset" && name === artifact.name)) {
-          operation.status = "failed";
-          throw error;
-        }
-        operation.status = "skippedExactRace";
       }
     }
 
@@ -97,9 +100,9 @@ export async function executeGitHubPublication(candidateInput, adapter) {
         let raced;
         try {
           raced = planGitHubPublication(candidate, state, "verify");
-        } catch (reconciliationError) {
+        } catch {
           operation.status = "failed";
-          throw reconciliationError;
+          throw error;
         }
         if (raced.status !== "published") {
           operation.status = "failed";
