@@ -171,7 +171,7 @@ function command(executable, args, { allowNotFound = false, maxOutputBytes = 102
   });
 }
 
-function commandToFile(executable, args, destination, { maxBytes, timeoutMs, stallTimeoutMs }) {
+function commandToFile(executable, args, destination, { maxBytes, maxOutputBytes = 1024 * 1024, timeoutMs, stallTimeoutMs }) {
   return new Promise((resolvePromise, reject) => {
     const output = createWriteStream(destination, { flags: "wx", mode: 0o600 });
     const child = spawn(executable, args, { cwd: repositoryRoot, stdio: ["ignore", "pipe", "pipe"] });
@@ -200,7 +200,13 @@ function commandToFile(executable, args, destination, { maxBytes, timeoutMs, sta
       else reject(new Error(`${executable} download failed (${childStatus}): ${stderr.trim()}`));
     };
     child.stderr.setEncoding("utf8");
-    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.stderr.on("data", (chunk) => {
+      if (Buffer.byteLength(stderr) + Buffer.byteLength(chunk) > maxOutputBytes) {
+        fail(new Error(`${executable} download diagnostics exceed their bound`));
+      } else {
+        stderr += chunk;
+      }
+    });
     child.stdout.on("data", (chunk) => {
       bytes += chunk.length;
       if (bytes > maxBytes) return fail(new Error(`${executable} download exceeds its bound`));
@@ -247,6 +253,9 @@ async function selfTest() {
     try { validateRegistryUrl(value, "fixture"); } catch { rejected = true; }
     if (!rejected) throw new Error(`capture adapter accepted unsafe registry URL ${value}`);
   }
+  let invalidBooleanRejected = false;
+  try { parseOptions(["--verify-immutable-release-only", "false"]); } catch { invalidBooleanRejected = true; }
+  if (!invalidBooleanRejected) throw new Error("capture adapter accepted a false boolean-mode flag");
   const temporary = await mkdtemp(join(tmpdir(), "kasb-capture-self-test-"));
   try {
     let rejected = false;
@@ -271,6 +280,9 @@ function parseOptions(args) {
     result[name.slice(2)] = value;
   }
   if (result["github-only"] !== undefined && result["github-only"] !== "true") throw new Error("--github-only only accepts true");
+  if (result["verify-immutable-release-only"] !== undefined && result["verify-immutable-release-only"] !== "true") {
+    throw new Error("--verify-immutable-release-only only accepts true");
+  }
   return result;
 }
 

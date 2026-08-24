@@ -62,6 +62,8 @@ const aggregateUpload = (jobs.aggregate?.steps ?? []).find(({ id }) => id === "u
 check(equal(paths(aggregateUpload), ["dist/cli/*.tar.gz", "dist/cli/SHA256SUMS", "dist/installers/install.ps1", "dist/installers/install.sh", "dist/native/*.tgz", "dist/provenance/provenance.json", "dist/release/artifact-manifest.json", "dist/release/candidate.json", "dist/root/*.tgz"].sort()), "sealed candidate upload must contain the raw manifest, proof-bearing receipt, and only canonical artifacts");
 const e2e = jobs["sealed-candidate-e2e"];
 check(hasInput(e2e, "artifact-ids") && hasRun(e2e, "test-release-candidate-consumer.mjs"), "every native E2E must download the aggregate by ID and consume it");
+const e2eConsumer = (e2e?.steps ?? []).find(({ run }) => String(run).includes("test-release-candidate-consumer.mjs"));
+check(String(e2eConsumer?.env?.KASB_CANDIDATE_SHA).includes("needs.metadata.outputs.sha"), "sealed native E2E must compare the receipt with the checked-out PR head rather than GitHub's merge SHA");
 for (const evidence of ["candidateReceiptFile", "candidateRoot", "installers", "receiptBytes", '["upgrade", "--check"]', "same-version upgrade check must not change the managed binary", "same-version upgrade check must not change the managed receipt"]) {
   check(consumerText.includes(evidence), `sealed candidate consumer is missing ${evidence}`);
 }
