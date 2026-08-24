@@ -10,7 +10,7 @@ artifact set.
 ## Current state
 
 - The prerequisite release, installation, and managed-upgrade contract merged
-  in PR #22 at `e9c707d`; `ROADMAP.md` now tracks this plan as Current.
+  in PR #22 at `e9c707d`; `ROADMAP.md` now tracks this plan as Completed.
 - `.github/workflows/ci.yml` remains economical merge validation, while the new
   reusable candidate workflow owns the exhaustive release rehearsal. Continuous
   CI has no tag trigger, release environment, publication permission, or
