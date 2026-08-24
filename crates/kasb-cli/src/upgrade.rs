@@ -376,6 +376,8 @@ enum BoundedFileError {
 }
 
 fn read_bounded_regular(path: &Path, limit: usize) -> Result<Vec<u8>, BoundedFileError> {
+    // Classify before opening because Windows rejects directory handles, then revalidate the
+    // opened handle so a path change cannot substitute a non-regular stream after the check.
     let path_metadata = fs::symlink_metadata(path).map_err(|_| BoundedFileError::Open)?;
     if !path_metadata.file_type().is_file() {
         return Err(BoundedFileError::NotRegular);
@@ -1457,13 +1459,18 @@ function Write-TerminalStatus([hashtable]$value) {{
   $value.helper = $helper
   $value.hadReceipt = $hadReceipt
   $statusJson = $value | ConvertTo-Json -Compress
-  $statusNext = "$status.next"
-  $statusPrevious = "$status.previous"
-  [System.IO.File]::WriteAllText($statusNext, $statusJson, (New-Object System.Text.UTF8Encoding($false)))
-  Flush-DurableFile $statusNext
-  Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $statusPrevious
-  [System.IO.File]::Replace($statusNext, $status, $statusPrevious)
-  Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $statusPrevious
+  $statusNonce = [guid]::NewGuid().ToString('N')
+  $statusNext = "$status.$statusNonce.next"
+  $statusPrevious = "$status.$statusNonce.previous"
+  try {{
+    [System.IO.File]::WriteAllText($statusNext, $statusJson, (New-Object System.Text.UTF8Encoding($false)))
+    Flush-DurableFile $statusNext
+    [System.IO.File]::Replace($statusNext, $status, $statusPrevious)
+    Flush-DurableFile $status
+    try {{ [System.IO.File]::Delete($statusPrevious) }} catch {{}}
+  }} finally {{
+    try {{ [System.IO.File]::Delete($statusNext) }} catch {{}}
+  }}
 }}
 Wait-Process -Id {} -ErrorAction SilentlyContinue
 try {{
@@ -1483,6 +1490,7 @@ try {{
 }} catch {{
   $replacementError = $_.Exception.Message
   $rollbackOk = $true
+  $rollbackErrors = [System.Collections.Generic.List[string]]::new()
   if ($simulateRollbackFailure -and [System.IO.File]::Exists($backup)) {{
     Remove-ExactFile $exe
     New-Item -ItemType Directory -Path $exe -Force | Out-Null
@@ -1491,15 +1499,28 @@ try {{
     try {{
       if (-not $simulateRollbackFailure) {{ Remove-ExactFile $exe }}
       Move-ExactFile $backup $exe
-    }} catch {{ $rollbackOk = $false }}
+    }} catch {{
+      $rollbackOk = $false
+      [void]$rollbackErrors.Add("executable restore: $($_.Exception.Message)")
+    }}
   }}
   if ($hadReceipt -and [System.IO.File]::Exists($receiptBackup)) {{
     try {{
       Remove-ExactFile $receipt
       Move-ExactFile $receiptBackup $receipt
-    }} catch {{ $rollbackOk = $false }}
+    }} catch {{
+      $rollbackOk = $false
+      [void]$rollbackErrors.Add("receipt restore: $($_.Exception.Message)")
+    }}
   }}
-  if (-not [System.IO.File]::Exists($exe) -or -not [System.IO.File]::Exists($receipt)) {{ $rollbackOk = $false }}
+  if (-not [System.IO.File]::Exists($exe)) {{
+    $rollbackOk = $false
+    [void]$rollbackErrors.Add('restored executable is missing')
+  }}
+  if (-not [System.IO.File]::Exists($receipt)) {{
+    $rollbackOk = $false
+    [void]$rollbackErrors.Add('restored receipt is missing')
+  }}
   if ($rollbackOk) {{
     try {{
       $oldReceipt = Get-Content -Raw -LiteralPath $receipt | ConvertFrom-Json
@@ -1507,13 +1528,17 @@ try {{
       if ($oldReceipt.manager -ne 'standalone' -or $oldReceipt.sha256 -ne $oldDigest) {{ throw 'restored receipt identity mismatch' }}
       Flush-DurableFile $exe
       Flush-DurableFile $receipt
-    }} catch {{ $rollbackOk = $false }}
+    }} catch {{
+      $rollbackOk = $false
+      [void]$rollbackErrors.Add("identity verification: $($_.Exception.Message)")
+    }}
   }}
   if ($rollbackOk) {{
     Write-TerminalStatus @{{ status = 'rolledBack'; phase = 'complete'; message = $replacementError }}
   }} else {{
-    if ($replacementError.Length -gt 512) {{ $replacementError = $replacementError.Substring(0, 512) }}
-    Write-TerminalStatus @{{ status = 'failed'; phase = 'recoveryRequired'; message = $replacementError }}
+    $failureMessage = "$replacementError; rollback: $($rollbackErrors -join ' | ')"
+    if ($failureMessage.Length -gt 512) {{ $failureMessage = $failureMessage.Substring(0, 512) }}
+    Write-TerminalStatus @{{ status = 'failed'; phase = 'recoveryRequired'; message = $failureMessage }}
   }}
 }} finally {{
   Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $helper
@@ -2089,6 +2114,15 @@ mod tests {
             read_bounded_regular(directory.path(), 1024).unwrap_err(),
             BoundedFileError::NotRegular
         );
+        #[cfg(unix)]
+        {
+            let symlink = directory.path().join("metadata-link.json");
+            std::os::unix::fs::symlink(&regular, &symlink).unwrap();
+            assert_eq!(
+                read_bounded_regular(&symlink, 1024).unwrap_err(),
+                BoundedFileError::NotRegular
+            );
+        }
     }
 
     #[tokio::test]
@@ -2315,6 +2349,11 @@ mod tests {
         assert!(script.contains("status = 'rolledBack'"));
         assert!(script.contains("Move-ExactFile $backup $exe"));
         assert!(
+            script.contains("[System.IO.File]::Replace($statusNext, $status, $statusPrevious)")
+        );
+        assert!(script.contains("Flush-DurableFile $status"));
+        assert!(script.contains("$status.$statusNonce.previous"));
+        assert!(
             script
                 .contains("Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $helper")
         );
@@ -2459,10 +2498,25 @@ mod tests {
         assert!(applied.exit_success);
         assert_eq!(applied.status["status"], "applied");
         assert_eq!(fs::read(applied.executable).unwrap(), b"new executable");
+        assert!(
+            !fs::read_dir(applied._directory.path())
+                .unwrap()
+                .any(|entry| {
+                    entry
+                        .unwrap()
+                        .file_name()
+                        .to_string_lossy()
+                        .ends_with(".previous")
+                })
+        );
 
         let rolled_back = run_windows_helper_case(false, false, false, None);
         assert!(rolled_back.exit_success);
-        assert_eq!(rolled_back.status["status"], "rolledBack");
+        assert_eq!(
+            rolled_back.status["status"], "rolledBack",
+            "status: {}",
+            rolled_back.status
+        );
         assert_eq!(fs::read(rolled_back.executable).unwrap(), b"old executable");
 
         let late_failure = run_windows_helper_case(true, false, true, None);
