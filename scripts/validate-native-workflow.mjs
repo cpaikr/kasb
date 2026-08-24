@@ -40,6 +40,16 @@ check(
   windowsReleaseJob?.["runs-on"] === "blacksmith-2vcpu-windows-2025",
   "the Windows release contract must run on blacksmith-2vcpu-windows-2025",
 );
+check(
+  (windowsReleaseJob?.steps ?? []).some(
+    (step) => step?.shell === "pwsh"
+      && typeof step?.run === "string"
+      && step.run.includes("libclang.dll")
+      && step.run.includes("LIBCLANG_PATH=$llvmBin")
+      && step.run.includes("$env:GITHUB_ENV"),
+  ),
+  "the Windows release contract must expose its verified libclang directory to Rust bindgen",
+);
 for (const command of [
   "cargo test --locked -p kasb-cli --lib",
   "cargo clippy --locked -p kasb-cli --all-targets -- -D warnings",

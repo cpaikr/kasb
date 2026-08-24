@@ -84,6 +84,17 @@ const candidatePackagingSteps = Object.entries(jobs)
   .flatMap(([, job]) => job?.steps ?? []);
 const releaseSteps = Object.values(release.jobs ?? {}).flatMap((job) => job?.steps ?? []);
 const actionSteps = action.runs?.steps ?? [];
+check(
+  actionSteps.some(
+    (step) => step?.if === "runner.os == 'Windows'"
+      && step?.shell === "pwsh"
+      && typeof step?.run === "string"
+      && step.run.includes("libclang.dll")
+      && step.run.includes("LIBCLANG_PATH=$llvmBin")
+      && step.run.includes("$env:GITHUB_ENV"),
+  ),
+  "target builder must expose its verified Windows libclang directory to Rust bindgen",
+);
 for (const [scope, steps] of [["candidate", candidatePackagingSteps], ["release", releaseSteps], ["target action", actionSteps]]) {
   const nodeSteps = steps.filter(({ uses }) => String(uses).startsWith("actions/setup-node@"));
   check(nodeSteps.length > 0 && nodeSteps.every((step) => String(step.with?.["node-version"]) === manifest.release.toolchain.node), `${scope} Node setup must match native-targets.json`);

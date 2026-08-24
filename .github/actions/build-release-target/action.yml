@@ -55,13 +55,13 @@ runs:
             ;;
           aarch64-apple-darwin)
             expected_package=darwin-arm64
-            expected_runner=macos-15
+            expected_runner=blacksmith-6vcpu-macos-15
             expected_image=
             expected_glibc=false
             ;;
           x86_64-pc-windows-msvc)
             expected_package=win32-x64-msvc
-            expected_runner=windows-2025
+            expected_runner=blacksmith-2vcpu-windows-2025
             expected_image=
             expected_glibc=false
             ;;
@@ -84,6 +84,16 @@ runs:
       with:
         toolchain: 1.88.0
         target: ${{ inputs.rust_target }}
+    - name: Locate Windows libclang
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $clang = (Get-Command clang.exe -ErrorAction Stop).Source
+        $llvmBin = Split-Path -Parent $clang
+        if (-not (Test-Path -LiteralPath (Join-Path $llvmBin "libclang.dll") -PathType Leaf)) {
+          throw "libclang.dll is not adjacent to the declared clang.exe"
+        }
+        "LIBCLANG_PATH=$llvmBin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
     - name: Build same-revision addon and CLI once
       shell: bash
       env:
