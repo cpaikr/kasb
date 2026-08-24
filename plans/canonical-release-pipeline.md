@@ -71,8 +71,10 @@ artifact set.
   appropriate breadth.
 - Add a shared release metadata gate whose strict mode verifies the canonical
   version, `v<version>` tag, checked-out commit, clean generated state, target
-  set, and absence of an already-published candidate identity before build or
-  mutation, while rehearsal mode replaces only the tag and live-vacancy inputs.
+  set, and publication state before build or mutation. Each npm identity must
+  be vacant, an exact-tarball resumable match, or a mismatched fail-closed
+  conflict. Rehearsal mode replaces only the tag and live publication-state
+  inputs.
 - Bind workflow permissions, release URLs, provenance, installers, and upgrade
   discovery to `cpaikr/kasb` without duplicating canonical release state.
 - Build the Node addon and Rust CLI once per target, then derive the native npm
@@ -85,7 +87,8 @@ artifact set.
 - Publish the staged GitHub Release and then the validated npm tarballs through
   protected release jobs with least-privilege permissions and explicit failure
   reporting. After publishing the GitHub Release and before npm publication,
-  verify that GitHub reports the release and its tag as immutable.
+  verify `release.immutable` is true, `tag_name` is the canonical tag, and the
+  tag resolves to the validated candidate commit.
 - Update release operator documentation with trusted-publisher setup,
   environment protection, recovery boundaries, and the separately authorized
   first-release procedure.

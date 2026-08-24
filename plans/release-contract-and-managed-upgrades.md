@@ -21,8 +21,8 @@ binary without runtime addon downloads.
   manifest, installer, installation receipt, CLI product-version command, or
   upgrade operation exists.
 - `cpaikr/kasb` is currently private. Its release assets cannot be the
-  unauthenticated canonical installation source unless the repository becomes
-  public or a separate public GitHub release repository is designated.
+  unauthenticated canonical installation source until the separately
+  authorized visibility change makes that repository public.
 - The approved direction adopts the accepted `../mytech` standalone CLI
   distribution guidance, including `upgrade --check` and recoverable
   `upgrade`. This is an intentional exception to the previous blanket
