@@ -57,6 +57,14 @@ check(
   "deterministic validation must install the cargo-about CLI feature",
 );
 check(
+  (deterministicJob?.steps ?? []).some(
+    (step) => step?.env?.KASB_REQUIRE_POWERSHELL_TESTS === "1"
+      && typeof step?.run === "string"
+      && step.run.includes("bun run test"),
+  ),
+  "deterministic validation must require Unix PowerShell installer behavior tests",
+);
+check(
   hasRun(linuxJob, "dnf install -y clang-devel"),
   "native-linux must install libclang for dependency binding generation",
 );

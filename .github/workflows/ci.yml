@@ -41,6 +41,8 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
       - name: Test Rust and Node products
+        env:
+          KASB_REQUIRE_POWERSHELL_TESTS: "1"
         run: bun run test
       - name: Run adversarial public-surface judge
         run: bun run conformance:judge
