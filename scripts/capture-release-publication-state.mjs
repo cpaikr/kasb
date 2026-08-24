@@ -48,12 +48,15 @@ async function githubSnapshot(contract, tag, expectedCommit, directory, options)
   }
   const tagSha = await resolveRemoteTag(repository, tag, limits);
   if (tagSha !== expectedCommit) throw new Error("remote release tag does not peel to the requested candidate commit");
-  const releasePages = JSON.parse((await command("gh", ["api", `repos/${repository}/releases?per_page=100`, "--paginate", "--slurp"], limits)).stdout);
-  if (!Array.isArray(releasePages) || releasePages.some((page) => !Array.isArray(page))) throw new Error("GitHub returned invalid release history");
-  const releaseHistory = releasePages.flat();
+  const releaseHistory = (await command("gh", [
+    "api",
+    `repos/${repository}/releases?per_page=100`,
+    "--paginate",
+    "--jq",
+    ".[] | select(.draft == false and .prerelease == false) | .tag_name",
+  ], limits)).stdout.split(/\r?\n/u).filter(Boolean);
   const highestPublishedVersion = highestStableVersion(releaseHistory
-    .filter((entry) => entry && entry.draft === false && entry.prerelease === false)
-    .map(({ tag_name: releaseTagName }) => typeof releaseTagName === "string" && releaseTagName.startsWith(release.tagPrefix)
+    .map((releaseTagName) => releaseTagName.startsWith(release.tagPrefix)
       ? releaseTagName.slice(release.tagPrefix.length)
       : null));
   const response = await command("gh", ["api", `repos/${repository}/releases/tags/${tag}`], { ...limits, allowNotFound: true });
