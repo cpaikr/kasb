@@ -4,7 +4,7 @@ import { access, chmod, constants, copyFile, mkdir, mkdtemp, readFile, readdir, 
 import { tmpdir } from "node:os";
 import { delimiter, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { localArchivePath } from "./local-archive-path.mjs";
+import { localTarInvocation } from "./local-archive-path.mjs";
 import { loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
 
 const rustTarget = process.argv[2];
@@ -197,8 +197,8 @@ async function extractDirectCliArchive(input, destinationRoot) {
   const archive = await suppliedArchive(input);
   const destination = resolve(destinationRoot, "direct-cli");
   await mkdir(destination, { recursive: true });
-  const localArchive = localArchivePath(archive);
-  run("tar", ["-xzf", localArchive.name, "-C", destination], localArchive.directory);
+  const invocation = localTarInvocation(archive, "-xzf", ["-C", destination]);
+  run("tar", invocation.args, invocation.options.cwd);
   const cli = resolve(destination, target.cliFile);
   const metadata = await stat(cli);
   if (!metadata.isFile()) throw new Error(`Direct CLI archive is missing ${target.cliFile}.`);
@@ -401,8 +401,8 @@ function pack(directory) {
 }
 
 function inspectPack(tarball, native) {
-  const localTarball = localArchivePath(tarball);
-  const entries = exec("tar", ["-tzf", localTarball.name], { cwd: localTarball.directory, encoding: "utf8" })
+  const invocation = localTarInvocation(tarball, "-tzf");
+  const entries = exec("tar", invocation.args, { ...invocation.options, encoding: "utf8" })
     .split(/\r?\n/u)
     .filter(Boolean);
   assert(entries.every((entry) => entry.startsWith("package/")), "npm artifact entries must stay under package/");

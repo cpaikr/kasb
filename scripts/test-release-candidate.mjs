@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { archiveInvocation } from "./assemble-cli-archive.mjs";
-import { localArchivePath } from "./local-archive-path.mjs";
+import { localArchivePath, localTarInvocation } from "./local-archive-path.mjs";
 import { canonicalCandidateIdentity, requiredCandidateGates, validateArtifactManifest, validateCandidateVersion, validatePrebuildPublicationState, validatePublicationStateSource } from "./release-candidate-contract.mjs";
 import { scanCandidateText, validateCandidateProvenance } from "./release-candidate-inspection.mjs";
 import { checksummedReleaseAssetNames, loadReleaseContract, releaseAssetNames, repositoryRoot } from "./release-contract.mjs";
@@ -26,6 +26,22 @@ try {
     localArchivePath(`${windowsOutputDirectory}\\${windowsTarget.archiveName}`),
     { directory: windowsOutputDirectory, name: windowsTarget.archiveName },
     "tar readers must keep Windows drive paths in cwd instead of archive operands",
+  );
+  assert.deepEqual(
+    localTarInvocation(`${windowsOutputDirectory}/${windowsTarget.archiveName}`, "-tzf"),
+    {
+      args: ["-tzf", windowsTarget.archiveName],
+      options: { cwd: windowsOutputDirectory },
+    },
+    "tar listing must use a local archive operand for forward-slash Windows paths",
+  );
+  assert.deepEqual(
+    localTarInvocation(`\\\\server\\release\\${windowsTarget.archiveName}`, "-xzf", ["-C", "destination"]),
+    {
+      args: ["-xzf", windowsTarget.archiveName, "-C", "destination"],
+      options: { cwd: "\\\\server\\release\\" },
+    },
+    "tar extraction must use a local archive operand for UNC paths",
   );
 
   for (const script of ["scripts/write-release-checksums.mjs", "scripts/validate-release-artifacts.mjs"]) {
