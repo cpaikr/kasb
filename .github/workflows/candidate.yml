@@ -439,6 +439,7 @@ jobs:
           artifact-ids: ${{ needs.aggregate.outputs.artifact_id }}
           path: dist
       - name: Exercise exact installer, receipt, and same-version upgrade check
+        shell: bash
         env:
           KASB_CANDIDATE_SHA: ${{ needs.metadata.outputs.sha }}
           RUST_TARGET: ${{ matrix.rust_target }}
