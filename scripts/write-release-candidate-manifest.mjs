@@ -14,8 +14,8 @@ const nativeFiles = await matchingFiles("dist/native", (name) => name.endsWith("
 const rootFiles = await matchingFiles("dist/root", (name) => name.endsWith(".tgz"));
 if (nativeFiles.length !== contract.targets.length) throw new Error(`expected ${contract.targets.length} native npm tarballs, found ${nativeFiles.length}`);
 if (rootFiles.length !== 1) throw new Error(`expected one root npm tarball, found ${rootFiles.length}`);
-await assertDirectoryFiles("dist/native", nativeFiles.map(basename));
-await assertDirectoryFiles("dist/root", rootFiles.map(basename));
+await assertDirectoryFiles("dist/native", nativeFiles.map((file) => basename(file)));
+await assertDirectoryFiles("dist/root", rootFiles.map((file) => basename(file)));
 
 const npmPackages = [];
 for (const file of [...nativeFiles, ...rootFiles]) {
