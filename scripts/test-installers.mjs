@@ -8,14 +8,8 @@ import { loadReleaseContract, releaseTag, repositoryRoot } from "./release-contr
 
 const contract = await loadReleaseContract();
 const powerShellOnly = process.argv.includes("--powershell-only");
-const windowsRustTarget = "x86_64-pc-windows-msvc";
-const windowsCliTargetDirectory = resolve(repositoryRoot, "target", "installer-tests");
 if (process.platform === "win32" && process.argv.includes("--build-windows-cli")) {
-  const build = spawnSync(
-    "cargo",
-    ["build", "--locked", "-p", "kasb-cli", "--bin", "kasb", "--target", windowsRustTarget, "--target-dir", windowsCliTargetDirectory],
-    { cwd: repositoryRoot, encoding: "utf8" },
-  );
+  const build = spawnSync("cargo", ["build", "--locked", "-p", "kasb-cli", "--bin", "kasb"], { cwd: repositoryRoot, encoding: "utf8" });
   assert(build.status === 0, `could not build the Windows installer identity fixture: ${build.stderr}`);
 }
 const root = await mkdtemp(join(tmpdir(), "kasb installer tests "));
@@ -291,7 +285,7 @@ async function fixtureFor(target, options = {}) {
   await mkdir(source, { recursive: true });
   const executablePath = join(source, target.executableName);
   const executable = options.executable ?? (process.platform === "win32"
-    ? await readFile(resolve(windowsCliTargetDirectory, windowsRustTarget, "debug", "kasb.exe"))
+    ? await readFile(resolve(repositoryRoot, "target/debug/kasb.exe"))
     : Buffer.from(`#!/bin/sh\nif [ "$1" = --version ]; then echo 'kasb ${contract.version}'; exit 0; fi\nexit 1\n`));
   await writeFile(executablePath, executable);
   await chmod(executablePath, 0o755);
