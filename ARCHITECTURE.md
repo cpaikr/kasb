@@ -63,8 +63,9 @@ behavior.
   addon and same-revision Rust CLI.
 - `fixtures` and `conformance` provide captured provider evidence, committed
   outcomes, process-isolated public-surface runners, and known-bad controls.
-- `native-targets.json` owns target selection, package names, compatibility
-  floors, and support claims.
+- `native-targets.json` owns target selection, package and standalone archive
+  identities, compatibility floors, release bounds, the receipt schema, and
+  support claims. Cargo workspace metadata owns the product version.
 - `plans/rust-node-rewrite.md` records completed cutover gates and evidence; it
   does not define runtime architecture or public semantics.
 
@@ -96,6 +97,19 @@ The npm command path does not call Node-API:
 npm bin shim -> JavaScript target resolver -> packaged Rust kasb binary
 ```
 
+The only approved runtime artifact download is an explicit, receipt-managed
+standalone upgrade:
+
+```text
+kasb upgrade -> immutable cpaikr/kasb release -> checksum + binary identity
+             -> same-filesystem stage -> executable + receipt replacement
+```
+
+`upgrade --check` performs bounded release discovery without replacement.
+Source-built, npm-owned, missing-receipt, or digest-mismatched executables are
+unmanaged and must be upgraded by their owner. Ordinary KASB commands never
+perform update discovery.
+
 The Node facade may reject malformed public input without network access. Rust
 validates again at the native trust boundary. `KasbClient` owns transport
 lifetime, clock/cancellation composition, and capability execution. The binding
@@ -122,6 +136,8 @@ streams, termination, and exit status without parsing KASB commands.
 | Node SDK, tool discovery, and JavaScript ergonomics | `packages/node` |
 | npm target selection and transparent launch | `packages/node` |
 | Native support matrix and package constraints | `native-targets.json` |
+| Product version | `[workspace.package].version` in `Cargo.toml` |
+| Standalone release, installer, and receipt policy | `native-targets.json` |
 | Deterministic behavior evidence | `fixtures`, `conformance` |
 
 OpenAPI is handwritten and validated; it does not generate the Rust conformer.
@@ -160,6 +176,13 @@ exact-version optional native package. Each target package declares its OS,
 architecture, and Linux libc constraints and contains both the Node addon and
 Rust CLI binary built from the same revision. The launcher never downloads or
 compiles artifacts during install or first use.
+
+Standalone CLI archives reuse those target binaries but have separate
+ownership. Generated shell and PowerShell installers accept only the canonical
+repository/tag identity, an immutable release, bounded HTTPS responses, and an
+exact SHA-256 entry. They publish the binary and adjacent receipt recoverably.
+On Windows, a detached helper performs replacement after the running process
+exits and records a terminal status; scheduling is not reported as applied.
 
 The supported matrix is Linux GNU x64/ARM64, macOS ARM64, and Windows x64. Each
 target passed native build, same-revision artifact, direct CLI, and clean packed

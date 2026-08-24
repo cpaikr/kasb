@@ -2,23 +2,23 @@ import { readdir, readFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { fileURLToPath } from "node:url";
+import { loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
 
-const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const inputs = process.argv.slice(2);
 const ciOnly = inputs[0] === "--ci";
 if (ciOnly) inputs.shift();
 const nativeDirectory = resolve(repositoryRoot, inputs[0] ?? "dist/native");
 const rootDirectory = resolve(repositoryRoot, inputs[1] ?? "dist/root");
 const cliDirectory = resolve(repositoryRoot, inputs[2] ?? "dist/cli");
-const manifest = JSON.parse(await readFile(resolve(repositoryRoot, "native-targets.json"), "utf8"));
+const contract = await loadReleaseContract();
+const { manifest } = contract;
 const rootSource = JSON.parse(await readFile(resolve(repositoryRoot, manifest.rootPackage, "package.json"), "utf8"));
 const license = await readFile(resolve(repositoryRoot, "LICENSE.md"), "utf8");
 const notices = await readFile(resolve(repositoryRoot, "THIRD_PARTY_LICENSES.html"), "utf8");
 const nodeNotices = await readFile(resolve(repositoryRoot, manifest.rootPackage, "THIRD_PARTY_LICENSES.md"), "utf8");
 const validatedTargets = ciOnly
-  ? manifest.targets.filter(({ continuousIntegration }) => continuousIntegration === true)
-  : manifest.targets;
+  ? contract.targets.filter(({ continuousIntegration }) => continuousIntegration === true)
+  : contract.targets;
 const expectedNative = new Map(validatedTargets.map((target) => [target.packageName, target]));
 
 assertPublicPackage(rootSource, "@sjunepark/kasb");
@@ -27,12 +27,22 @@ assertNoPiMetadata(rootSource);
 const nativeTarballs = await tarballs(nativeDirectory);
 const rootTarballs = await tarballs(rootDirectory);
 const cliArchives = await archives(cliDirectory);
+const checksumManifest = await readFile(resolve(cliDirectory, manifest.release.checksumAsset), "utf8");
+const checksums = new Map();
+for (const line of checksumManifest.trimEnd().split(/\r?\n/u)) {
+  const match = line.match(/^([0-9a-f]{64})  ([^/\\]+)$/u);
+  if (!match || checksums.has(match[2])) throw new Error(`Invalid or duplicate checksum entry ${JSON.stringify(line)}.`);
+  checksums.set(match[2], match[1]);
+}
 if (nativeTarballs.length !== expectedNative.size) {
   throw new Error(`Expected ${expectedNative.size} native tarballs, found ${nativeTarballs.length}.`);
 }
 if (rootTarballs.length !== 1) throw new Error(`Expected one root tarball, found ${rootTarballs.length}.`);
 if (cliArchives.length !== expectedNative.size) {
   throw new Error(`Expected ${expectedNative.size} direct CLI archives, found ${cliArchives.length}.`);
+}
+if (checksums.size !== expectedNative.size) {
+  throw new Error(`Expected ${expectedNative.size} exact checksum entries, found ${checksums.size}.`);
 }
 
 const seen = new Set();
@@ -68,11 +78,14 @@ for (const tarball of nativeTarballs) {
   if (tarballEntry(tarball, "package/LICENSE.md") !== license) throw new Error(`${pkg.name} has a stale license.`);
   if (tarballEntry(tarball, "package/THIRD_PARTY_LICENSES.html") !== notices) throw new Error(`${pkg.name} has stale notices.`);
 
-  const expectedArchiveName = `kasb-${rootSource.version}-${target.packageDirectory}.tar.gz`;
+  const expectedArchiveName = target.archiveName;
   const cliArchive = cliArchives.find((candidate) => basename(candidate) === expectedArchiveName);
   if (!cliArchive) throw new Error(`${pkg.name} is missing its direct CLI archive.`);
+  if (checksums.get(expectedArchiveName) !== hash(await readFile(cliArchive))) {
+    throw new Error(`${pkg.name} direct CLI archive checksum differs from ${manifest.release.checksumAsset}.`);
+  }
   const cliEntries = listArchive(cliArchive).sort();
-  const expectedEntries = [target.cliFile, "LICENSE.md", "README.md", "THIRD_PARTY_LICENSES.html"].sort();
+  const expectedEntries = [...target.archiveEntries].sort();
   if (JSON.stringify(cliEntries) !== JSON.stringify(expectedEntries)) {
     throw new Error(`${pkg.name} direct CLI archive has unexpected contents.`);
   }

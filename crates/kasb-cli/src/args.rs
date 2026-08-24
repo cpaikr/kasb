@@ -17,7 +17,8 @@ const ROOT_AFTER_HELP: &str = r#"Workflows:
   kasb get-qna --doc-number SSI-35629 --output summary
 
 Cautions:
-  - This tool performs read-only retrieval from KASB public material.
+  - The six KASB content commands perform read-only retrieval from public material.
+  - upgrade changes only a receipt-managed standalone CLI installation.
   - It does not provide accounting, legal, investment, or tax advice.
   - Results are structured data for source verification."#;
 
@@ -83,9 +84,9 @@ Notes:
 #[command(
     name = "kasb",
     about = "Retrieve KASB standards and Q&A material as tool-friendly JSON.",
+    version,
     after_help = ROOT_AFTER_HELP,
     arg_required_else_help = true,
-    disable_version_flag = true,
     args_override_self = true,
     color = clap::ColorChoice::Never
 )]
@@ -114,6 +115,8 @@ enum Operation {
     /// Retrieve a KASB Q&A document by docNumber.
     #[command(after_help = GET_QNA_AFTER_HELP)]
     GetQna(GetQnaArgs),
+    /// Check or apply a managed standalone CLI upgrade.
+    Upgrade(UpgradeArgs),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -124,6 +127,7 @@ pub(crate) enum OperationName {
     GetParagraph,
     SearchQna,
     GetQna,
+    Upgrade,
 }
 
 impl OperationName {
@@ -135,6 +139,7 @@ impl OperationName {
             Self::GetParagraph => "get-paragraph",
             Self::SearchQna => "search-qna",
             Self::GetQna => "get-qna",
+            Self::Upgrade => "upgrade",
         }
     }
 }
@@ -372,6 +377,13 @@ struct GetQnaArgs {
     pretty: bool,
 }
 
+#[derive(Debug, Args)]
+struct UpgradeArgs {
+    /// Check the latest immutable release without changing the installation.
+    #[arg(long)]
+    check: bool,
+}
+
 #[derive(Debug)]
 pub(crate) struct Invocation {
     pub operation: OperationName,
@@ -380,6 +392,7 @@ pub(crate) struct Invocation {
     pub pretty: bool,
     pub failure_pretty: bool,
     pub used_options: BTreeMap<&'static str, &'static str>,
+    pub upgrade_check: bool,
 }
 
 impl Cli {
@@ -488,6 +501,17 @@ impl Cli {
                 insert_string(&mut input, &mut used, "keyword", "--keyword", args.keyword);
                 Invocation::new(OperationName::GetQna, input, args.output, args.pretty, used)
             }
+            Operation::Upgrade(args) => {
+                let mut invocation = Invocation::new(
+                    OperationName::Upgrade,
+                    Map::new(),
+                    None,
+                    false,
+                    BTreeMap::new(),
+                );
+                invocation.upgrade_check = args.check;
+                invocation
+            }
         }
     }
 }
@@ -507,6 +531,7 @@ impl Invocation {
             pretty,
             failure_pretty: pretty,
             used_options,
+            upgrade_check: false,
         }
     }
 }

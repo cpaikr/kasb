@@ -1,6 +1,6 @@
 {
   "name": "@sjunepark/kasb-win32-x64-msvc",
-  "version": "0.2.1",
+  "version": "0.1.0",
   "description": "Native KASB Node addon and Rust CLI for win32-x64.",
   "main": "kasb.win32-x64-msvc.node",
   "files": [

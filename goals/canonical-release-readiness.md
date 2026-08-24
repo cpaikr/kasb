@@ -30,28 +30,36 @@ _None._
 
 ### Current in-scope result
 
-Establish the canonical release, installation, and managed-upgrade contract in
-`plans/release-contract-and-managed-upgrades.md`. The release-pipeline plan is
-sequenced after that contract because it must build and validate the resulting
-versioned artifacts and upgrade behavior.
+Finish review and delivery of the canonical release, installation, and
+managed-upgrade implementation on `codex/release-contract-upgrades`. The
+release-pipeline plan remains sequenced after this contract because it must
+build and validate the resulting versioned artifacts and upgrade behavior.
 
 ### Next in-scope action
 
-Land the two reviewed release plans and this goal record, then implement one
-canonical product-version source and a repository-owned validator that rejects
-Cargo, npm, generated package, archive, binary, and release-metadata skew.
+Finish implementation PR #22 against the goal integration branch, record its
+merged validation evidence, then start the four-target candidate and
+publication-pipeline slice.
 
 ### Evidence and blockers
 
 - The Rust/Node rewrite is complete and merged to `main` by PR #20. Its
   deterministic and Linux-native Blacksmith checks passed on the final merged
   revision.
-- PR #21 carries the two release plans, active goal record, and truthful
-  rewrite-completion documentation against the goal's integration branch.
-- `native-targets.json` owns four supported targets, but does not yet own
-  versioned standalone assets, installers, checksums, or receipts.
-- Cargo currently reports product version `0.1.0`, while the root and generated
-  native npm packages report `0.2.1`; no repository gate rejects that skew.
+- PR #21 merged the two release plans, active goal record, and truthful
+  rewrite-completion documentation into commit `80eea30` on the goal integration
+  branch.
+- PR #22 carries the reviewed release, installation, and managed-upgrade
+  implementation. Its local contract, test, conformance, build, formatting,
+  clippy, license, native-workflow, and diff checks pass; required CI and
+  hosted review are in progress.
+- The implementation branch makes Cargo workspace version `0.1.0` the current
+  development identity; npm packages, four target-derived standalone archives,
+  generated installers, checksums, CLI identity, and receipts derive from it.
+  It does not select the first production version.
+- Local contract, installer, Node, Rust, formatting, clippy, license, and
+  generated-file checks pass. PowerShell behavioral execution remains pending
+  in required CI because `pwsh` is not installed on the local macOS host.
 - `cpaikr/kasb` remains the single canonical source and release repository.
   This goal implements and validates that binding without changing its current
   private visibility; making it public is an external prerequisite for the
