@@ -12,8 +12,12 @@ export async function executeGitHubPublication(candidateInput, adapter) {
   const candidate = strictCandidate(candidateInput);
   requireAdapter(adapter, ["readState", "readCandidateFile", "createDraft", "uploadAsset", "publishDraft"]);
   const receipt = baseReceipt("github", candidate);
+  const maxStagingIterations = candidate.githubAssets.length + 2;
   try {
-    for (;;) {
+    for (let iteration = 0;; iteration += 1) {
+      if (iteration >= maxStagingIterations) {
+        fail("github_staging_iteration_limit", "GitHub publication state did not converge within the bounded staging plan");
+      }
       const state = await adapter.readState();
       const plan = planGitHubPublication(candidate, state, "stage");
       if (plan.actions.length === 0) break;

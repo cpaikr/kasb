@@ -45,9 +45,9 @@ export async function validateCandidateProvenance(path, identity) {
   return provenance;
 }
 
-export async function scanCandidateText({ githubAssets, npmPackages }) {
+export async function scanCandidateText({ githubAssets, npmPackages }, root = repositoryRoot) {
   const contract = await loadReleaseContract();
-  const byName = new Map(githubAssets.map((asset) => [asset.name, resolve(repositoryRoot, asset.file)]));
+  const byName = new Map(githubAssets.map((asset) => [asset.name, resolve(root, asset.file)]));
   for (const name of [
     contract.release.checksumAsset,
     contract.release.shellInstallerAsset,
@@ -63,7 +63,7 @@ export async function scanCandidateText({ githubAssets, npmPackages }) {
     }
   }
   for (const pkg of npmPackages) {
-    const tarball = resolve(repositoryRoot, pkg.file);
+    const tarball = resolve(root, pkg.file);
     const entries = listTar(tarball);
     for (const entry of entries.filter(isKnownTextEntry)) {
       scanText(tarEntry(tarball, entry, false, contract.release.metadataLimitBytes), `${basename(tarball)}:${entry}`);
@@ -85,7 +85,8 @@ function isKnownTextEntry(entry) {
 async function boundedText(path, limit, label) {
   if (!path) throw new Error(`${label} is missing`);
   const bytes = await readFile(path);
-  if (bytes.length === 0 || bytes.length > limit) throw new Error(`${label} exceeds its bounded textual size`);
+  if (bytes.length === 0) throw new Error(`${label} is empty`);
+  if (bytes.length > limit) throw new Error(`${label} exceeds its bounded textual size`);
   if (bytes.includes(0)) throw new Error(`${label} is not a textual surface`);
   return bytes.toString("utf8");
 }
@@ -100,6 +101,7 @@ function tarEntry(path, entry, gzip, limit) {
   const result = spawnSync("tar", [gzip ? "-xOzf" : "-xOf", path, entry], { maxBuffer: limit + 1 });
   if (result.status !== 0) throw new Error(`could not inspect textual entry ${entry} in ${path}`);
   if (result.stdout.length === 0 || result.stdout.length > limit || result.stdout.includes(0)) {
+    if (result.stdout.length === 0) throw new Error(`${basename(path)}:${entry} is empty`);
     throw new Error(`${basename(path)}:${entry} exceeds its bounded textual size`);
   }
   return result.stdout.toString("utf8");
