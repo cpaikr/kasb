@@ -1,0 +1,9 @@
+{
+  "ok": false,
+  "error": {
+    "code": "source_changed",
+    "message": "Could not find standardIndexes array.",
+    "retryable": false,
+    "sourceUrl": "https://db.kasb.or.kr/api/standard-indexes/1116"
+  }
+}

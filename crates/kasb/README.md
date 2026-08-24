@@ -1,8 +1,10 @@
 # kasb Rust SDK
 
-The native `kasb` crate currently implements the phase-4 `get-paragraph`
-vertical pilot. It is read-only and has no dependency on the TypeScript package
-or Node.js runtime. Remaining v1 Rust capabilities belong to migration phase 5.
+The native `kasb` crate implements all six read-only KASB v1 operations:
+`search-standards`, `get-standard-structure`, `get-section`, `get-paragraph`,
+`search-qna`, and `get-qna`. It has no dependency on the TypeScript package or
+Node.js runtime. KASB transport, source decoding, normalization, domain policy,
+and typed capability failures live in this crate.
 
 The example uses Tokio's runtime macro. Add these direct dependencies to the
 consumer crate:
@@ -36,6 +38,11 @@ proxy affinity, and concurrency budget. Use `KasbClient::from_parts` with an
 implementation of `HttpTransport` and `Clock` for deterministic embedding and
 tests. Caller cancellation returns `KasbError::Cancelled`; capability failures
 remain structured `KasbError::Failure` values with serializable fields.
+
+Each capability module exposes a validated request type and a project-owned
+result type. `KasbClient` provides a typed method and an `execute_*` JSON trust
+boundary for each operation. The latter is used by native projections and
+still validates inputs before any source request.
 
 From this directory, run `cargo build --locked`, `cargo test --locked`, and
 `cargo clippy --all-targets --locked -- -D warnings`.

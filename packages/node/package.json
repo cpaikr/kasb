@@ -1,0 +1,55 @@
+{
+  "name": "@sjunepark/kasb",
+  "version": "0.2.1",
+  "description": "Read-only Rust-backed SDK and CLI for KASB standards and Q&A material.",
+  "type": "module",
+  "license": "Elastic-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cpaikr/kasb.git",
+    "directory": "packages/node"
+  },
+  "bin": {
+    "kasb": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./toolset": {
+      "types": "./dist/toolset.d.ts",
+      "import": "./dist/toolset.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE.md",
+    "THIRD_PARTY_LICENSES.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20.18.1"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs && bun scripts/build-toolset.ts",
+    "prepack": "bun run build",
+    "test": "bun run build && bun test test",
+    "typecheck": "bun run build && tsc --noEmit -p tsconfig.json"
+  },
+  "optionalDependencies": {
+    "@sjunepark/kasb-linux-x64-gnu": "0.2.1",
+    "@sjunepark/kasb-linux-arm64-gnu": "0.2.1",
+    "@sjunepark/kasb-darwin-arm64": "0.2.1",
+    "@sjunepark/kasb-win32-x64-msvc": "0.2.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.1",
+    "effect": "^3.20.0",
+    "typescript": "^5.9.0"
+  }
+}

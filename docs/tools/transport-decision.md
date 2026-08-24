@@ -1,52 +1,44 @@
 # Transport Decision
 
-## Short Answer
+## Decision
 
-This repo is CLI-only.
+The supported public projections are:
 
-The practical shape is:
+- the native `kasb` Rust SDK;
+- the native Rust `kasb` CLI; and
+- the Node SDK, including `@sjunepark/kasb/toolset`.
 
-- implement a reusable core
-- expose it through a Commander CLI
-- keep other transports out of scope unless the product direction changes
+Rust is the sole KASB conformer. The CLI invokes the public SDK directly. The
+Node surfaces invoke it through a narrow asynchronous Node-API binding and do
+not own URLs, request serialization, transport, source decoding, normalization,
+or capability failures.
 
-## Recommendation For This Repo
+The Rust CLI owns flags, help, stdout/stderr, presentation, and exit status. The
+Node SDK/toolset owns side-effect-free discovery and validation plus JavaScript
+ergonomics. Both use the same stable operation identities.
 
-Adopt `capability core + thin CLI`, matching `../darty`.
+The npm package retains a `kasb` executable for installation convenience. Its
+JavaScript entrypoint is only a shell-free target resolver and process launcher
+for the exact Rust CLI binary in the selected optional platform package. It
+forwards the process contract and owns no KASB command behavior.
 
-The CLI should mostly:
+## Process contract
 
-- parse command-line input
-- apply command help and examples
-- call the shared app/capability layer
-- serialize success envelopes as JSON on `stdout`
-- serialize failure envelopes as JSON on `stderr` with nonzero exit codes
+- Machine-mode success and failure are one newline-terminated JSON document on
+  `stdout`; failure exits nonzero.
+- Human-readable help remains separate from machine execution output.
+- Discovery, command help, and validation do not contact KASB.
+- Cancellation crosses Node-API explicitly and remains distinct from timeout or
+  provider failure.
+- The CLI transport and Node SDK call the public Rust capability boundary; npm
+  launcher and JavaScript facade code never call KASB endpoints directly.
+- The npm launcher does not download, compile, parse, render, or fall back to a
+  JavaScript implementation.
 
-Do not fork logic between CLI commands and source adapters. The CLI should not call KASB endpoints directly.
+## Out of scope
 
-## Why CLI First Wins Here
-
-- easiest to test manually
-- easiest to profile and benchmark
-- easiest to inspect failure modes
-- least coupled to one agent ecosystem
-- works well for subprocess-based agent use
-
-## Out Of Scope
-
-- MCP handlers
-- SDK packages
-- Pi-native tools
-- database persistence or background ingestion
-- HTTP wrappers
-
-These can be reconsidered only if the product docs change. They are not current implementation targets.
-
-## Anti-Patterns
-
-- putting domain logic in CLI command files
-- designing outputs around human terminal readability only
-- printing non-JSON failure text that subprocess callers must special-case
-- forcing agents to chain multiple shell-oriented commands when one semantic call should exist
-- using a skill to compensate for a poor tool contract
-- returning giant unfiltered dumps because "the model can figure it out"
+- Pi, MCP, or another host-specific adapter;
+- a second CLI implementation in JavaScript;
+- browser, edge, Deno, or Bun-runtime npm support;
+- database persistence, background ingestion, or HTTP wrappers; and
+- a JavaScript transport-injection seam that would create a second conformer.

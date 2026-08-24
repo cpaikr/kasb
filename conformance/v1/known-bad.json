@@ -21,6 +21,13 @@
       "actual": "conformance/v1/known-bad/serialization-mismatch.json",
       "expectedDifference": "type",
       "expectedPath": "$.value.result.request.stdNum"
+    },
+    {
+      "id": "source-metadata-corruption",
+      "baselineCase": "get-paragraph-success",
+      "actual": "conformance/v1/known-bad/source-metadata-corruption.json",
+      "expectedDifference": "value",
+      "expectedPath": "$.value.metadata.source.endpoint"
     }
   ]
 }

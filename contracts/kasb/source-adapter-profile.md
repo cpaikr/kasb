@@ -1,0 +1,102 @@
+# KASB source-adapter profile
+
+Status: normative language-neutral wire interpretation profile
+
+This profile complements [OpenAPI](openapi.yaml). OpenAPI owns the supported
+HTTP paths, parameters, and JSON envelope shapes; this document owns only
+cross-response and decoding rules that OpenAPI cannot express. Public product
+semantics remain in
+[the KASB standards v1 specification](../../docs/specs/kasb-standards-v1.md).
+
+## Request serialization
+
+- Encode every path identifier as one independent UTF-8 percent-encoded path
+  segment. Embedded `/`, query delimiters, spaces, and control characters must
+  never change the route shape.
+- Encode query values as UTF-8 with the WHATWG
+  `application/x-www-form-urlencoded` serializer, including `+` for spaces.
+  Preserve the operation's parameter order because source URLs are public metadata:
+  `types`, `searchWord`, `page`, `rows` for Q&A search; otherwise the order in
+  OpenAPI.
+- Omit optional query parameters rather than serializing empty or undefined
+  values.
+- Send no request body. Reuse one session-scoped client so cookies, connection
+  pooling, proxy affinity, and the concurrency budget remain coherent.
+- Reject a successful response once its decoded body exceeds 8 MiB. Enforce the
+  limit from both declared content length and streamed bytes so chunked or
+  compressed responses cannot bypass it.
+- Make no automatic replay. One logical KASB request produces at most one HTTP
+  attempt; retry policy belongs to callers after a typed failure.
+
+## Identifier and identity rules
+
+- Normalize source identifier scalars from strings or finite IEEE-754 binary64
+  JSON numbers. Strings remain unchanged. Render numbers as the shortest
+  round-trippable decimal; render negative zero as `0`; use fixed notation for
+  absolute values in `[1e-6, 1e21)` and lowercase scientific notation outside
+  that interval, with an explicit `+` for nonnegative exponents. Do not promote
+  source ordering fields or browser-facing title ids into public identifiers.
+- Reject source-derived identifiers equal to `.` or `..` before constructing a
+  follow-up URL. Search rows follow the partial-data policy; exact or
+  identity-bearing responses fail as `source_changed`. No dot-segment value may
+  reach path encoding or URL assembly.
+- A paragraph response must match the requested `stdNum` and `paraNum`, and its
+  `uniqueKey` must equal `{stdNum}-{paraNum}`.
+- Every base-structure row that supplies both a source `documentId` and
+  `stdNum` must match the requested `stdNum`; a mismatch is `source_changed`.
+- Every section clause with an explicit `stdNum` must match the requested
+  `stdNum`. A clause may carry a child `documentId`; otherwise the requested
+  section id is the fallback retrieval identity.
+- A Q&A detail response must match the requested `docNumber`.
+- Filtered structure keys other than the literal string `"null"` must resolve
+  to nodes from the base structure response.
+- When section clauses are empty, confirm the requested `indexDocumentId`
+  against the base structure before classifying the response as an existing
+  empty section.
+
+## Cardinality and partial data
+
+- Exact paragraph lookup with zero rows is `not_found`, one valid matching row
+  is success, and multiple rows or a malformed required field is
+  `source_changed`.
+- A null or absent `facilityQna` detail member is `not_found`. When the member
+  is present and non-null, missing behavior-driving row fields are
+  `source_changed`; required exact-detail fields are never synthesized from
+  optional fields.
+- Search, structure, section, and Q&A-search arrays may omit malformed rows and
+  mark the result partial when at least one valid row remains. A nonempty source
+  array with no normalizable rows is `source_changed`.
+- Preserve source array order before applying public, explicitly documented
+  sorting. Preserve unknown object properties as ignorable extensions rather
+  than treating additions alone as drift.
+- Ref resolution chooses the deepest matching node, then stable source order,
+  and reports ambiguity. Structure and paragraph enrichment is best-effort;
+  cancellation always stops both primary and enrichment work.
+- Relevance and title standard searches enrich at most 512 candidate rows
+  before sorting, with at most eight enrichment requests in flight. A larger
+  candidate set is source drift rather than a partially ranked result.
+  Match-count and standard-number searches sort and truncate first, then enrich
+  only the public `limit` rows.
+- Q&A recency controls scan at most 500 rows in pages of at most 50 and report
+  partial metadata when the bounded window cannot cover the source count.
+
+## Content and failures
+
+- Preserve public HTML fields where the semantic contract names them. Plain
+  text normalization is deterministic and must not invent missing required
+  content.
+- Malformed JSON, malformed required envelopes, identity mismatches, and
+  impossible cardinality are `source_changed`. A successful response above the
+  decoded-body limit is also non-retryable `source_changed`, regardless of
+  whether the concrete transport rejects it while streaming or returns the
+  oversized bytes to the shared adapter boundary.
+- HTTP 404 is `not_found`. HTTP 429 and every 5xx response are retryable
+  `source_unavailable`; other non-success statuses are non-retryable
+  `source_unavailable`. Connection and timeout failures are retryable
+  `source_unavailable`.
+- Caller cancellation is execution control, not a capability failure. Public
+  projections expose it distinctly as transport-local `aborted` behavior.
+
+The browser persona is an implementation policy used for bounded,
+session-coherent access. It is not a claim that KASB requires those headers;
+bounded source observations also succeeded with ordinary `curl` requests.

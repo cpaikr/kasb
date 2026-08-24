@@ -1,5 +1,9 @@
 # Rust migration translation rulebook
 
+Historical pilot rulebook. Its additive-migration framing was superseded by
+[`MIGRATION.md`](../../../MIGRATION.md); retain the validated translation and
+conformance details as evidence for the rewrite.
+
 This file records durable TypeScript-to-Rust decisions for the additive native
 SDK. [The v1 spec](../../specs/kasb-standards-v1.md) is normative; TypeScript is
 an executable baseline, not a source of truth when it conflicts with the spec

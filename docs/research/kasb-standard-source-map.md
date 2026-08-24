@@ -2,7 +2,11 @@
 
 Captured on 2026-03-31. Q&A endpoint notes refreshed on 2026-05-21.
 
-Status: observed source evidence, not the public contract or architecture guide. Promote stable contract decisions into [../specs/kasb-standards-v1.md](../specs/kasb-standards-v1.md) and implementation-shape decisions into [../../ARCHITECTURE.md](../../ARCHITECTURE.md).
+Status: observed provider evidence, not a wire, public, or architecture
+contract. Supported HTTP wire facts are promoted into
+`contracts/kasb/openapi.yaml`, public semantic decisions into
+[../specs/kasb-standards-v1.md](../specs/kasb-standards-v1.md), and component
+boundaries into [../../ARCHITECTURE.md](../../ARCHITECTURE.md).
 
 Method:
 
@@ -199,10 +203,11 @@ Observed response shapes:
 
 Implementation implication:
 
-- source response schemas should live under each SDK's source-adapter root
-  (`packages/kasb-ts/src/sources/kasb/` and `crates/kasb/src/sources/kasb/`)
+- supported source response shapes live only in
+  `contracts/kasb/openapi.yaml`; source adapters keep private decoding models
+  that implement that authority
 - public capability result schemas should expose normalized standards, sections, paragraphs, references, metadata, and warnings
-- raw source payloads may be exposed only through explicit CLI debugging output, not the default public success result
+- raw source payloads are not exposed through public SDK or CLI results
 
 ## Browser Independence
 
@@ -241,7 +246,7 @@ Observed implication:
 - `stdNum + paraNum` behaves as an exact paragraph reference across numeric, Korean-prefixed, appendix, and basis-for-conclusions paragraph forms in tested cases
 - direct paragraph lookup also returns the parent retrieval `documentId`, so callers do not need to supply a section id to fetch one exact paragraph
 
-## Rust Pilot Validation Evidence
+## Rust Adapter Validation Evidence
 
 Validated locally from the captured observations above:
 

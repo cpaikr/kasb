@@ -45,18 +45,27 @@ Initial fixture targets:
 
 Use opt-in live checks for source behavior that fixtures cannot prove, such as source drift, id mismatches, and endpoint availability.
 
-In this repo, those belong under `packages/kasb-ts/test/live/` and are gated by `LIVE_KASB_TESTS=1`.
+In this repo, those belong under `packages/node/test/live/` and are gated by
+`LIVE_KASB_TESTS=1`.
 
 ### Scenario evals
 
 Use user-like tasks at the capability level. Put scenario-style CLI and model-in-the-loop checks under `evals/` when they exercise live task usefulness or agent/tool wiring rather than narrow unit behavior.
 
-Internal typed evals use `evals/typed-tools.ts`. These definitions call `packages/kasb-ts/src/app/*` operations directly, keep semantic JSON parameters separate from CLI flags, and return the shared capability envelopes without subprocess noise.
+Internal typed evals use `evals/typed-tools.ts`. The production definitions map
+to the canonical Rust-backed Node toolset, keep semantic JSON parameters
+separate from CLI flags, and return public capability envelopes without
+subprocess noise. Scenario tests inject caller-owned fixture operations for
+deterministic orchestration checks; those fixtures are not a KASB conformer.
 
 CLI smoke tests should assert stream and exit behavior:
 
 - success: exit code `0`, JSON envelope on `stdout`, empty `stderr`
-- failure: nonzero exit code, empty `stdout`, JSON failure envelope on `stderr`
+- failure: exit code `1`, JSON failure envelope on `stdout`, empty `stderr`
+
+The frozen replacement inventory in
+[`../contracts/kasb-v1-compatibility.md`](../contracts/kasb-v1-compatibility.md)
+owns the complete CLI process contract.
 
 Initial deterministic CLI/test scenarios, before adding `evals/` artifacts:
 

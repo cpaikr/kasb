@@ -3,8 +3,18 @@ use serde_json::Value;
 
 use crate::KasbError;
 use crate::capabilities::get_paragraph::{GetParagraphRequest, GetParagraphResult};
+use crate::capabilities::get_qna::{GetQnaRequest, GetQnaResult};
+use crate::capabilities::get_section::{GetSectionRequest, GetSectionResult};
+use crate::capabilities::get_standard_structure::{
+    GetStandardStructureRequest, GetStandardStructureResult,
+};
+use crate::capabilities::search_qna::{SearchQnaRequest, SearchQnaResult};
+use crate::capabilities::search_standards::{SearchStandardsRequest, SearchStandardsResult};
 use crate::http::{
     CancellationToken, HttpTransport, PersonaBuildError, PersonaClient, PersonaConfig,
+};
+use crate::sources::kasb::operations::{
+    get_qna, get_section, get_standard_structure, search_qna, search_standards,
 };
 use crate::sources::kasb::paragraph::get_paragraph;
 
@@ -62,6 +72,121 @@ where
     ) -> Result<GetParagraphResult, KasbError> {
         let request = GetParagraphRequest::from_json(input).map_err(KasbError::from)?;
         self.get_paragraph(request, cancellation).await
+    }
+
+    pub async fn execute_search_standards(
+        &self,
+        input: Value,
+        cancellation: &CancellationToken,
+    ) -> Result<SearchStandardsResult, KasbError> {
+        self.search_standards(
+            SearchStandardsRequest::from_json(input).map_err(KasbError::from)?,
+            cancellation,
+        )
+        .await
+    }
+
+    pub async fn search_standards(
+        &self,
+        request: SearchStandardsRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<SearchStandardsResult, KasbError> {
+        search_standards(&self.transport, &request, cancellation, || {
+            self.clock.now_iso8601()
+        })
+        .await
+    }
+
+    pub async fn execute_get_standard_structure(
+        &self,
+        input: Value,
+        cancellation: &CancellationToken,
+    ) -> Result<GetStandardStructureResult, KasbError> {
+        self.get_standard_structure(
+            GetStandardStructureRequest::from_json(input).map_err(KasbError::from)?,
+            cancellation,
+        )
+        .await
+    }
+
+    pub async fn get_standard_structure(
+        &self,
+        request: GetStandardStructureRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<GetStandardStructureResult, KasbError> {
+        get_standard_structure(&self.transport, &request, cancellation, || {
+            self.clock.now_iso8601()
+        })
+        .await
+    }
+
+    pub async fn execute_get_section(
+        &self,
+        input: Value,
+        cancellation: &CancellationToken,
+    ) -> Result<GetSectionResult, KasbError> {
+        self.get_section(
+            GetSectionRequest::from_json(input).map_err(KasbError::from)?,
+            cancellation,
+        )
+        .await
+    }
+
+    pub async fn get_section(
+        &self,
+        request: GetSectionRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<GetSectionResult, KasbError> {
+        get_section(&self.transport, &request, cancellation, || {
+            self.clock.now_iso8601()
+        })
+        .await
+    }
+
+    pub async fn execute_search_qna(
+        &self,
+        input: Value,
+        cancellation: &CancellationToken,
+    ) -> Result<SearchQnaResult, KasbError> {
+        self.search_qna(
+            SearchQnaRequest::from_json(input).map_err(KasbError::from)?,
+            cancellation,
+        )
+        .await
+    }
+
+    pub async fn search_qna(
+        &self,
+        request: SearchQnaRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<SearchQnaResult, KasbError> {
+        search_qna(&self.transport, &request, cancellation, || {
+            self.clock.now_iso8601()
+        })
+        .await
+    }
+
+    pub async fn execute_get_qna(
+        &self,
+        input: Value,
+        cancellation: &CancellationToken,
+    ) -> Result<GetQnaResult, KasbError> {
+        self.get_qna(
+            GetQnaRequest::from_json(input).map_err(KasbError::from)?,
+            cancellation,
+        )
+        .await
+    }
+
+    pub async fn get_qna(
+        &self,
+        request: GetQnaRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<GetQnaResult, KasbError> {
+        get_qna(&self.transport, &request, cancellation, || {
+            self.clock.now_iso8601()
+        })
+        .await
     }
 
     pub async fn get_paragraph(

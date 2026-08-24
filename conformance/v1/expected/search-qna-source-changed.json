@@ -1,0 +1,9 @@
+{
+  "ok": false,
+  "error": {
+    "code": "source_changed",
+    "message": "Could not find facilityQnas array.",
+    "retryable": false,
+    "sourceUrl": "https://db.kasb.or.kr/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=10"
+  }
+}

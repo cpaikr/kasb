@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "authority": "independent-provider-evidence",
+  "entries": [
+    {
+      "fixture": "fixtures/kasb/search-standards-lease.json",
+      "operationId": "searchStandardsSource",
+      "method": "GET",
+      "requestUrl": "https://db.kasb.or.kr/api/standard?searchWord=%EB%A6%AC%EC%8A%A4",
+      "capturedAt": "2026-03-31",
+      "sha256": "6ec2c2f5b0de39b53a182fed135d9857e9608bac9c9648ebb87584d5befe8f2b"
+    },
+    {
+      "fixture": "fixtures/kasb/standard-indexes-1116.json",
+      "operationId": "getStandardIndexesSource",
+      "method": "GET",
+      "requestUrl": "https://db.kasb.or.kr/api/standard-indexes/1116",
+      "capturedAt": "2026-03-31",
+      "sha256": "4bf435156d5366696b4188164e1fe79a72d5a1819712dd51c8917c761c0eb2cc"
+    },
+    {
+      "fixture": "fixtures/kasb/standard-indexes-1116-search-lease.json",
+      "operationId": "searchStandardIndexesSource",
+      "method": "GET",
+      "requestUrl": "https://db.kasb.or.kr/api/standard-indexes/1116/searchWord?searchWord=%EB%A6%AC%EC%8A%A4",
+      "capturedAt": "2026-03-31",
+      "sha256": "911e83625d3fe906ee3039e0541e342d32915305b9ec46961bbc3d2908fdde77"
+    },
+    {
+      "fixture": "fixtures/kasb/standard-indexes-1116-search-empty.json",
+      "operationId": "searchStandardIndexesSource",
+      "method": "GET",
+      "requestUrl": "https://db.kasb.or.kr/api/standard-indexes/1116/searchWord?searchWord=__no_match__",
+      "capturedAt": "2026-03-31",
+      "sha256": "a77732a1928e52714493c582c7234945014f8a9a34bc1f312f727f381116fd06"
+    },
+    {
+      "fixture": "fixtures/kasb/section-1116-ZB2hJW.json",
+      "operationId": "getSectionSource",
+      "method": "GET",
+      "requestUrl": "https://db.kasb.or.kr/api/paragraphs/1116/ZB2hJW",
+      "capturedAt": "2026-03-31",
+      "sha256": "bf2435bdae1281e746d44559e0c7410f1d7946303008c8d35510acc1b5adacb4"
+    },
+    {
+      "fixture": "fixtures/kasb/paragraph-1116-23.json",
+      "operationId": "getParagraphSource",
+      "method": "GET",
+      "requestUrl": "https://db.kasb.or.kr/api/paragraphs/content/1116/23",
+      "capturedAt": "2026-03-31",
+      "sha256": "35dfba5491bb483915117b9e81a2990d9008c5dbecb909f38b2c2fb86b75e187"
+    },
+    {
+      "fixture": "fixtures/kasb/paragraph-1116-han2.1.json",
+      "operationId": "getParagraphSource",
+      "method": "GET",
+      "requestUrl": "https://db.kasb.or.kr/api/paragraphs/content/1116/%ED%95%9C2.1",
+      "capturedAt": "2026-03-31",
+      "sha256": "04da753dc4b6efd4b2babe6e8e39b0e53a960d134dc74a8425ceb083e9bbe847"
+    },
+    {
+      "fixture": "fixtures/kasb/paragraph-1116-B3.json",
+      "operationId": "getParagraphSource",
+      "method": "GET",
+      "requestUrl": "https://db.kasb.or.kr/api/paragraphs/content/1116/B3",
+      "capturedAt": "2026-03-31",
+      "sha256": "432d372033f68b8e14b382bef8c7891da69334f2d0fb8da8c025c16cdbe31625"
+    },
+    {
+      "fixture": "fixtures/kasb/paragraph-1116-BC240A.json",
+      "operationId": "getParagraphSource",
+      "method": "GET",
+      "requestUrl": "https://db.kasb.or.kr/api/paragraphs/content/1116/BC240A",
+      "capturedAt": "2026-03-31",
+      "sha256": "e0958b3852e3977b096b59c40f1a119960c93ee22fdadfa237f15e89985b7aec"
+    },
+    {
+      "fixture": "fixtures/kasb/search-qna-lease.json",
+      "operationId": "searchQnaSource",
+      "method": "GET",
+      "requestUrl": "https://db.kasb.or.kr/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=%EB%A6%AC%EC%8A%A4&page=1&rows=5",
+      "capturedAt": "2026-05-21",
+      "sha256": "28b46c2bd76e2e58b9b44f1fde0a3537f36a9c6cf7603097eb7f69d77c52c679"
+    },
+    {
+      "fixture": "fixtures/kasb/qna-SSI-35629.json",
+      "operationId": "getQnaSource",
+      "method": "GET",
+      "requestUrl": "https://db.kasb.or.kr/api/qnas/v2/SSI-35629",
+      "capturedAt": "2026-05-21",
+      "sha256": "650000fbc8c09188e1fca5b5cd0c48beb329fcc9b64b36fc272a16b4b6a39390"
+    }
+  ]
+}
