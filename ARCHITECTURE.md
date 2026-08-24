@@ -187,6 +187,7 @@ source-build target does not automatically become an npm support claim.
 The replacement Rust SDK, Rust CLI, Node binding, Node SDK, npm launcher,
 claimed native packages, adversarial judge, live checks, and clean-consumer
 gates passed before the TypeScript implementation and Pi surface were removed.
-Final cutover CI, review, and PR delivery gates remain in progress.
+Final cutover CI, review, and PR delivery gates passed, and PR #20 promoted the
+completed rewrite to `main`.
 [MIGRATION.md](MIGRATION.md) records the decision. Git history is the recovery
 path; registry publication remains a separate, unauthorized action.
