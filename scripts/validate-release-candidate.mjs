@@ -9,11 +9,9 @@ const identity = await canonicalCandidateIdentity(options);
 assertCheckout(identity, options.skipCheckoutValidation);
 assertGeneratedState(options.skipCheckoutValidation);
 
-const publicationState = hydratePublicationState(
-  JSON.parse(await readFile(resolve(repositoryRoot, options.publicationState), "utf8")),
-  identity,
-);
+let publicationState = JSON.parse(await readFile(resolve(repositoryRoot, options.publicationState), "utf8"));
 validatePublicationStateSource(identity.mode, publicationState);
+if (identity.mode === "rehearsal") publicationState = hydratePublicationState(publicationState, identity);
 
 let candidate = { ...identity, phase: "identity" };
 if (options.artifactManifest) {

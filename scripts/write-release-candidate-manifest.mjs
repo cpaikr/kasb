@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { loadReleaseContract, releaseAssetNames, repositoryRoot } from "./release-contract.mjs";
+import { candidateAssetDirectory, loadReleaseContract, releaseAssetNames, repositoryRoot } from "./release-contract.mjs";
 import { requiredCandidateGates } from "./release-candidate-contract.mjs";
 
 const { sha, output } = parseArgs(process.argv.slice(2));
@@ -31,9 +31,7 @@ await assertDirectoryFiles("dist/provenance", [contract.release.provenanceAsset]
 await assertDirectoryFiles("dist/provenance/fragments", contract.targets.map(({ rustTarget }) => `${rustTarget}.json`));
 const githubAssets = [];
 for (const name of githubNames) {
-  const directory = name === contract.release.shellInstallerAsset || name === contract.release.powershellInstallerAsset
-    ? "dist/installers"
-    : name === contract.release.provenanceAsset ? "dist/provenance" : "dist/cli";
+  const directory = candidateAssetDirectory(contract, name);
   githubAssets.push(await fileIdentity(resolve(repositoryRoot, directory, name), { name }));
 }
 
@@ -87,11 +85,10 @@ async function assertDirectoryFiles(directory, expected, allowedDirectories = []
 
 async function fileIdentity(file, fields) {
   const bytes = await readFile(file);
-  const info = await stat(file);
   return {
     ...fields,
     file: relative(repositoryRoot, file).split("\\").join("/"),
-    size: info.size,
+    size: bytes.length,
     sha256: createHash("sha256").update(bytes).digest("hex"),
   };
 }
@@ -99,5 +96,9 @@ async function fileIdentity(file, fields) {
 function packageJson(tarball) {
   const result = spawnSync("tar", ["-xOf", tarball, "package/package.json"], { encoding: "utf8" });
   if (result.status !== 0) throw new Error(`could not read package.json from ${tarball}: ${result.stderr.trim()}`);
-  return JSON.parse(result.stdout);
+  try {
+    return JSON.parse(result.stdout);
+  } catch (error) {
+    throw new Error(`could not parse package.json from ${tarball}: ${error.message}`);
+  }
 }

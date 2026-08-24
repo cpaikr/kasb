@@ -67,7 +67,7 @@ runs:
           archive=()
           [[ "$node_version" != 24 ]] || archive=(dist/cli)
           npx --yes --package "node@$node_version" node scripts/test-native-consumer.mjs \
-            "${{ inputs.rust_target }}" dist/root dist/native "${archive[@]}"
+            "${{ inputs.rust_target }}" dist/root dist/native ${archive[@]+"${archive[@]}"}
         done < <(node -e 'for (const version of JSON.parse(process.argv[1])) console.log(version)' '${{ inputs.validation_node_versions }}')
     - name: Record bounded target provenance
       shell: bash

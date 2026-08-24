@@ -31,7 +31,8 @@ async function main() {
 }
 
 async function githubSnapshot(contract, tag, expectedCommit, directory, options) {
-  const { release, repository } = contract;
+  const { release } = contract;
+  const { repository } = release;
   const limits = commandLimits(release);
   const repositoryResponse = await command("gh", ["api", `repos/${repository}`], limits);
   const repositoryMetadata = JSON.parse(repositoryResponse.stdout);

@@ -61,3 +61,9 @@ export function internalCandidateAssetNames(contract) {
 export function checksummedReleaseAssetNames(contract) {
   return releaseAssetNames(contract).filter((name) => name !== contract.release.checksumAsset);
 }
+
+export function candidateAssetDirectory(contract, name) {
+  if (name === contract.release.shellInstallerAsset || name === contract.release.powershellInstallerAsset) return "dist/installers";
+  if (name === contract.release.provenanceAsset) return "dist/provenance";
+  return "dist/cli";
+}

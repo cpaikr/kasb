@@ -49,9 +49,9 @@ export async function validateCandidateProvenance(path, identity) {
   return provenance;
 }
 
-export async function scanCandidateText({ githubAssets, npmPackages }) {
+export async function scanCandidateText({ githubAssets, npmPackages }, root = repositoryRoot) {
   const contract = await loadReleaseContract();
-  const byName = new Map(githubAssets.map((asset) => [asset.name, resolve(repositoryRoot, asset.file)]));
+  const byName = new Map(githubAssets.map((asset) => [asset.name, resolve(root, asset.file)]));
   const archives = new Set(contract.targets.map(({ archiveName }) => archiveName));
   for (const asset of githubAssets) {
     const path = byName.get(asset.name);
@@ -64,7 +64,7 @@ export async function scanCandidateText({ githubAssets, npmPackages }) {
     }
   }
   for (const pkg of npmPackages) {
-    const tarball = resolve(repositoryRoot, pkg.file);
+    const tarball = resolve(root, pkg.file);
     const label = basename(tarball);
     await scanFile(tarball, contract.release.archiveLimitBytes, label);
     await scanTar(tarball, label, contract.release);
@@ -87,7 +87,8 @@ async function boundedText(path, limit, label) {
     chunks.push(chunk);
   }
   const bytes = Buffer.concat(chunks, length);
-  if (bytes.length === 0 || bytes.length > limit) throw new Error(`${label} exceeds its bounded textual size`);
+  if (bytes.length === 0) throw new Error(`${label} is empty`);
+  if (bytes.length > limit) throw new Error(`${label} exceeds its bounded textual size`);
   if (bytes.includes(0)) throw new Error(`${label} is not a textual surface`);
   return bytes.toString("utf8");
 }
@@ -138,7 +139,8 @@ async function scanTarEntry(path, entry, label, limit, aggregate) {
     diagnosticsBytes += bounded.length;
   });
   try {
-    await scanReadable(child.stdout, label, limit, aggregate);
+    const bytes = await scanReadable(child.stdout, label, limit, aggregate);
+    if (bytes === 0) throw new Error(`${label} is empty`);
   } catch (error) {
     child.kill("SIGKILL");
     await completion.catch(() => {});
@@ -164,6 +166,7 @@ async function scanReadable(readable, label, limit, aggregate = undefined) {
     scanner.push(chunk);
   }
   scanner.finish();
+  return bytes;
 }
 
 function markerScanner(label) {

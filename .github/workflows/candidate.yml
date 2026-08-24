@@ -305,6 +305,7 @@ jobs:
       - name: Validate aggregate and create manifest
         shell: bash
         env:
+          CANDIDATE_REF: ${{ needs.metadata.outputs.ref }}
           CANDIDATE_SHA: ${{ needs.metadata.outputs.sha }}
         run: |
           set -euo pipefail
@@ -316,14 +317,14 @@ jobs:
           jq -se \
             --arg repository "$GITHUB_REPOSITORY" \
             --arg version "$version" \
-            --arg sourceRef "${{ needs.metadata.outputs.ref }}" \
+            --arg sourceRef "$CANDIDATE_REF" \
             --arg commit "$CANDIDATE_SHA" \
             --argjson expectedTargets "$expected_targets" \
             --argjson expectedToolchain "$expected_toolchain" \
-            'length == 4 and ([.[].target.rustTarget] | unique | sort) == $expectedTargets and all(.[]; .schemaVersion == 1 and .repository == $repository and .version == $version and .sourceRef == $sourceRef and .commit == $commit and .toolchain == $expectedToolchain and (.target.runner.label | length > 0) and (.target.runner.os | length > 0) and (.target.runner.arch | length > 0))' \
+            'length == ($expectedTargets | length) and ([.[].target.rustTarget] | unique | sort) == $expectedTargets and all(.[]; .schemaVersion == 1 and .repository == $repository and .version == $version and .sourceRef == $sourceRef and .commit == $commit and .toolchain == $expectedToolchain and (.target.runner.label | length > 0) and (.target.runner.os | length > 0) and (.target.runner.arch | length > 0))' \
             dist/provenance/fragments/*.json >/dev/null
           jq -s --arg repository "$GITHUB_REPOSITORY" --arg commit "$CANDIDATE_SHA" \
-            --arg version "$version" --arg sourceRef "${{ needs.metadata.outputs.ref }}" \
+            --arg version "$version" --arg sourceRef "$CANDIDATE_REF" \
             --slurpfile manifest native-targets.json \
             '{schemaVersion:1,repository:$repository,version:$version,sourceRef:$sourceRef,commit:$commit,toolchain:.[0].toolchain,targets:([$manifest[0].targets[].rustTarget as $target | .[] | .target | select(.rustTarget == $target)])}' \
             dist/provenance/fragments/*.json > dist/provenance/provenance.json

@@ -114,7 +114,6 @@ function npmAdapter(runCommand = command, downloadFile = commandToFile) {
         },
       ));
     },
-    isConflict(error) { return /(?:E409|cannot publish over|previously published)/iu.test(error?.message ?? ""); },
   };
 }
 
@@ -313,8 +312,6 @@ async function selfTest() {
   ]);
   const vacant = npmAdapter(async () => ({ stdout: "", stderr: "", notFound: true }));
   assert.deepEqual(await vacant.inspectPackage({ name: "@sjunepark/kasb", version: "0.3.0", maxBytes: 1024 }), { state: "vacant" });
-  assert.equal(npm.isConflict(new Error("E409 previously published")), true);
-  assert.equal(npm.isConflict(new Error("network unavailable")), false);
   console.log("publication executor uses bounded commands, private verified-byte files, and exact live adapter commands");
 }
 
