@@ -231,8 +231,9 @@ try {
   $MetadataPath = Join-Path $Work "release.json"
   Save-BoundedReleaseFile "$ApiBase/repos/$Repository/releases/tags/$Tag" $MetadataPath 1048576
   $Metadata = Get-Content -Raw -LiteralPath $MetadataPath | ConvertFrom-Json
-  if ($Metadata.immutable -ne $true) { throw "kasb: release is not immutable" }
-  if ($Metadata.draft -eq $true -or $Metadata.prerelease -eq $true) { throw "kasb: release is not a production release" }
+  if ($Metadata.immutable -isnot [bool] -or $Metadata.immutable -ne $true) { throw "kasb: release is not immutable" }
+  if ($Metadata.draft -isnot [bool] -or $Metadata.prerelease -isnot [bool]) { throw "kasb: release production flags are invalid" }
+  if ($Metadata.draft -ne $false -or $Metadata.prerelease -ne $false) { throw "kasb: release is not a production release" }
   if ($Metadata.tag_name -ne $Tag) { throw "kasb: release tag identity mismatch" }
   $ArchiveAssets = @($Metadata.assets | Where-Object { $_.name -eq $Archive })
   $ChecksumAssets = @($Metadata.assets | Where-Object { $_.name -eq $ChecksumAsset })

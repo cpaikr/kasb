@@ -1303,6 +1303,7 @@ fn schedule_windows_replacement(
         &receipt_backup,
         &status,
         false,
+        false,
         None,
     );
     write_windows_status(
@@ -1405,6 +1406,7 @@ fn windows_replacement_script(
     receipt_backup: &Path,
     status: &Path,
     simulate_rollback_failure: bool,
+    fail_after_receipt_publish: bool,
     stop_after_phase: Option<&str>,
 ) -> String {
     fn literal(path: &Path) -> String {
@@ -1421,6 +1423,7 @@ $receiptBackup = {}
 $status = {}
 $helper = $MyInvocation.MyCommand.Path
 $simulateRollbackFailure = {}
+$failAfterReceiptPublish = {}
 $stopAfterPhase = {}
 $hadReceipt = Test-Path -LiteralPath $receipt
 function Flush-DurableFile([string]$path) {{
@@ -1467,6 +1470,7 @@ try {{
   Move-ExactFile $stagedReceipt $receipt
   Flush-DurableFile $exe
   Flush-DurableFile $receipt
+  if ($failAfterReceiptPublish) {{ throw 'simulated failure after receipt publication' }}
   Write-TerminalStatus @{{ status = 'applied'; phase = 'complete' }}
   Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $backup, $receiptBackup
 }} catch {{
@@ -1482,8 +1486,11 @@ try {{
       Move-ExactFile $backup $exe
     }} catch {{ $rollbackOk = $false }}
   }}
-  if ($hadReceipt -and [System.IO.File]::Exists($receiptBackup) -and -not (Test-AnyPath $receipt)) {{
-    try {{ Move-ExactFile $receiptBackup $receipt }} catch {{ $rollbackOk = $false }}
+  if ($hadReceipt -and [System.IO.File]::Exists($receiptBackup)) {{
+    try {{
+      Remove-ExactFile $receipt
+      Move-ExactFile $receiptBackup $receipt
+    }} catch {{ $rollbackOk = $false }}
   }}
   if (-not [System.IO.File]::Exists($exe) -or -not [System.IO.File]::Exists($receipt)) {{ $rollbackOk = $false }}
   if ($rollbackOk) {{
@@ -1513,6 +1520,11 @@ try {{
         literal(receipt_backup),
         literal(status),
         if simulate_rollback_failure {
+            "$true"
+        } else {
+            "$false"
+        },
+        if fail_after_receipt_publish {
             "$true"
         } else {
             "$false"
@@ -2287,8 +2299,9 @@ mod tests {
     #[test]
     fn windows_helper_quotes_paths_without_interpolation() {
         let path = Path::new(r"C:\Program Files\$cash\O'Brien\kasb.exe");
-        let script =
-            windows_replacement_script(42, path, path, path, path, path, path, path, false, None);
+        let script = windows_replacement_script(
+            42, path, path, path, path, path, path, path, false, false, None,
+        );
         assert!(script.contains(r"'C:\Program Files\$cash\O''Brien\kasb.exe'"));
         assert!(script.contains("Wait-Process -Id 42"));
         assert!(script.contains("Flush-DurableFile $exe"));
@@ -2364,6 +2377,7 @@ mod tests {
     fn run_windows_helper_case(
         staged_receipt_exists: bool,
         simulate_rollback_failure: bool,
+        fail_after_receipt_publish: bool,
         stop_after_phase: Option<&str>,
     ) -> WindowsHelperResult {
         let directory = tempfile::tempdir().unwrap();
@@ -2402,6 +2416,7 @@ mod tests {
                 &receipt_backup,
                 &status,
                 simulate_rollback_failure,
+                fail_after_receipt_publish,
                 stop_after_phase,
             ),
         )
@@ -2433,23 +2448,34 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn windows_helper_executes_success_rollback_failure_and_crash_protocols() {
-        let applied = run_windows_helper_case(true, false, None);
+        let applied = run_windows_helper_case(true, false, false, None);
         assert!(applied.exit_success);
         assert_eq!(applied.status["status"], "applied");
         assert_eq!(fs::read(applied.executable).unwrap(), b"new executable");
 
-        let rolled_back = run_windows_helper_case(false, false, None);
+        let rolled_back = run_windows_helper_case(false, false, false, None);
         assert!(rolled_back.exit_success);
         assert_eq!(rolled_back.status["status"], "rolledBack");
         assert_eq!(fs::read(rolled_back.executable).unwrap(), b"old executable");
 
-        let failed = run_windows_helper_case(false, true, None);
+        let late_failure = run_windows_helper_case(true, false, true, None);
+        assert!(late_failure.exit_success);
+        assert_eq!(late_failure.status["status"], "rolledBack");
+        assert_eq!(
+            fs::read(late_failure.executable).unwrap(),
+            b"old executable"
+        );
+        let late_receipt: serde_json::Value =
+            serde_json::from_slice(&fs::read(late_failure.receipt).unwrap()).unwrap();
+        assert_eq!(late_receipt["sha256"], hex_digest(b"old executable"));
+
+        let failed = run_windows_helper_case(false, true, false, None);
         assert!(failed.exit_success);
         assert_eq!(failed.status["status"], "failed");
         assert!(failed.backup.exists());
         assert!(failed.receipt.exists() || failed.receipt_backup.exists());
 
-        let interrupted = run_windows_helper_case(true, false, Some("replacing"));
+        let interrupted = run_windows_helper_case(true, false, false, Some("replacing"));
         assert!(!interrupted.exit_success);
         assert_eq!(interrupted.status["status"], "pending");
         assert_eq!(interrupted.status["phase"], "replacing");

@@ -399,6 +399,14 @@ async function validatePowerShellInstaller() {
   assert(await readFile(existingEarlyReceipt, "utf8") === "existing receipt\n", "early PowerShell failure changed the existing receipt");
   configureRelease(fixture, { immutable: false });
   assert((await runPowerShell(executable, target, join(root, "PowerShell mutable"))).code !== 0, "mutable PowerShell release was accepted");
+  for (const [name, mutate] of [
+    ["string immutable", (metadata) => ({ ...metadata, immutable: "true" })],
+    ["missing draft", ({ draft: _draft, ...metadata }) => metadata],
+    ["string prerelease", (metadata) => ({ ...metadata, prerelease: "false" })],
+  ]) {
+    configureRelease(fixture, { metadataBody: (metadata) => Buffer.from(JSON.stringify(mutate(metadata))) });
+    assert((await runPowerShell(executable, target, join(root, `PowerShell ${name}`))).code !== 0, `${name} PowerShell release flags were accepted`);
+  }
   configureRelease(fixture, { omitArchive: true });
   assert((await runPowerShell(executable, target, join(root, "PowerShell missing"))).code !== 0, "missing PowerShell archive was accepted");
   configureRelease(fixture, { duplicateArchive: true });
