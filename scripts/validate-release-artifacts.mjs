@@ -5,11 +5,10 @@ import { createHash } from "node:crypto";
 import { checksummedReleaseAssetNames, loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
 
 const inputs = process.argv.slice(2);
-const ciOnly = inputs[0] === "--ci";
-if (ciOnly) inputs.shift();
-const candidate = inputs[0] === "--candidate";
-if (candidate) inputs.shift();
+const ciOnly = removeFlag(inputs, "--ci");
+const candidate = removeFlag(inputs, "--candidate");
 if (ciOnly && candidate) throw new Error("--ci and --candidate are mutually exclusive.");
+if (inputs.some((input) => input.startsWith("--")) || inputs.length > 3) throw new Error("Unknown release artifact validation option.");
 const nativeDirectory = resolve(repositoryRoot, inputs[0] ?? "dist/native");
 const rootDirectory = resolve(repositoryRoot, inputs[1] ?? "dist/root");
 const cliDirectory = resolve(repositoryRoot, inputs[2] ?? "dist/cli");
@@ -235,4 +234,11 @@ function assertNoPiMetadata(pkg) {
   if (Object.hasOwn(pkg.exports ?? {}, "./pi") || Object.hasOwn(pkg, "pi")) {
     throw new Error("The canonical package must not expose Pi metadata.");
   }
+}
+
+function removeFlag(inputs, flag) {
+  const index = inputs.indexOf(flag);
+  if (index === -1) return false;
+  inputs.splice(index, 1);
+  return true;
 }

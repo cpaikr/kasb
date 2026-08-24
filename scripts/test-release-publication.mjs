@@ -363,6 +363,11 @@ async function testGuardedExecutionAdapters() {
   const skippedGithub = await executeGitHubPublication(strict, exactGithub);
   assert.deepEqual(skippedGithub.operations, []);
 
+  const staleGithub = githubAdapter(strict, built.files);
+  const permanentlyVacant = structuredClone(staleGithub.state);
+  staleGithub.readState = async () => structuredClone(permanentlyVacant);
+  await assert.rejects(executeGitHubPublication(strict, staleGithub), hasCode("github_staging_iteration_limit"));
+
   const immutableReceipt = await executeGitHubPublication(strict, githubAdapter(strict, built.files));
   const allVacant = npmAdapter(built.files);
   const npmReceipt = await executeNpmPublication(strict, immutableReceipt, allVacant);
@@ -561,7 +566,6 @@ function npmAdapter(files, options = {}) {
       this.registry.set(key, pkg.bytes);
       this.published.push({ name: pkg.name, role: pkg.role });
     },
-    isConflict(error) { return error?.code === "E409"; },
   };
 }
 

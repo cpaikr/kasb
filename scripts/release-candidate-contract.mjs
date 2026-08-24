@@ -127,7 +127,7 @@ export async function validateArtifactManifest(identity, manifest, root = reposi
   await validateChecksumManifest(contract, githubAssets, root);
   const provenance = githubAssets.find(({ name }) => name === contract.release.provenanceAsset);
   await validateCandidateProvenance(resolve(root, provenance.file), identity);
-  await scanCandidateText({ githubAssets, npmPackages });
+  await scanCandidateText({ githubAssets, npmPackages }, root);
 
   return { ...identity, phase: "artifacts", gates: { ...manifest.gates }, npmPackages, githubAssets };
 }
