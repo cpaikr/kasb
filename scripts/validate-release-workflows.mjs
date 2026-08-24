@@ -46,6 +46,7 @@ check(needs(jobs["native-consumers"], ["metadata", "root-package", "native-linux
 check(needs(jobs.aggregate, ["metadata", "deterministic", "root-package", "native-linux", "native-portable", "native-consumers"]), "aggregate must follow every producer and clean consumer");
 check(needs(jobs["sealed-candidate-e2e"], ["metadata", "aggregate"]), "sealed native E2E must consume the aggregate");
 check(needs(jobs.seal, ["aggregate", "sealed-candidate-e2e"]), "candidate outputs must remain hidden until every native E2E passes");
+check(jobs.seal?.["runs-on"] === "blacksmith-2vcpu-ubuntu-2404", "candidate seal must use the available portable Linux release runner");
 check(String(candidate.on?.workflow_call?.outputs?.candidate_artifact_id?.value ?? "").includes("jobs.seal.outputs"), "workflow outputs must be emitted only by the final seal job");
 
 const metadataRun = runs(jobs.metadata).join("\n");

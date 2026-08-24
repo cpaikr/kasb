@@ -454,7 +454,7 @@ jobs:
   seal:
     name: Expose only the fully consumed candidate
     needs: [aggregate, sealed-candidate-e2e]
-    runs-on: ubuntu-24.04
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 5
     outputs:
       artifact_id: ${{ needs.aggregate.outputs.artifact_id }}
