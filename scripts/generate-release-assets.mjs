@@ -785,16 +785,8 @@ try {
   $Staged = Join-Path $Work $Executable
   Extract-TarExecutable $ArchivePath $Executable $ArchiveEntries $Staged ${release.archiveLimitBytes}
   if (-not $RunningWindows) {
-    $UnixFileModeType = [System.IO.File].Assembly.GetType('System.IO.UnixFileMode')
-    $SetUnixFileMode = @([System.IO.File].GetMethods() | Where-Object {
-      $_.Name -eq 'SetUnixFileMode' -and $_.GetParameters().Count -eq 2 -and $_.GetParameters()[1].ParameterType.FullName -eq 'System.IO.UnixFileMode'
-    })[0]
-    if ($null -ne $UnixFileModeType -and $null -ne $SetUnixFileMode) {
-      [void]$SetUnixFileMode.Invoke($null, @($Staged, [System.Enum]::ToObject($UnixFileModeType, 493)))
-    } else {
-      & chmod 755 $Staged
-      if ($LASTEXITCODE -ne 0) { throw "kasb: could not mark the archive executable as executable" }
-    }
+    & chmod 755 $Staged
+    if ($LASTEXITCODE -ne 0) { throw "kasb: could not mark the archive executable as executable" }
   }
   Flush-DurableFile $Staged
   Test-BoundedExecutableIdentity $Staged "kasb $Version"

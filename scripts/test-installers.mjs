@@ -360,11 +360,12 @@ function runShell(target, installDir, extra = {}) {
 async function validatePowerShellInstaller() {
   const text = await readFile(resolve(repositoryRoot, "installers/install.ps1"), "utf8");
   for (const target of contract.targets) assert(text.includes(target.archiveName), `PowerShell installer lacks ${target.archiveName}`);
-  for (const required of ["immutable", "Get-Sha256Hex", "[System.Security.Cryptography.SHA256]::Create()", "Test-JsonInteger", "browser_download_url -isnot [string]", "schemaVersion", "manager = 'standalone'", "Save-BoundedReleaseFile", "ResponseHeadersRead", "ResponseStream", "CreateLinkedTokenSource", "FileAccess]::ReadWrite", "ArchiveEntries", "invalid entry set", "Move-ExactFile", "finally", "Extract-TarExecutable", "pre-existing installation paths must be regular files", ".kasb-install.", "-cne $Tag", "-ceq $Archive", "-cmatch"]) {
+  for (const required of ["immutable", "Get-Sha256Hex", "[System.Security.Cryptography.SHA256]::Create()", "Test-JsonInteger", "browser_download_url -isnot [string]", "schemaVersion", "manager = 'standalone'", "Save-BoundedReleaseFile", "ResponseHeadersRead", "ResponseStream", "CreateLinkedTokenSource", "FileAccess]::ReadWrite", "ArchiveEntries", "invalid entry set", "Move-ExactFile", "finally", "Extract-TarExecutable", "& chmod 755 $Staged", "pre-existing installation paths must be regular files", ".kasb-install.", "-cne $Tag", "-ceq $Archive", "-cmatch"]) {
     assert(text.includes(required), `PowerShell installer lacks ${required} contract`);
   }
   assert(!text.includes("Get-FileHash"), "PowerShell installer depends on an optional hashing cmdlet");
   assert(!text.includes("[System.IO.UnixFileMode]"), "PowerShell installer has a static pre-.NET 7 UnixFileMode reference");
+  assert(!text.includes("SetUnixFileMode"), "PowerShell installer uses reflection for Unix executable permissions");
   assert(!/\$Input\b/u.test(text), "PowerShell installer shadows the automatic Input variable");
   assert(!/\btar\s+-/u.test(text), "PowerShell installer depends on an external tar executable");
   const executable = process.platform === "win32"
