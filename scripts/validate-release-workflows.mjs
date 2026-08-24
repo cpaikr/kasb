@@ -19,7 +19,7 @@ const failures = [];
 check(candidate.permissions?.contents === "read", "candidate workflow must be read-only");
 check(Object.hasOwn(candidate.on ?? {}, "pull_request"), "candidate must run a non-publishing PR rehearsal");
 for (const requiredPath of [".github/actions/build-release-target/**", "crates/**", "packages/**", "README.md", "LICENSE.md", "THIRD_PARTY_LICENSES.html"]) {
-  check(!candidate.on.pull_request?.paths || candidate.on.pull_request.paths.includes(requiredPath), `candidate PR trigger must include ${requiredPath}`);
+  check(!candidate.on?.pull_request?.paths || candidate.on.pull_request.paths.includes(requiredPath), `candidate PR trigger must include ${requiredPath}`);
 }
 check(Object.hasOwn(candidate.on ?? {}, "workflow_call") && Object.hasOwn(candidate.on ?? {}, "workflow_dispatch"), "candidate must support strict reuse and manual rehearsal");
 check(!candidate.on?.pull_request_target, "candidate must never use pull_request_target");
@@ -32,7 +32,7 @@ for (const name of ["native-linux", "native-portable"]) check(needs(jobs[name], 
 check(needs(jobs.aggregate, ["metadata", "deterministic", "root-package", "native-linux", "native-portable"]), "aggregate must follow every producer");
 check(needs(jobs["sealed-candidate-e2e"], ["metadata", "aggregate"]), "sealed native E2E must consume the aggregate");
 check(needs(jobs.seal, ["aggregate", "sealed-candidate-e2e"]), "candidate outputs must remain hidden until every native E2E passes");
-check(candidate.on.workflow_call.outputs.candidate_artifact_id.value.includes("jobs.seal.outputs"), "workflow outputs must be emitted only by the final seal job");
+check(String(candidate.on?.workflow_call?.outputs?.candidate_artifact_id?.value ?? "").includes("jobs.seal.outputs"), "workflow outputs must be emitted only by the final seal job");
 
 const metadataRun = runs(jobs.metadata).join("\n");
 for (const evidence of [".targets[]", ".releaseRunner", ".buildContainer", ".validationNodeVersions", "e2e_matrix="]) {
@@ -52,7 +52,25 @@ for (const command of ["cargo build --locked --release --target", "assemble-nati
 }
 check(!actionText.includes("jq "), "cross-platform target action must not assume jq is installed");
 check(actionText.includes("npm install --global npm@11.6.2") && hasRun(jobs["root-package"], "npm install --global npm@11.6.2"), "all npm packaging must pin 11.6.2 on Node 24");
+const candidateSteps = Object.values(jobs).flatMap((job) => job?.steps ?? []);
+const releaseSteps = Object.values(release.jobs ?? {}).flatMap((job) => job?.steps ?? []);
+const actionSteps = action.runs?.steps ?? [];
+for (const [scope, steps] of [["candidate", candidateSteps], ["release", releaseSteps], ["target action", actionSteps]]) {
+  const nodeSteps = steps.filter(({ uses }) => String(uses).startsWith("actions/setup-node@"));
+  check(nodeSteps.length > 0 && nodeSteps.every((step) => String(step.with?.["node-version"]) === manifest.release.toolchain.node), `${scope} Node setup must match native-targets.json`);
+  const npmVersions = steps.flatMap(({ run }) => [...String(run ?? "").matchAll(/\bnpm install --global npm@([^\s\\]+)/gu)].map((match) => match[1]));
+  check(npmVersions.length > 0 && npmVersions.every((version) => version === manifest.release.toolchain.npm), `${scope} npm setup must match native-targets.json`);
+}
+const actionRustSteps = actionSteps.filter(({ uses }) => String(uses).startsWith("actions-rust-lang/setup-rust-toolchain@"));
+check(actionRustSteps.length > 0 && actionRustSteps.every((step) => String(step.with?.toolchain) === manifest.release.toolchain.rust), "target action Rust setup must match native-targets.json");
+const candidateRustSetup = candidateSteps.find(({ name }) => String(name).startsWith("Set up Rust"));
+const candidateRustVersions = [...String(candidateRustSetup?.run ?? "").matchAll(/\brustup (?:toolchain install|default) ([^\s\\]+)/gu)].map((match) => match[1]);
+check(
+  candidateRustVersions.length === 2 && candidateRustVersions.every((version) => version === manifest.release.toolchain.rust),
+  "candidate Rust setup must match native-targets.json",
+);
 check(actionText.includes("dist/native/*.tgz") && actionText.includes("dist/cli/*.tar.gz") && !actionText.includes("dist/**"), "target uploads must be allowlisted");
+check(!actionSteps.some(({ run }) => String(run).includes("${{ inputs.candidate_ref }}")), "target action must pass the candidate ref through the environment rather than shell template expansion");
 
 check(hasRun(jobs.aggregate, "write-release-checksums.mjs --candidate"), "aggregate must checksum all publishable assets");
 check(hasRun(jobs.aggregate, "validate-release-artifacts.mjs --candidate"), "aggregate must run full candidate-aware artifact validation");
@@ -69,7 +87,7 @@ for (const evidence of ["candidateReceiptFile", "candidateRoot", "installers", "
 }
 check(!/\b(?:cargo build|npm pack|bun run build)\b/u.test(consumerText), "sealed candidate consumer must never rebuild");
 
-check(equal(Object.keys(release.on ?? {}), ["push"]) && equal(release.on.push.tags, ["v*"]), "publication must be canonical-tag-only");
+check(equal(Object.keys(release.on ?? {}), ["push"]) && equal(release.on?.push?.tags, ["v*"]), "publication must be canonical-tag-only");
 check(release.permissions?.contents === "read" && release.concurrency?.["cancel-in-progress"] === false, "publication defaults must be read-only and non-cancelling");
 const releaseJobs = release.jobs ?? {};
 const preflight = releaseJobs["publication-state"];

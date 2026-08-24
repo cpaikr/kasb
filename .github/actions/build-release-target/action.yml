@@ -71,12 +71,15 @@ runs:
         done < <(node -e 'for (const version of JSON.parse(process.argv[1])) console.log(version)' '${{ inputs.validation_node_versions }}')
     - name: Record bounded target provenance
       shell: bash
+      env:
+        CANDIDATE_REF: ${{ inputs.candidate_ref }}
+        CANDIDATE_SHA: ${{ inputs.candidate_sha }}
       run: |
         set -euo pipefail
         node scripts/write-release-target-provenance.mjs \
           --repository "$GITHUB_REPOSITORY" \
-          --commit "${{ inputs.candidate_sha }}" \
-          --ref "${{ inputs.candidate_ref }}" \
+          --commit "$CANDIDATE_SHA" \
+          --ref "$CANDIDATE_REF" \
           --target "${{ inputs.rust_target }}" \
           --rust "$(rustc --version)" \
           --npm "$(npm --version)" \

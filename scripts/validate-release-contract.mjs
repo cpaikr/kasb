@@ -49,7 +49,12 @@ check(contract.release.provenanceAsset === "provenance.json", "release provenanc
 check(contract.release.receiptSchemaVersion === 1, "receipt schema version must remain explicit");
 check(contract.release.receiptFile === ".kasb-receipt.json", "receipt filename must remain stable");
 check(contract.release.candidateReceiptFile === "candidate.json", "candidate receipt filename must remain stable");
-check(JSON.stringify(contract.release.toolchain) === JSON.stringify({ rust: "1.88.0", node: "24", npm: "11.6.2" }), "release toolchain pins must remain manifest-owned");
+const expectedToolchain = { rust: "1.88.0", node: "24", npm: "11.6.2" };
+const toolchain = contract.release.toolchain ?? {};
+check(JSON.stringify(Object.keys(toolchain).sort()) === JSON.stringify(Object.keys(expectedToolchain).sort()), "release toolchain must contain exactly rust, node, and npm pins");
+for (const [name, version] of Object.entries(expectedToolchain)) {
+  check(toolchain[name] === version, `release ${name} toolchain pin must remain ${version}`);
+}
 for (const target of contract.targets) {
   check(typeof target.releaseRunner === "string" && target.releaseRunner.length > 0, `${target.rustTarget} is missing a release runner`);
 }
