@@ -147,6 +147,7 @@ const e2eConsumer = (e2e?.steps ?? []).find(({ run }) => String(run).includes("t
 check(e2eConsumer?.shell === "bash", "sealed native E2E must use one portable shell on every target runner");
 check(String(e2eConsumer?.env?.KASB_CANDIDATE_SHA).includes("needs.metadata.outputs.sha"), "sealed native E2E must compare the receipt with the checked-out PR head rather than GitHub's merge SHA");
 check(consumerText.includes('localTarInvocation(archive, "-xzf"'), "sealed candidate extraction must keep Windows drive paths out of tar archive operands");
+check(consumerText.includes("localTarDestination(archive, extracted)"), "sealed candidate extraction must keep Windows drive paths out of tar destination operands");
 for (const evidence of ["candidateReceiptFile", "candidateRoot", "installers", "receiptBytes", '["upgrade", "--check"]', '["upgrade"]', "same-version ${operation} must not change the managed binary", "same-version ${operation} must not change the managed receipt"]) {
   check(consumerText.includes(evidence), `sealed candidate consumer is missing ${evidence}`);
 }

@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { archiveInvocation } from "./assemble-cli-archive.mjs";
-import { localArchivePath, localTarInvocation } from "./local-archive-path.mjs";
+import { localArchivePath, localTarDestination, localTarInvocation } from "./local-archive-path.mjs";
 import { canonicalCandidateIdentity, requiredCandidateGates, validateArtifactManifest, validateCandidateVersion, validatePrebuildPublicationState, validatePublicationStateSource } from "./release-candidate-contract.mjs";
 import { scanCandidateText, scanText, validateCandidateProvenance } from "./release-candidate-inspection.mjs";
 import { checksummedReleaseAssetNames, loadReleaseContract, releaseAssetNames, repositoryRoot } from "./release-contract.mjs";
@@ -42,6 +42,13 @@ try {
       options: { cwd: "\\\\server\\release\\" },
     },
     "tar extraction must use a local archive operand for UNC paths",
+  );
+  assert.equal(
+    localTarDestination(
+      `C:\\candidate\\cli\\${windowsTarget.archiveName}`,
+      "C:\\candidate\\.kasb-exact-candidate-123\\archive",
+    ),
+    "../.kasb-exact-candidate-123/archive",
   );
 
   for (const script of ["scripts/write-release-checksums.mjs", "scripts/validate-release-artifacts.mjs"]) {

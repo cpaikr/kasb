@@ -2,11 +2,10 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { access, constants, lstat, mkdir, mkdtemp, readFile, realpath, rm, stat } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { spawn } from "node:child_process";
 
-import { localTarInvocation } from "./local-archive-path.mjs";
+import { localTarDestination, localTarInvocation } from "./local-archive-path.mjs";
 import { loadReleaseContract, releaseTag, repositoryRoot } from "./release-contract.mjs";
 
 const rustTarget = process.argv[2];
@@ -72,13 +71,14 @@ await new Promise((ready, reject) => {
   server.listen(0, "127.0.0.1", ready);
 });
 const base = `http://127.0.0.1:${server.address().port}`;
-const temporary = await mkdtemp(resolve(tmpdir(), "kasb-exact-candidate-"));
+const temporary = await mkdtemp(resolve(candidateRoot, ".kasb-exact-candidate-"));
 
 try {
   const extracted = resolve(temporary, "archive");
   const installDirectory = resolve(temporary, "installed path with spaces");
   await mkdir(extracted, { recursive: true });
-  const extractionCommand = localTarInvocation(archive, "-xzf", ["-C", extracted]);
+  const extractionDirectory = localTarDestination(archive, extracted);
+  const extractionCommand = localTarInvocation(archive, "-xzf", ["-C", extractionDirectory]);
   const extraction = await run("tar", extractionCommand.args, extractionCommand.options);
   assertProcessSucceeded(extraction, "exact candidate archive extraction");
 
