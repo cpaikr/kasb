@@ -417,7 +417,7 @@ reported_done="\${work}/reported-version.done"
 mkfifo "\${reported_pipe}"
 (head -c 129 < "\${reported_pipe}" > "\${reported_path}"; : > "\${reported_done}") &
 identity_reader_pid=\$!
-"\${staged}" --version > "\${reported_pipe}" 2>/dev/null &
+"\${staged}" --version < /dev/null > "\${reported_pipe}" 2>/dev/null &
 identity_pid=\$!
 identity_waits=0
 while kill -0 "\${identity_pid}" 2>/dev/null; do
@@ -471,6 +471,7 @@ if [ "\${KASB_INSTALLER_TEST_ALLOW_NONCANONICAL_URLS:-}" = 1 ] && [ "\${KASB_INS
 mv "\${staged}" "\${destination}"
 if [ "\${KASB_INSTALLER_TEST_ALLOW_NONCANONICAL_URLS:-}" = 1 ] && [ "\${KASB_INSTALLER_TEST_FAIL_RECEIPT_PUBLISH:-0}" = 1 ]; then false; fi
 mv "\${receipt_staged}" "\${receipt}"
+sync_file "\${install_dir}"
 committed=1
 echo "Installed kasb \${version} at \${destination}"
 `;
@@ -506,8 +507,10 @@ if (($env:KASB_INSTALLER_TEST_PLATFORM -or $env:KASB_INSTALLER_TEST_ARCH) -and $
 $Platform = if ($env:KASB_INSTALLER_TEST_PLATFORM) { $env:KASB_INSTALLER_TEST_PLATFORM } elseif ($RunningWindows) { "Win32NT" } elseif ($RunningMacOS) { "Unix:OSX" } else { "Unix:Linux" }
 $Architecture = if ($env:KASB_INSTALLER_TEST_ARCH) { $env:KASB_INSTALLER_TEST_ARCH } else { [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() }
 if ($Platform -eq "Unix:Linux" -and -not $env:KASB_INSTALLER_TEST_PLATFORM -and -not $env:KASB_INSTALLER_TEST_ARCH) {
-  $GlibcIdentity = (& getconf GNU_LIBC_VERSION 2>$null | Out-String).Trim()
-  if ($LASTEXITCODE -ne 0 -or $GlibcIdentity -notmatch '^glibc ([0-9]+\.[0-9]+)') { throw "kasb: standalone Linux requires glibc" }
+  $GetconfCommand = Get-Command getconf -CommandType Application -ErrorAction SilentlyContinue
+  if (-not $GetconfCommand) { throw "kasb: standalone Linux requires glibc" }
+  $GlibcIdentity = (& $GetconfCommand.Source GNU_LIBC_VERSION 2>$null | Out-String).Trim()
+  if ($LASTEXITCODE -ne 0 -or $GlibcIdentity -notmatch '^glibc ([0-9]+\\.[0-9]+)') { throw "kasb: standalone Linux requires glibc" }
   if ([version]$Matches[1] -lt [version]'${manifest.minimumGlibcVersion}') { throw "kasb: standalone Linux glibc is below ${manifest.minimumGlibcVersion}" }
 }
 switch ("$Platform\`:$Architecture") {
@@ -777,7 +780,7 @@ try {
   Save-BoundedReleaseFile "$DownloadBase/$Repository/releases/download/$Tag/$ChecksumAsset" $Checksums ${release.metadataLimitBytes} ${release.requestTimeoutSeconds}
   if ((Get-Item -LiteralPath $ArchivePath).Length -ne $ArchiveAsset.size) { throw "kasb: release archive size identity mismatch" }
   if ((Get-Item -LiteralPath $Checksums).Length -ne $ChecksumAssetMetadata.size) { throw "kasb: release checksum size identity mismatch" }
-  $Line = @(Get-Content $Checksums | Where-Object { $_ -cmatch "^[0-9a-fA-F]{64}  $([regex]::Escape($Archive))$" })
+  $Line = @(Get-Content -LiteralPath $Checksums | Where-Object { $_ -cmatch "^[0-9a-fA-F]{64}  $([regex]::Escape($Archive))$" })
   if ($Line.Count -ne 1) { throw "kasb: invalid or missing archive checksum" }
   $Expected = $Line[0].Substring(0, 64).ToLowerInvariant()
   $Actual = Get-Sha256Hex $ArchivePath
@@ -847,7 +850,7 @@ try {
       [Console]::Error.WriteLine("kasb: installation rollback was incomplete; recovery files remain in $Work")
     }
   }
-  if (-not $PreserveWork) { Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $Work }
+  if (-not $PreserveWork) { Remove-Item -LiteralPath $Work -Recurse -Force -ErrorAction SilentlyContinue }
 }
 `;
 }

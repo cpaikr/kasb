@@ -923,8 +923,9 @@ fn executable_from_archive(
     if !expected_entries.contains(Path::new(executable_name)) {
         return Err(invalid_entry_set());
     }
+    let aggregate_limit = executable_limit.saturating_mul(2);
     let decoder = GzDecoder::new(archive).take(
-        executable_limit
+        aggregate_limit
             .saturating_add(ARCHIVE_EXPANSION_OVERHEAD)
             .saturating_add(1),
     );
@@ -945,7 +946,7 @@ fn executable_from_archive(
             )
         })?;
         expanded_bytes = expanded_bytes.saturating_add(entry.size());
-        if expanded_bytes > executable_limit.saturating_mul(2) {
+        if expanded_bytes > aggregate_limit {
             return Err(UpgradeError::new(
                 "upgrade_archive_invalid",
                 "The expanded release archive exceeds its size limit.",

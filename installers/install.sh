@@ -376,7 +376,7 @@ reported_done="${work}/reported-version.done"
 mkfifo "${reported_pipe}"
 (head -c 129 < "${reported_pipe}" > "${reported_path}"; : > "${reported_done}") &
 identity_reader_pid=$!
-"${staged}" --version > "${reported_pipe}" 2>/dev/null &
+"${staged}" --version < /dev/null > "${reported_pipe}" 2>/dev/null &
 identity_pid=$!
 identity_waits=0
 while kill -0 "${identity_pid}" 2>/dev/null; do
@@ -430,5 +430,6 @@ if [ "${KASB_INSTALLER_TEST_ALLOW_NONCANONICAL_URLS:-}" = 1 ] && [ "${KASB_INSTA
 mv "${staged}" "${destination}"
 if [ "${KASB_INSTALLER_TEST_ALLOW_NONCANONICAL_URLS:-}" = 1 ] && [ "${KASB_INSTALLER_TEST_FAIL_RECEIPT_PUBLISH:-0}" = 1 ]; then false; fi
 mv "${receipt_staged}" "${receipt}"
+sync_file "${install_dir}"
 committed=1
 echo "Installed kasb ${version} at ${destination}"

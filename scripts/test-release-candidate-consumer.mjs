@@ -188,12 +188,23 @@ function run(command, args, options = {}) {
     });
     let stdout = "";
     let stderr = "";
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      callback(value);
+    };
+    const timeout = setTimeout(() => {
+      child.kill("SIGKILL");
+      finish(reject, new Error(`Timed out after 60 seconds: ${command} ${args.join(" ")}`));
+    }, 60_000);
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk) => { stdout += chunk; });
     child.stderr.on("data", (chunk) => { stderr += chunk; });
-    child.once("error", reject);
-    child.once("close", (status, signal) => resolveResult({ status, signal, stdout, stderr }));
+    child.once("error", (error) => finish(reject, error));
+    child.once("close", (status, signal) => finish(resolveResult, { status, signal, stdout, stderr }));
   });
 }
 

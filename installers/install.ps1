@@ -19,8 +19,10 @@ if (($env:KASB_INSTALLER_TEST_PLATFORM -or $env:KASB_INSTALLER_TEST_ARCH) -and $
 $Platform = if ($env:KASB_INSTALLER_TEST_PLATFORM) { $env:KASB_INSTALLER_TEST_PLATFORM } elseif ($RunningWindows) { "Win32NT" } elseif ($RunningMacOS) { "Unix:OSX" } else { "Unix:Linux" }
 $Architecture = if ($env:KASB_INSTALLER_TEST_ARCH) { $env:KASB_INSTALLER_TEST_ARCH } else { [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() }
 if ($Platform -eq "Unix:Linux" -and -not $env:KASB_INSTALLER_TEST_PLATFORM -and -not $env:KASB_INSTALLER_TEST_ARCH) {
-  $GlibcIdentity = (& getconf GNU_LIBC_VERSION 2>$null | Out-String).Trim()
-  if ($LASTEXITCODE -ne 0 -or $GlibcIdentity -notmatch '^glibc ([0-9]+.[0-9]+)') { throw "kasb: standalone Linux requires glibc" }
+  $GetconfCommand = Get-Command getconf -CommandType Application -ErrorAction SilentlyContinue
+  if (-not $GetconfCommand) { throw "kasb: standalone Linux requires glibc" }
+  $GlibcIdentity = (& $GetconfCommand.Source GNU_LIBC_VERSION 2>$null | Out-String).Trim()
+  if ($LASTEXITCODE -ne 0 -or $GlibcIdentity -notmatch '^glibc ([0-9]+\.[0-9]+)') { throw "kasb: standalone Linux requires glibc" }
   if ([version]$Matches[1] -lt [version]'2.28') { throw "kasb: standalone Linux glibc is below 2.28" }
 }
 switch ("$Platform`:$Architecture") {
@@ -293,7 +295,7 @@ try {
   Save-BoundedReleaseFile "$DownloadBase/$Repository/releases/download/$Tag/$ChecksumAsset" $Checksums 1048576 15
   if ((Get-Item -LiteralPath $ArchivePath).Length -ne $ArchiveAsset.size) { throw "kasb: release archive size identity mismatch" }
   if ((Get-Item -LiteralPath $Checksums).Length -ne $ChecksumAssetMetadata.size) { throw "kasb: release checksum size identity mismatch" }
-  $Line = @(Get-Content $Checksums | Where-Object { $_ -cmatch "^[0-9a-fA-F]{64}  $([regex]::Escape($Archive))$" })
+  $Line = @(Get-Content -LiteralPath $Checksums | Where-Object { $_ -cmatch "^[0-9a-fA-F]{64}  $([regex]::Escape($Archive))$" })
   if ($Line.Count -ne 1) { throw "kasb: invalid or missing archive checksum" }
   $Expected = $Line[0].Substring(0, 64).ToLowerInvariant()
   $Actual = Get-Sha256Hex $ArchivePath
@@ -363,5 +365,5 @@ try {
       [Console]::Error.WriteLine("kasb: installation rollback was incomplete; recovery files remain in $Work")
     }
   }
-  if (-not $PreserveWork) { Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $Work }
+  if (-not $PreserveWork) { Remove-Item -LiteralPath $Work -Recurse -Force -ErrorAction SilentlyContinue }
 }

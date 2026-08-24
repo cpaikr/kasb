@@ -4,7 +4,7 @@ import { access, chmod, constants, copyFile, mkdir, mkdtemp, readFile, readdir, 
 import { tmpdir } from "node:os";
 import { delimiter, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { localTarInvocation } from "./local-archive-path.mjs";
+import { localTarDestination, localTarInvocation } from "./local-archive-path.mjs";
 import { loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
 
 const rustTarget = process.argv[2];
@@ -197,7 +197,7 @@ async function extractDirectCliArchive(input, destinationRoot) {
   const archive = await suppliedArchive(input);
   const destination = resolve(destinationRoot, "direct-cli");
   await mkdir(destination, { recursive: true });
-  const invocation = localTarInvocation(archive, "-xzf", ["-C", destination]);
+  const invocation = localTarInvocation(archive, "-xzf", ["-C", localTarDestination(archive, destination)]);
   run("tar", invocation.args, invocation.options.cwd);
   const cli = resolve(destination, target.cliFile);
   const metadata = await stat(cli);
