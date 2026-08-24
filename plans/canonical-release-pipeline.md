@@ -32,14 +32,14 @@ artifact set.
 - The source and canonical release repository is private, so unauthenticated
   installation and upgrades require the separately authorized visibility
   change before the first real release.
-- No pipeline implementation has yet satisfied this plan's full four-target
-  rehearsal and review criteria. The current implementation branch contains
-  the reusable candidate workflow, guarded publication jobs, tested mutation
-  executor, and failure-injection contracts; hosted four-target evidence and
-  repository review remain outstanding. Public visibility, repository release
-  immutability, protected release environment configuration, and npm trusted
-  publisher registrations are external first-release prerequisites to verify,
-  not changes authorized by this plan.
+- PR #23 completed the reusable candidate workflow, guarded publication jobs,
+  tested mutation executor, failure-injection contracts, and operator guidance,
+  then merged at `8e86a86`. Exact implementation head `a9d781a` passed CI run
+  `32713982066` and the full non-publishing four-target candidate run
+  `32713982087`. Public visibility, repository release immutability, protected
+  release environment configuration, and npm trusted publisher registrations
+  remain external first-release prerequisites to verify, not changes authorized
+  by this plan.
 
 ## Decisions
 
@@ -181,8 +181,8 @@ artifact set.
 
 ## Next action
 
-Open the implementation PR against the release-readiness integration branch,
-run its non-publishing full-target candidate workflow, resolve repository
-review, and record the exact hosted evidence before merge. The plan remains
-active until the full four-target rehearsal, repository review, and
-implementation PR merge are recorded.
+This plan is complete. PR #23 delivered the reviewed implementation after exact
+head CI and the non-publishing four-target rehearsal passed. Selecting a
+production version, configuring external release prerequisites, and performing
+the first real publication remain separately authorized work in
+`tasks/perform-first-rust-node-release.md`.
