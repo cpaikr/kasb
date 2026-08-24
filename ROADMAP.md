@@ -2,7 +2,7 @@
 
 ## Current
 
-_None._
+[Establish the release, installation, and managed-upgrade contract](plans/release-contract-and-managed-upgrades.md)
 
 ## Completed
 
@@ -10,8 +10,7 @@ _None._
 
 ## Plans
 
-1. [Establish the release, installation, and managed-upgrade contract](plans/release-contract-and-managed-upgrades.md)
-2. [Automate canonical GitHub and npm releases](plans/canonical-release-pipeline.md)
+1. [Automate canonical GitHub and npm releases](plans/canonical-release-pipeline.md)
 
 ## Tasks
 
