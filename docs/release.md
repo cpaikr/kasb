@@ -66,4 +66,64 @@ version, public canonical repository access, repository release immutability,
 fresh native evidence for every claimed target, contracts and adversarial
 conformance, Rust/Node/CLI tests, ABI-floor and clean-consumer checks, license
 checks, and aggregate validation of the exact npm and standalone artifacts.
-This slice adds no publication workflow and performs no release.
+The repository may implement and rehearse the automation needed to establish
+that evidence, but doing so performs no release and grants no publication
+authority.
+
+## Publication prerequisites and authority
+
+Before a separately authorized first release, an operator must verify all of
+the following external state rather than infer it from a passing build:
+
+- `cpaikr/kasb` is public so canonical release metadata and assets are available
+  to unauthenticated installers and managed upgrades.
+- Repository release immutability is enabled and the publication path verifies
+  the final release as immutable before npm publication. Published tags and
+  assets are never moved or replaced; a correction uses a new version.
+- A dedicated protected release environment limits deployment to the canonical
+  release refs through required reviewers and deployment rules configured
+  outside the repository. The publication workflow must explicitly enter that
+  environment.
+- npm trusted publishers are registered for the root package and each native
+  package against that exact GitHub repository, the final top-level workflow
+  filename, and, when the optional npm environment field is configured, the
+  exact protected environment name used by this project. Each new registration
+  must select whether it allows `npm publish`, staged publish, or both.
+  Publication uses a GitHub-hosted runner with `id-token: write` scoped to the
+  npm job and no retained npm token; the repository and package must be public
+  for provenance.
+- A production version newer than the occupied retired-product version `0.2.1`
+  has been explicitly authorized and remains vacant or is an exact resumable
+  match. This document does not select that version or authorize its tag.
+
+Configuration or mutation of those prerequisites is outside the
+release-readiness goal. A passing rehearsal reports readiness only; it must not
+change repository visibility, environment protection, trusted-publisher
+registration, tags, releases, or registry state.
+
+## Non-publishing candidate verification
+
+The canonical rehearsal must build the Linux GNU x64/ARM64, macOS ARM64, and
+Windows x64 candidates from one checkout and exercise the same metadata,
+artifact, installer, receipt, upgrade, provenance, and clean-consumer contracts
+used by strict publication. The validated candidate includes every native npm
+tarball, the root npm tarball, all four standalone archives, `SHA256SUMS`, both
+generated installers, and bounded provenance.
+
+Rehearsal substitutes only an unmistakable synthetic candidate ref and
+deterministic publication-state fixtures. It must have no release-write
+permission, protected-environment access, npm publishing identity, or path to a
+live publication step. Failure injection must prove that incomplete target
+sets, failed prerequisites, interrupted upload state, non-immutable release
+metadata, occupied mismatches, partial npm publication, and root-package
+failure stop closed while exact already-published tarballs are the only
+resumable registry state.
+
+Strict publication, when separately authorized, consumes the already validated
+candidate without rebuilding it. Repository release immutability must already
+be enabled. The workflow stages a draft, uploads and verifies the complete
+GitHub asset set, and only then publishes it. It next re-verifies the immutable
+state, tag, commit, and asset set before publishing native npm packages followed
+by the exact-version root package. Any partial publication is reported
+truthfully and resumed only after byte-for-byte identity checks. These operator
+contracts do not authorize running that path.
