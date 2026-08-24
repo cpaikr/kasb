@@ -32,7 +32,7 @@ function validateReleasePolicy(release) {
       throw new Error(`native-targets.json release.${field} must be a nonempty string.`);
     }
   }
-  if (!/^\d+\.\d+\.\d+$/u.test(release.retiredThroughVersion)) {
+  if (!/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.test(release.retiredThroughVersion)) {
     throw new Error("native-targets.json release.retiredThroughVersion must be stable MAJOR.MINOR.PATCH.");
   }
   if (!Array.isArray(release.archiveEntries) || release.archiveEntries.length === 0 || release.archiveEntries.some((entry) => typeof entry !== "string" || entry.length === 0)) {
