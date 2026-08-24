@@ -342,7 +342,7 @@ function runShell(target, installDir, extra = {}) {
 async function validatePowerShellInstaller() {
   const text = await readFile(resolve(repositoryRoot, "installers/install.ps1"), "utf8");
   for (const target of contract.targets) assert(text.includes(target.archiveName), `PowerShell installer lacks ${target.archiveName}`);
-  for (const required of ["immutable", "Get-Sha256Hex", "[System.Security.Cryptography.SHA256]::Create()", "schemaVersion", "manager = 'standalone'", "Save-BoundedReleaseFile", "ResponseHeadersRead", "Move-ExactFile", "finally", "Extract-TarExecutable", "pre-existing installation paths must be regular files", ".kasb-install.", "-cne $Tag", "-ceq $Archive", "-cmatch"]) {
+  for (const required of ["immutable", "Get-Sha256Hex", "[System.Security.Cryptography.SHA256]::Create()", "Test-JsonInteger", "browser_download_url -isnot [string]", "schemaVersion", "manager = 'standalone'", "Save-BoundedReleaseFile", "ResponseHeadersRead", "Move-ExactFile", "finally", "Extract-TarExecutable", "pre-existing installation paths must be regular files", ".kasb-install.", "-cne $Tag", "-ceq $Archive", "-cmatch"]) {
     assert(text.includes(required), `PowerShell installer lacks ${required} contract`);
   }
   assert(!text.includes("Get-FileHash"), "PowerShell installer depends on an optional hashing cmdlet");
@@ -419,6 +419,30 @@ async function validatePowerShellInstaller() {
   ]) {
     configureRelease(fixture, { metadataBody: (metadata) => Buffer.from(JSON.stringify(mutate(metadata))) });
     assert((await runPowerShell(executable, target, join(root, `PowerShell ${name}`))).code !== 0, `${name} PowerShell release identity was accepted`);
+  }
+  const mutateAsset = (metadata, index, mutate) => ({
+    ...metadata,
+    assets: metadata.assets.map((asset, assetIndex) => assetIndex === index ? mutate(asset) : asset),
+  });
+  for (const [assetKind, index] of [["archive", 0], ["checksum", 1]]) {
+    for (const [shape, mutateSize] of [
+      ["string", (size) => String(size)],
+      ["float", () => 1.5],
+      ["array", (size) => [size]],
+      ["boolean", () => true],
+    ]) {
+      configureRelease(fixture, { metadataBody: (metadata) => Buffer.from(JSON.stringify(mutateAsset(metadata, index, (asset) => ({ ...asset, size: mutateSize(asset.size) })))) });
+      assert((await runPowerShell(executable, target, join(root, `PowerShell ${assetKind} ${shape} size`))).code !== 0, `${assetKind} ${shape} PowerShell asset size was accepted`);
+    }
+    for (const [shape, mutateUrl] of [
+      ["missing", ({ browser_download_url: _url, ...asset }) => asset],
+      ["array", (asset) => ({ ...asset, browser_download_url: [asset.browser_download_url] })],
+      ["case-variant", (asset) => ({ ...asset, browser_download_url: asset.browser_download_url.replace("/releases/", "/Releases/") })],
+      ["path-variant", (asset) => ({ ...asset, browser_download_url: `${asset.browser_download_url}?download=1` })],
+    ]) {
+      configureRelease(fixture, { metadataBody: (metadata) => Buffer.from(JSON.stringify(mutateAsset(metadata, index, mutateUrl))) });
+      assert((await runPowerShell(executable, target, join(root, `PowerShell ${assetKind} ${shape} URL`))).code !== 0, `${assetKind} ${shape} PowerShell asset URL was accepted`);
+    }
   }
   configureRelease(fixture, { omitArchive: true });
   assert((await runPowerShell(executable, target, join(root, "PowerShell missing"))).code !== 0, "missing PowerShell archive was accepted");

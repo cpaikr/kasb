@@ -573,6 +573,9 @@ function Get-Sha256Hex([string]$Path) {
     $Stream.Dispose()
   }
 }
+function Test-JsonInteger([object]$Value) {
+  return $Value -is [byte] -or $Value -is [sbyte] -or $Value -is [int16] -or $Value -is [uint16] -or $Value -is [int32] -or $Value -is [uint32] -or $Value -is [int64] -or $Value -is [uint64]
+}
 function Test-AnyPath([string]$Path) {
   return [System.IO.File]::Exists($Path) -or [System.IO.Directory]::Exists($Path)
 }
@@ -726,14 +729,20 @@ try {
   if ($ChecksumAssets.Count -ne 1) { throw "kasb: release checksum manifest is missing or duplicated" }
   $ArchiveAsset = $ArchiveAssets[0]
   $ChecksumAssetMetadata = $ChecksumAssets[0]
-  if ([long]$ArchiveAsset.size -le 0 -or [long]$ArchiveAsset.size -gt ${release.archiveLimitBytes}) { throw "kasb: release archive metadata exceeds size limit" }
-  if ([long]$ChecksumAssetMetadata.size -le 0 -or [long]$ChecksumAssetMetadata.size -gt ${release.metadataLimitBytes}) { throw "kasb: release checksum metadata exceeds size limit" }
+  $ExpectedArchiveUrl = "https://github.com/$Repository/releases/download/$Tag/$Archive"
+  $ExpectedChecksumUrl = "https://github.com/$Repository/releases/download/$Tag/$ChecksumAsset"
+  if ($ArchiveAsset.browser_download_url -isnot [string] -or $ArchiveAsset.browser_download_url -cne $ExpectedArchiveUrl) { throw "kasb: release archive URL identity mismatch" }
+  if ($ChecksumAssetMetadata.browser_download_url -isnot [string] -or $ChecksumAssetMetadata.browser_download_url -cne $ExpectedChecksumUrl) { throw "kasb: release checksum URL identity mismatch" }
+  if (-not (Test-JsonInteger $ArchiveAsset.size)) { throw "kasb: release archive metadata has an invalid size" }
+  if (-not (Test-JsonInteger $ChecksumAssetMetadata.size)) { throw "kasb: release checksum metadata has an invalid size" }
+  if ($ArchiveAsset.size -le 0 -or $ArchiveAsset.size -gt ${release.archiveLimitBytes}) { throw "kasb: release archive metadata exceeds size limit" }
+  if ($ChecksumAssetMetadata.size -le 0 -or $ChecksumAssetMetadata.size -gt ${release.metadataLimitBytes}) { throw "kasb: release checksum metadata exceeds size limit" }
   $ArchivePath = Join-Path $Work $Archive
   $Checksums = Join-Path $Work $ChecksumAsset
   Save-BoundedReleaseFile "$DownloadBase/$Repository/releases/download/$Tag/$Archive" $ArchivePath ${release.archiveLimitBytes}
   Save-BoundedReleaseFile "$DownloadBase/$Repository/releases/download/$Tag/$ChecksumAsset" $Checksums ${release.metadataLimitBytes}
-  if ((Get-Item -LiteralPath $ArchivePath).Length -ne [long]$ArchiveAsset.size) { throw "kasb: release archive size identity mismatch" }
-  if ((Get-Item -LiteralPath $Checksums).Length -ne [long]$ChecksumAssetMetadata.size) { throw "kasb: release checksum size identity mismatch" }
+  if ((Get-Item -LiteralPath $ArchivePath).Length -ne $ArchiveAsset.size) { throw "kasb: release archive size identity mismatch" }
+  if ((Get-Item -LiteralPath $Checksums).Length -ne $ChecksumAssetMetadata.size) { throw "kasb: release checksum size identity mismatch" }
   $Line = @(Get-Content $Checksums | Where-Object { $_ -cmatch "^[0-9a-fA-F]{64}  $([regex]::Escape($Archive))$" })
   if ($Line.Count -ne 1) { throw "kasb: invalid or missing archive checksum" }
   $Expected = $Line[0].Substring(0, 64).ToLowerInvariant()
