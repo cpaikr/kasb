@@ -220,6 +220,15 @@ async function withPrivateCandidateFile(bytes, name, operation) {
 }
 
 async function selfTest() {
+  const receiptDirectory = await mkdtemp(join(tmpdir(), "kasb-receipt-test-"));
+  const receiptPath = join(receiptDirectory, "receipt.json");
+  try {
+    await writeFile(receiptPath, '{"error":{"code":"outcome_unknown"}}\n');
+    await writeReceiptAtomically(receiptPath, { schemaVersion: 1, ok: true, channel: "github", operations: [] });
+    assert.deepEqual(JSON.parse(await readFile(receiptPath, "utf8")), { schemaVersion: 1, ok: true, channel: "github", operations: [] });
+  } finally {
+    await rm(receiptDirectory, { recursive: true, force: true });
+  }
   const expected = Buffer.from("verified candidate bytes\n");
   let observedPath;
   await withPrivateCandidateFile(expected, "candidate.tgz", async (path) => {

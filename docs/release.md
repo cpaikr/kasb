@@ -114,6 +114,27 @@ release-readiness goal. A passing rehearsal reports readiness only; it must not
 change repository visibility, environment protection, trusted-publisher
 registration, tags, releases, or registry state.
 
+Before approving a separately authorized production run, inspect the external
+gates with read-only queries. Set the intended version locally; do not create a
+tag as part of this verification:
+
+```bash
+KASB_RELEASE_VERSION='<authorized-version>'
+gh repo view cpaikr/kasb --json visibility
+gh api repos/cpaikr/kasb/immutable-releases --jq .enabled
+gh api repos/cpaikr/kasb/environments/github-release
+gh api repos/cpaikr/kasb/environments/npm-release
+npm view "@sjunepark/kasb@${KASB_RELEASE_VERSION}" dist.tarball --json
+```
+
+Repeat the final `npm view` check for every native package named in
+`native-targets.json`. A not-found result is the expected vacant state; an
+existing version is acceptable only when the guarded workflow proves its
+tarball is byte-for-byte identical to the sealed candidate. Confirm the
+environment-only sentinels, GitHub App scope, reviewers, deployment rules, and
+npm trusted-publisher bindings in their provider settings because read-only
+repository metadata does not reveal every secret or publisher constraint.
+
 ## Non-publishing candidate verification
 
 The canonical rehearsal must build the Linux GNU x64/ARM64, macOS ARM64, and
@@ -146,3 +167,21 @@ contracts do not authorize running that path. Resume uses the original
 validated Actions artifact: rerun only the failed publication job while that
 artifact remains retained. An expired or unavailable artifact fails closed and
 must not be replaced by a rebuild for the same partially published version.
+
+Download and inspect the channel receipt before any retry. `not_started` means
+the job failed before entering its mutation executor; `outcome_unknown` means
+the executor may have reached an external service; and a completed failure
+receipt records the operations already reconciled. In every case use GitHub
+Actions' **Re-run failed jobs** operation so successful publication jobs and
+the sealed candidate are not rebuilt. If GitHub publication failed, the retry
+reconciles the draft, assets, and immutable final state before npm can run. If
+only npm failed, retry only that failed job; it first re-verifies GitHub and
+then accepts only exact already-published tarballs before continuing native
+packages and finally the root package. Never delete or replace a published tag,
+release asset, or package to recover.
+
+The current candidate and strict-state artifacts are retained for seven days.
+If either expires, stop. A version with no published external state may proceed
+only under a newly authorized release attempt; a partially published version
+requires an explicit recovery decision because this pipeline will neither
+rebuild its missing bytes nor overwrite external state.

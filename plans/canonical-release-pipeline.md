@@ -84,9 +84,9 @@ artifact set.
   authorized release refs. Environment-only sentinel secrets fail closed before
   mutation; the GitHub environment also supplies a repository-scoped
   Contents-read and Administration-read credential for the immutable-release
-  settings preflight. npm
-  trusted-publisher registrations must bind each native package and the root
-  package to the canonical repository, the exact final top-level workflow
+  settings preflight. npm trusted-publisher registrations must bind each native
+  package and the root package to the canonical repository, the exact final
+  top-level workflow
   filename, and the exact `npm-release` environment name. Each registration
   must select whether it allows
   `npm publish`, staged publish, or both. Publication runs on GitHub-hosted
