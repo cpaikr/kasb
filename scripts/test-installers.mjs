@@ -8,6 +8,10 @@ import { loadReleaseContract, releaseTag, repositoryRoot } from "./release-contr
 
 const contract = await loadReleaseContract();
 const powerShellOnly = process.argv.includes("--powershell-only");
+if (process.platform === "win32" && process.argv.includes("--build-windows-cli")) {
+  const build = spawnSync("cargo", ["build", "--locked", "-p", "kasb-cli", "--bin", "kasb"], { cwd: repositoryRoot, encoding: "utf8" });
+  assert(build.status === 0, `could not build the Windows installer identity fixture: ${build.stderr}`);
+}
 const root = await mkdtemp(join(tmpdir(), "kasb installer tests "));
 const routes = new Map();
 const requests = [];
@@ -60,6 +64,12 @@ try {
 
   const target = contract.targets.find(({ npmPlatform, npmArch }) => npmPlatform === "linux" && npmArch === "x64");
   const fixture = await fixtureFor(target);
+
+  configureRelease(fixture, {
+    checksumBody: Buffer.from(fixture.checksums.toString("utf8").replace(/^[0-9a-f]{64}/u, (digest) => digest.toUpperCase())),
+  });
+  const uppercaseChecksum = await runShell(target, join(root, "uppercase checksum"));
+  assert(uppercaseChecksum.code === 0, `uppercase shell checksum was rejected: ${uppercaseChecksum.stderr}`);
 
   configureRelease(fixture);
   const relativeInstallAbsolute = join(root, "relative install path");
@@ -126,6 +136,13 @@ try {
   configureRelease(duplicateFixture);
   const duplicate = await runShell(target, join(root, "duplicate executable"));
   assert(duplicate.code !== 0 && duplicate.stderr.includes("entry set or executable identity"), "duplicate shell archive executable was accepted");
+
+  const wrongEntriesFixture = await fixtureFor(target, {
+    archiveEntries: [...target.archiveEntries.slice(0, -1), "UNEXPECTED.md"],
+  });
+  configureRelease(wrongEntriesFixture);
+  const wrongEntries = await runShell(target, join(root, "wrong archive entries"));
+  assert(wrongEntries.code !== 0 && wrongEntries.stderr.includes("entry set"), "same-size noncanonical shell archive entry set was accepted");
 
   const expandedFixture = await fixtureFor(target, { executable: Buffer.alloc(2048, 0x41) });
   configureRelease(expandedFixture);
@@ -272,13 +289,14 @@ async function fixtureFor(target, options = {}) {
     : Buffer.from(`#!/bin/sh\nif [ "$1" = --version ]; then echo 'kasb ${contract.version}'; exit 0; fi\nexit 1\n`));
   await writeFile(executablePath, executable);
   await chmod(executablePath, 0o755);
-  const supportFiles = ["LICENSE.md", "README.md", "THIRD_PARTY_LICENSES.html"];
+  const entries = options.archiveEntries ?? target.archiveEntries;
+  const supportFiles = [...new Set([...target.archiveEntries, ...entries])].filter((entry) => entry !== target.executableName);
   for (const name of supportFiles) await writeFile(join(source, name), options.supportBody ?? `${name} fixture\n`);
   const archivePath = join(root, target.archiveName);
-  const entries = options.duplicateExecutable
-    ? [target.executableName, ...supportFiles, target.executableName]
-    : [target.executableName, ...supportFiles];
-  const tar = spawnSync("tar", ["-czf", archivePath, ...entries], { cwd: source, encoding: "utf8" });
+  const archiveEntries = options.duplicateExecutable
+    ? [...entries, target.executableName]
+    : entries;
+  const tar = spawnSync("tar", ["--format=ustar", "-czf", archivePath, ...archiveEntries], { cwd: source, encoding: "utf8" });
   assert(tar.status === 0, `could not create fixture archive: ${tar.stderr}`);
   const archive = await readFile(archivePath);
   const digest = createHash("sha256").update(archive).digest("hex");
@@ -342,10 +360,12 @@ function runShell(target, installDir, extra = {}) {
 async function validatePowerShellInstaller() {
   const text = await readFile(resolve(repositoryRoot, "installers/install.ps1"), "utf8");
   for (const target of contract.targets) assert(text.includes(target.archiveName), `PowerShell installer lacks ${target.archiveName}`);
-  for (const required of ["immutable", "Get-Sha256Hex", "[System.Security.Cryptography.SHA256]::Create()", "Test-JsonInteger", "browser_download_url -isnot [string]", "schemaVersion", "manager = 'standalone'", "Save-BoundedReleaseFile", "ResponseHeadersRead", "Move-ExactFile", "finally", "Extract-TarExecutable", "pre-existing installation paths must be regular files", ".kasb-install.", "-cne $Tag", "-ceq $Archive", "-cmatch"]) {
+  for (const required of ["immutable", "Get-Sha256Hex", "[System.Security.Cryptography.SHA256]::Create()", "Test-JsonInteger", "browser_download_url -isnot [string]", "schemaVersion", "manager = 'standalone'", "Save-BoundedReleaseFile", "ResponseHeadersRead", "ResponseStream", "CreateLinkedTokenSource", "FileAccess]::ReadWrite", "ArchiveEntries", "invalid entry set", "Move-ExactFile", "finally", "Extract-TarExecutable", "pre-existing installation paths must be regular files", ".kasb-install.", "-cne $Tag", "-ceq $Archive", "-cmatch"]) {
     assert(text.includes(required), `PowerShell installer lacks ${required} contract`);
   }
   assert(!text.includes("Get-FileHash"), "PowerShell installer depends on an optional hashing cmdlet");
+  assert(!text.includes("[System.IO.UnixFileMode]"), "PowerShell installer has a static pre-.NET 7 UnixFileMode reference");
+  assert(!/\$Input\b/u.test(text), "PowerShell installer shadows the automatic Input variable");
   assert(!/\btar\s+-/u.test(text), "PowerShell installer depends on an external tar executable");
   const executable = process.platform === "win32"
     ? "powershell.exe"
@@ -370,6 +390,7 @@ async function validatePowerShellInstaller() {
     assert(receipt.manager === "standalone", `${target.releaseTarget} PowerShell receipt manager drifted`);
     assert(receipt.version === contract.version, `${target.releaseTarget} PowerShell receipt version drifted`);
     assert(receipt.target === target.releaseTarget, `${target.releaseTarget} PowerShell receipt target drifted`);
+    assert(receipt.executable === await realpath(join(installDir, target.executableName)), `${target.releaseTarget} PowerShell receipt path was not canonical or lost spaces`);
     assert(receipt.sha256 === createHash("sha256").update(fixture.executable).digest("hex"), `${target.releaseTarget} PowerShell receipt digest drifted`);
   }
 
@@ -388,6 +409,13 @@ async function validatePowerShellInstaller() {
   assert((await runPowerShell(executable, target, corruptDir)).code !== 0, "corrupt PowerShell download was accepted");
   await assertMissing(join(corruptDir, target.executableName), "early PowerShell failure left a fresh executable");
   await assertMissing(join(corruptDir, contract.release.receiptFile), "early PowerShell failure left a fresh receipt");
+
+  const wrongEntriesFixture = await fixtureFor(target, {
+    archiveEntries: [...target.archiveEntries.slice(0, -1), "UNEXPECTED.md"],
+  });
+  configureRelease(wrongEntriesFixture);
+  const wrongEntries = await runPowerShell(executable, target, join(root, "PowerShell wrong archive entries"));
+  assert(wrongEntries.code !== 0 && wrongEntries.stderr.includes("entry set"), "same-size noncanonical PowerShell archive entry set was accepted");
 
   const existingEarlyFailureDir = join(root, "PowerShell existing early failure");
   await mkdir(existingEarlyFailureDir, { recursive: true });
@@ -577,13 +605,25 @@ async function assertMissing(path, message) {
 }
 
 function run(command, args, environment = {}) {
-  return new Promise((resolveRun) => {
+  return new Promise((resolveRun, rejectRun) => {
     const child = spawn(command, args, { cwd: repositoryRoot, env: { ...process.env, ...environment } });
     const stdout = [];
     const stderr = [];
+    let settled = false;
+    const settle = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      callback(value);
+    };
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      settle(rejectRun, new Error(`${command} did not exit within 60 seconds`));
+    }, 60_000);
+    child.on("error", (error) => settle(rejectRun, error));
     child.stdout.on("data", (chunk) => stdout.push(chunk));
     child.stderr.on("data", (chunk) => stderr.push(chunk));
-    child.on("close", (code) => resolveRun({ code, stdout: Buffer.concat(stdout).toString("utf8"), stderr: Buffer.concat(stderr).toString("utf8") }));
+    child.on("close", (code) => settle(resolveRun, { code, stdout: Buffer.concat(stdout).toString("utf8"), stderr: Buffer.concat(stderr).toString("utf8") }));
   });
 }
 

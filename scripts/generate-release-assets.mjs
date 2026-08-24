@@ -29,6 +29,9 @@ if (stale.length) {
 console.log(checkOnly ? "release installers are current" : "generated release installers");
 
 function shellInstaller({ version, release, targets, manifest }) {
+  const archiveEntryArguments = release.archiveEntries
+    .map((entry) => entry === "{executable}" ? '"${executable}"' : `'${entry.replaceAll("'", `'\\''`)}'`)
+    .join(" ");
   const cases = targets
     .filter((target) => target.npmPlatform !== "win32")
     .map((target) => {
@@ -173,8 +176,14 @@ fetch() {
     *) echo 'kasb: refused an invalid release URL' >&2; return 1 ;;
   esac
   curl --fail --silent --show-error --location --proto "\${protocols}" --proto-redir "\${protocols}" \\
-    --connect-timeout ${release.connectTimeoutSeconds} --max-time ${release.requestTimeoutSeconds} \\
+    --connect-timeout ${release.connectTimeoutSeconds} --max-time "\$4" \\
+    --speed-limit 1 --speed-time ${release.transferStallTimeoutSeconds} \\
     --max-redirs ${release.redirectLimit} --max-filesize "\$3" --output "\$2" "\$1"
+}
+
+sync_file() {
+  if sync -f "\$1" 2>/dev/null; then return 0; fi
+  sync
 }
 
 parse_release_metadata() {
@@ -335,8 +344,10 @@ parse_release_metadata() {
 }
 
 metadata="\${work}/release.json"
-fetch "\${api_base}/repos/\${repository}/releases/tags/\${tag}" "\${metadata}" ${release.metadataLimitBytes}
+fetch "\${api_base}/repos/\${repository}/releases/tags/\${tag}" "\${metadata}" ${release.metadataLimitBytes} ${release.requestTimeoutSeconds}
 metadata_fields=\$(parse_release_metadata "\${metadata}") || { echo 'kasb: release metadata is invalid JSON or has an invalid shape' >&2; exit 1; }
+# The parser emits validated integer fields for intentional positional splitting.
+# shellcheck disable=SC2086
 set -- \${metadata_fields}
 [ "\$#" -eq 15 ] || { echo 'kasb: release metadata is incomplete' >&2; exit 1; }
 [ "\$1" -eq 1 ] && [ "\$2" -eq 1 ] || { echo 'kasb: release is not immutable' >&2; exit 1; }
@@ -357,13 +368,14 @@ case "\${checksum_size}" in ''|*[!0-9]*) echo 'kasb: release checksum metadata h
 archive_path="\${work}/\${archive}"
 checksums="\${work}/\${checksum_asset}"
 release_download="\${download_base}/\${repository}/releases/download/\${tag}"
-fetch "\${release_download}/\${archive}" "\${archive_path}" ${release.archiveLimitBytes}
-fetch "\${release_download}/\${checksum_asset}" "\${checksums}" ${release.metadataLimitBytes}
+fetch "\${release_download}/\${archive}" "\${archive_path}" ${release.archiveLimitBytes} ${release.archiveRequestTimeoutSeconds}
+fetch "\${release_download}/\${checksum_asset}" "\${checksums}" ${release.metadataLimitBytes} ${release.requestTimeoutSeconds}
 [ "\$(wc -c < "\${archive_path}" | tr -d ' ')" -eq "\${archive_size}" ] || { echo 'kasb: release archive size identity mismatch' >&2; exit 1; }
 [ "\$(wc -c < "\${checksums}" | tr -d ' ')" -eq "\${checksum_size}" ] || { echo 'kasb: release checksum size identity mismatch' >&2; exit 1; }
 expected=\$(awk -v name="\${archive}" '\$2 == name { print \$1 }' "\${checksums}")
 case "\${expected}" in ''|*[!0-9a-fA-F]* ) echo 'kasb: invalid or missing archive checksum' >&2; exit 1 ;; esac
 [ "\${#expected}" -eq 64 ] || { echo 'kasb: invalid archive checksum length' >&2; exit 1; }
+expected=\$(printf '%s' "\${expected}" | LC_ALL=C tr 'A-F' 'a-f')
 if command -v sha256sum >/dev/null 2>&1; then
   actual=\$(sha256sum "\${archive_path}" | awk '{print \$1}')
 else
@@ -385,8 +397,15 @@ rm -f "\${archive_pipe}"
 [ "\${decompressor_ok}" -eq 1 ] || { echo 'kasb: release archive compression is invalid' >&2; exit 1; }
 staged="\${work}/kasb.new"
 entry_counts=\$(tar -tf "\${expanded_archive}" | awk -v name="\${executable}" '{ total += 1; if (\$0 == name) executable += 1 } END { print total + 0, executable + 0 }')
+# The archive counter emits two integers for intentional positional splitting.
+# shellcheck disable=SC2086
 set -- \${entry_counts}
-[ "\$#" -eq 2 ] && [ "\$1" -eq 4 ] && [ "\$2" -eq 1 ] || { echo 'kasb: archive entry set or executable identity is invalid' >&2; exit 1; }
+[ "\$#" -eq 2 ] && [ "\$1" -eq ${release.archiveEntries.length} ] && [ "\$2" -eq 1 ] || { echo 'kasb: archive entry set or executable identity is invalid' >&2; exit 1; }
+expected_archive_entries="\${work}/expected-archive-entries"
+observed_archive_entries="\${work}/observed-archive-entries"
+printf '%s\\n' ${archiveEntryArguments} | LC_ALL=C sort > "\${expected_archive_entries}"
+tar -tf "\${expanded_archive}" | LC_ALL=C sort > "\${observed_archive_entries}"
+cmp -s "\${expected_archive_entries}" "\${observed_archive_entries}" || { echo 'kasb: archive entry set or executable identity is invalid' >&2; exit 1; }
 entry_description=\$(tar -tvf "\${expanded_archive}" "\${executable}")
 case "\${entry_description}" in -*) ;; *) echo 'kasb: archive executable entry is not a regular file' >&2; exit 1 ;; esac
 tar -xOf "\${expanded_archive}" "\${executable}" | head -c \$((expanded_limit + 1)) > "\${staged}"
@@ -440,6 +459,8 @@ binary_digest=\$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "\${sta
 escaped_destination=\$(printf '%s' "\${destination}" | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g')
 receipt_staged="\${work}/receipt.new"
 printf '%s\\n' '{"schemaVersion":${release.receiptSchemaVersion},"manager":"standalone","version":"'"\${version}"'","target":"'"\${target}"'","executable":"'"\${escaped_destination}"'","releaseRepository":"'"\${repository}"'","releaseTag":"'"\${tag}"'","assetName":"'"\${archive}"'","sha256":"'"\${binary_digest}"'"}' > "\${receipt_staged}"
+sync_file "\${staged}"
+sync_file "\${receipt_staged}"
 
 if [ -e "\${destination}" ] || [ -L "\${destination}" ]; then had_destination=1; fi
 if [ -e "\${receipt}" ] || [ -L "\${receipt}" ]; then had_receipt=1; fi
@@ -460,7 +481,8 @@ function powershellInstaller({ version, release, targets, manifest }) {
     .map((target) => {
       const platform = target.npmPlatform === "win32" ? "Win32NT" : target.npmPlatform === "darwin" ? "Unix:OSX" : "Unix:Linux";
       const arch = target.npmArch === "x64" ? "X64" : "Arm64";
-      return `  "${platform}:${arch}" { $Target = "${target.releaseTarget}"; $Archive = "${target.archiveName}"; $Executable = "${target.executableName}" }`;
+      const archiveEntries = target.archiveEntries.map((entry) => `'${entry.replaceAll("'", "''")}'`).join(", ");
+      return `  "${platform}:${arch}" { $Target = "${target.releaseTarget}"; $Archive = "${target.archiveName}"; $Executable = "${target.executableName}"; $ArchiveEntries = @(${archiveEntries}) }`;
     })
     .join("\n");
   return `#requires -Version 5.1
@@ -506,7 +528,7 @@ $HadDestination = $false
 $HadReceipt = $false
 
 Add-Type -AssemblyName System.Net.Http
-function Save-BoundedReleaseFile([string]$Uri, [string]$Path, [long]$Limit) {
+function Save-BoundedReleaseFile([string]$Uri, [string]$Path, [long]$Limit, [int]$TimeoutSeconds) {
   $Parsed = [uri]$Uri
   $AllowInsecureTestUrl = $env:KASB_INSTALLER_TEST_ALLOW_NONCANONICAL_URLS -eq '1' -and $Parsed.Scheme -eq 'http'
   if ($Parsed.Scheme -ne 'https' -and -not $AllowInsecureTestUrl) { throw "kasb: refused an insecure release URL" }
@@ -514,13 +536,13 @@ function Save-BoundedReleaseFile([string]$Uri, [string]$Path, [long]$Limit) {
   $Handler.AllowAutoRedirect = $true
   $Handler.MaxAutomaticRedirections = ${release.redirectLimit}
   $Client = New-Object System.Net.Http.HttpClient($Handler)
-  $Client.Timeout = [TimeSpan]::FromSeconds(${release.requestTimeoutSeconds})
+  $Client.Timeout = [TimeSpan]::FromSeconds($TimeoutSeconds)
   $Client.DefaultRequestHeaders.UserAgent.ParseAdd("kasb-installer/$Version")
   $Response = $null
-  $Input = $null
+  $ResponseStream = $null
   $Output = $null
   $Cancellation = New-Object System.Threading.CancellationTokenSource
-  $Cancellation.CancelAfter([TimeSpan]::FromSeconds(${release.requestTimeoutSeconds}))
+  $Cancellation.CancelAfter([TimeSpan]::FromSeconds($TimeoutSeconds))
   try {
     $Response = $Client.GetAsync($Parsed, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead, $Cancellation.Token).GetAwaiter().GetResult()
     if (-not $Response.IsSuccessStatusCode) { throw "kasb: release request failed with HTTP $([int]$Response.StatusCode)" }
@@ -528,11 +550,19 @@ function Save-BoundedReleaseFile([string]$Uri, [string]$Path, [long]$Limit) {
     $FinalInsecureTestUrl = $env:KASB_INSTALLER_TEST_ALLOW_NONCANONICAL_URLS -eq '1' -and $FinalUri.Scheme -eq 'http'
     if ($FinalUri.Scheme -ne 'https' -and -not $FinalInsecureTestUrl) { throw "kasb: refused an insecure release redirect" }
     if ($Response.Content.Headers.ContentLength -ne $null -and $Response.Content.Headers.ContentLength -gt $Limit) { throw "kasb: release response exceeds size limit" }
-    $Input = $Response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+    $ResponseStream = $Response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
     $Output = [System.IO.File]::Open($Path, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
     $Buffer = New-Object byte[] 65536
     [long]$Total = 0
-    while (($Count = $Input.ReadAsync($Buffer, 0, $Buffer.Length, $Cancellation.Token).GetAwaiter().GetResult()) -gt 0) {
+    while ($true) {
+      $ReadCancellation = [System.Threading.CancellationTokenSource]::CreateLinkedTokenSource($Cancellation.Token)
+      $ReadCancellation.CancelAfter([TimeSpan]::FromSeconds(${release.transferStallTimeoutSeconds}))
+      try {
+        $Count = $ResponseStream.ReadAsync($Buffer, 0, $Buffer.Length, $ReadCancellation.Token).GetAwaiter().GetResult()
+      } finally {
+        $ReadCancellation.Dispose()
+      }
+      if ($Count -eq 0) { break }
       $Total += $Count
       if ($Total -gt $Limit) { throw "kasb: release response exceeds size limit" }
       $Output.Write($Buffer, 0, $Count)
@@ -540,7 +570,7 @@ function Save-BoundedReleaseFile([string]$Uri, [string]$Path, [long]$Limit) {
     $Output.Flush($true)
   } finally {
     if ($Output) { $Output.Dispose() }
-    if ($Input) { $Input.Dispose() }
+    if ($ResponseStream) { $ResponseStream.Dispose() }
     if ($Response) { $Response.Dispose() }
     $Cancellation.Dispose()
     $Client.Dispose()
@@ -556,7 +586,7 @@ function Read-Exactly([System.IO.Stream]$Stream, [byte[]]$Buffer, [int]$Count) {
   }
 }
 function Flush-DurableFile([string]$Path) {
-  $Stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+  $Stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::Read)
   try { $Stream.Flush($true) } finally { $Stream.Dispose() }
 }
 function Get-Sha256Hex([string]$Path) {
@@ -646,13 +676,14 @@ function Test-BoundedExecutableIdentity([string]$Path, [string]$Expected) {
     $Process.Dispose()
   }
 }
-function Extract-TarExecutable([string]$ArchivePath, [string]$Name, [string]$Destination, [long]$Limit) {
+function Extract-TarExecutable([string]$ArchivePath, [string]$Name, [string[]]$ExpectedEntries, [string]$Destination, [long]$Limit) {
   $ArchiveInput = $null
   $Gzip = $null
   $Output = $null
   $Found = $false
   [int]$EntryCount = 0
   [long]$ExpandedBytes = 0
+  $ObservedEntries = @()
   try {
     $ArchiveInput = [System.IO.File]::OpenRead($ArchivePath)
     $Gzip = New-Object System.IO.Compression.GzipStream($ArchiveInput, [System.IO.Compression.CompressionMode]::Decompress)
@@ -664,8 +695,10 @@ function Extract-TarExecutable([string]$ArchivePath, [string]$Name, [string]$Des
       foreach ($Byte in $Header) { if ($Byte -ne 0) { $AllZero = $false; break } }
       if ($AllZero) { break }
       $EntryCount += 1
-      if ($EntryCount -gt 16) { throw "kasb: release archive contains too many entries" }
+      if ($EntryCount -gt $ExpectedEntries.Count) { throw "kasb: release archive contains too many entries" }
       $EntryName = [System.Text.Encoding]::ASCII.GetString($Header, 0, 100).Trim([char]0)
+      if ($ExpectedEntries -cnotcontains $EntryName -or $ObservedEntries -ccontains $EntryName) { throw "kasb: release archive contains an invalid entry set" }
+      $ObservedEntries += $EntryName
       $SizeText = [System.Text.Encoding]::ASCII.GetString($Header, 124, 12).Trim([char]0, [char]32)
       if ($SizeText -notmatch '^[0-7]+$') { throw "kasb: invalid release archive entry size" }
       [long]$Size = [Convert]::ToInt64($SizeText, 8)
@@ -689,6 +722,7 @@ function Extract-TarExecutable([string]$ArchivePath, [string]$Name, [string]$Des
       if ($Padding -gt 0) { Read-Exactly $Gzip $Discard ([int]$Padding) }
     }
     if (-not $Found) { throw "kasb: release archive executable is missing" }
+    if ($EntryCount -ne $ExpectedEntries.Count) { throw "kasb: release archive contains an invalid entry set" }
   } finally {
     if ($Output) { $Output.Dispose() }
     if ($Gzip) { $Gzip.Dispose() }
@@ -708,7 +742,7 @@ try {
     }
   }
   $MetadataPath = Join-Path $Work "release.json"
-  Save-BoundedReleaseFile "$ApiBase/repos/$Repository/releases/tags/$Tag" $MetadataPath ${release.metadataLimitBytes}
+  Save-BoundedReleaseFile "$ApiBase/repos/$Repository/releases/tags/$Tag" $MetadataPath ${release.metadataLimitBytes} ${release.requestTimeoutSeconds}
   $Metadata = Get-Content -Raw -LiteralPath $MetadataPath | ConvertFrom-Json
   if ($Metadata.immutable -isnot [bool] -or $Metadata.immutable -ne $true) { throw "kasb: release is not immutable" }
   if ($Metadata.draft -isnot [bool] -or $Metadata.prerelease -isnot [bool]) { throw "kasb: release production flags are invalid" }
@@ -739,8 +773,8 @@ try {
   if ($ChecksumAssetMetadata.size -le 0 -or $ChecksumAssetMetadata.size -gt ${release.metadataLimitBytes}) { throw "kasb: release checksum metadata exceeds size limit" }
   $ArchivePath = Join-Path $Work $Archive
   $Checksums = Join-Path $Work $ChecksumAsset
-  Save-BoundedReleaseFile "$DownloadBase/$Repository/releases/download/$Tag/$Archive" $ArchivePath ${release.archiveLimitBytes}
-  Save-BoundedReleaseFile "$DownloadBase/$Repository/releases/download/$Tag/$ChecksumAsset" $Checksums ${release.metadataLimitBytes}
+  Save-BoundedReleaseFile "$DownloadBase/$Repository/releases/download/$Tag/$Archive" $ArchivePath ${release.archiveLimitBytes} ${release.archiveRequestTimeoutSeconds}
+  Save-BoundedReleaseFile "$DownloadBase/$Repository/releases/download/$Tag/$ChecksumAsset" $Checksums ${release.metadataLimitBytes} ${release.requestTimeoutSeconds}
   if ((Get-Item -LiteralPath $ArchivePath).Length -ne $ArchiveAsset.size) { throw "kasb: release archive size identity mismatch" }
   if ((Get-Item -LiteralPath $Checksums).Length -ne $ChecksumAssetMetadata.size) { throw "kasb: release checksum size identity mismatch" }
   $Line = @(Get-Content $Checksums | Where-Object { $_ -cmatch "^[0-9a-fA-F]{64}  $([regex]::Escape($Archive))$" })
@@ -749,12 +783,26 @@ try {
   $Actual = Get-Sha256Hex $ArchivePath
   if ($Actual -ne $Expected) { throw "kasb: archive checksum mismatch" }
   $Staged = Join-Path $Work $Executable
-  Extract-TarExecutable $ArchivePath $Executable $Staged ${release.archiveLimitBytes}
-  if (-not $RunningWindows) { [System.IO.File]::SetUnixFileMode($Staged, [System.IO.UnixFileMode]493) }
+  Extract-TarExecutable $ArchivePath $Executable $ArchiveEntries $Staged ${release.archiveLimitBytes}
+  if (-not $RunningWindows) {
+    $UnixFileModeType = [System.IO.File].Assembly.GetType('System.IO.UnixFileMode')
+    $SetUnixFileMode = @([System.IO.File].GetMethods() | Where-Object {
+      $_.Name -eq 'SetUnixFileMode' -and $_.GetParameters().Count -eq 2 -and $_.GetParameters()[1].ParameterType.FullName -eq 'System.IO.UnixFileMode'
+    })[0]
+    if ($null -ne $UnixFileModeType -and $null -ne $SetUnixFileMode) {
+      [void]$SetUnixFileMode.Invoke($null, @($Staged, [System.Enum]::ToObject($UnixFileModeType, 493)))
+    } else {
+      & chmod 755 $Staged
+      if ($LASTEXITCODE -ne 0) { throw "kasb: could not mark the archive executable as executable" }
+    }
+  }
+  Flush-DurableFile $Staged
   Test-BoundedExecutableIdentity $Staged "kasb $Version"
   $Digest = Get-Sha256Hex $Staged
   $ReceiptStaged = Join-Path $Work "receipt.new"
-  $ReceiptJson = [ordered]@{ schemaVersion = ${release.receiptSchemaVersion}; manager = 'standalone'; version = $Version; target = $Target; executable = [System.IO.Path]::GetFullPath($Destination); releaseRepository = $Repository; releaseTag = $Tag; assetName = $Archive; sha256 = $Digest } | ConvertTo-Json -Compress
+  $CanonicalInstallDir = (Resolve-Path -LiteralPath $InstallDir).ProviderPath
+  $CanonicalDestination = [System.IO.Path]::GetFullPath((Join-Path $CanonicalInstallDir $Executable))
+  $ReceiptJson = [ordered]@{ schemaVersion = ${release.receiptSchemaVersion}; manager = 'standalone'; version = $Version; target = $Target; executable = $CanonicalDestination; releaseRepository = $Repository; releaseTag = $Tag; assetName = $Archive; sha256 = $Digest } | ConvertTo-Json -Compress
   [System.IO.File]::WriteAllText($ReceiptStaged, $ReceiptJson + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
   Flush-DurableFile $ReceiptStaged
   $HadDestination = Test-Path -LiteralPath $Destination

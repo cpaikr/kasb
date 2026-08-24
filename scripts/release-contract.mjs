@@ -21,10 +21,12 @@ export async function loadReleaseContract() {
 
 export function deriveTarget(release, version, target) {
   const archiveName = `${release.archivePrefix}-${version}-${target.packageDirectory}.${release.archiveExtension}`;
+  const archiveEntries = release.archiveEntries.map((entry) => entry === "{executable}" ? target.cliFile : entry);
   return {
     ...target,
     releaseTarget: target.packageDirectory,
     archiveName,
+    archiveEntries,
     receiptFile: release.receiptFile,
     executableName: target.cliFile,
   };

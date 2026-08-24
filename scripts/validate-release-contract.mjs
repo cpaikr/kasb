@@ -45,6 +45,13 @@ check(contract.targets.length === 4, "release identity must cover all four suppo
 check(contract.release.repository === "cpaikr/kasb", "release repository identity must remain cpaikr/kasb");
 check(contract.release.receiptSchemaVersion === 1, "receipt schema version must remain explicit");
 check(contract.release.receiptFile === ".kasb-receipt.json", "receipt filename must remain stable");
+check(
+  JSON.stringify(contract.release.archiveEntries) === JSON.stringify(["{executable}", "LICENSE.md", "README.md", "THIRD_PARTY_LICENSES.html"]),
+  "standalone archive entries must remain one exact shared release contract",
+);
+check(new Set(contract.release.archiveEntries).size === contract.release.archiveEntries.length, "standalone archive entries must be unique");
+check(contract.release.archiveRequestTimeoutSeconds > contract.release.requestTimeoutSeconds, "archive downloads need a distinct longer transfer timeout");
+check(contract.release.transferStallTimeoutSeconds > 0, "release downloads need a positive stall timeout");
 
 for (const installer of ["installers/install.sh", "installers/install.ps1"]) {
   const text = await readFile(resolve(repositoryRoot, installer), "utf8");

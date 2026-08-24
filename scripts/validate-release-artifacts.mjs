@@ -85,7 +85,7 @@ for (const tarball of nativeTarballs) {
     throw new Error(`${pkg.name} direct CLI archive checksum differs from ${manifest.release.checksumAsset}.`);
   }
   const cliEntries = listArchive(cliArchive).sort();
-  const expectedEntries = [target.cliFile, "LICENSE.md", "README.md", "THIRD_PARTY_LICENSES.html"].sort();
+  const expectedEntries = [...target.archiveEntries].sort();
   if (JSON.stringify(cliEntries) !== JSON.stringify(expectedEntries)) {
     throw new Error(`${pkg.name} direct CLI archive has unexpected contents.`);
   }

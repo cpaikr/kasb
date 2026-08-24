@@ -136,8 +136,14 @@ fetch() {
     *) echo 'kasb: refused an invalid release URL' >&2; return 1 ;;
   esac
   curl --fail --silent --show-error --location --proto "${protocols}" --proto-redir "${protocols}" \
-    --connect-timeout 5 --max-time 15 \
+    --connect-timeout 5 --max-time "$4" \
+    --speed-limit 1 --speed-time 15 \
     --max-redirs 5 --max-filesize "$3" --output "$2" "$1"
+}
+
+sync_file() {
+  if sync -f "$1" 2>/dev/null; then return 0; fi
+  sync
 }
 
 parse_release_metadata() {
@@ -297,8 +303,10 @@ parse_release_metadata() {
 }
 
 metadata="${work}/release.json"
-fetch "${api_base}/repos/${repository}/releases/tags/${tag}" "${metadata}" 1048576
+fetch "${api_base}/repos/${repository}/releases/tags/${tag}" "${metadata}" 1048576 15
 metadata_fields=$(parse_release_metadata "${metadata}") || { echo 'kasb: release metadata is invalid JSON or has an invalid shape' >&2; exit 1; }
+# The parser emits validated integer fields for intentional positional splitting.
+# shellcheck disable=SC2086
 set -- ${metadata_fields}
 [ "$#" -eq 15 ] || { echo 'kasb: release metadata is incomplete' >&2; exit 1; }
 [ "$1" -eq 1 ] && [ "$2" -eq 1 ] || { echo 'kasb: release is not immutable' >&2; exit 1; }
@@ -319,13 +327,14 @@ case "${checksum_size}" in ''|*[!0-9]*) echo 'kasb: release checksum metadata ha
 archive_path="${work}/${archive}"
 checksums="${work}/${checksum_asset}"
 release_download="${download_base}/${repository}/releases/download/${tag}"
-fetch "${release_download}/${archive}" "${archive_path}" 134217728
-fetch "${release_download}/${checksum_asset}" "${checksums}" 1048576
+fetch "${release_download}/${archive}" "${archive_path}" 134217728 300
+fetch "${release_download}/${checksum_asset}" "${checksums}" 1048576 15
 [ "$(wc -c < "${archive_path}" | tr -d ' ')" -eq "${archive_size}" ] || { echo 'kasb: release archive size identity mismatch' >&2; exit 1; }
 [ "$(wc -c < "${checksums}" | tr -d ' ')" -eq "${checksum_size}" ] || { echo 'kasb: release checksum size identity mismatch' >&2; exit 1; }
 expected=$(awk -v name="${archive}" '$2 == name { print $1 }' "${checksums}")
 case "${expected}" in ''|*[!0-9a-fA-F]* ) echo 'kasb: invalid or missing archive checksum' >&2; exit 1 ;; esac
 [ "${#expected}" -eq 64 ] || { echo 'kasb: invalid archive checksum length' >&2; exit 1; }
+expected=$(printf '%s' "${expected}" | LC_ALL=C tr 'A-F' 'a-f')
 if command -v sha256sum >/dev/null 2>&1; then
   actual=$(sha256sum "${archive_path}" | awk '{print $1}')
 else
@@ -347,8 +356,15 @@ rm -f "${archive_pipe}"
 [ "${decompressor_ok}" -eq 1 ] || { echo 'kasb: release archive compression is invalid' >&2; exit 1; }
 staged="${work}/kasb.new"
 entry_counts=$(tar -tf "${expanded_archive}" | awk -v name="${executable}" '{ total += 1; if ($0 == name) executable += 1 } END { print total + 0, executable + 0 }')
+# The archive counter emits two integers for intentional positional splitting.
+# shellcheck disable=SC2086
 set -- ${entry_counts}
 [ "$#" -eq 2 ] && [ "$1" -eq 4 ] && [ "$2" -eq 1 ] || { echo 'kasb: archive entry set or executable identity is invalid' >&2; exit 1; }
+expected_archive_entries="${work}/expected-archive-entries"
+observed_archive_entries="${work}/observed-archive-entries"
+printf '%s\n' "${executable}" 'LICENSE.md' 'README.md' 'THIRD_PARTY_LICENSES.html' | LC_ALL=C sort > "${expected_archive_entries}"
+tar -tf "${expanded_archive}" | LC_ALL=C sort > "${observed_archive_entries}"
+cmp -s "${expected_archive_entries}" "${observed_archive_entries}" || { echo 'kasb: archive entry set or executable identity is invalid' >&2; exit 1; }
 entry_description=$(tar -tvf "${expanded_archive}" "${executable}")
 case "${entry_description}" in -*) ;; *) echo 'kasb: archive executable entry is not a regular file' >&2; exit 1 ;; esac
 tar -xOf "${expanded_archive}" "${executable}" | head -c $((expanded_limit + 1)) > "${staged}"
@@ -402,6 +418,8 @@ binary_digest=$(if command -v sha256sum >/dev/null 2>&1; then sha256sum "${stage
 escaped_destination=$(printf '%s' "${destination}" | sed 's/\\/\\\\/g; s/"/\\"/g')
 receipt_staged="${work}/receipt.new"
 printf '%s\n' '{"schemaVersion":1,"manager":"standalone","version":"'"${version}"'","target":"'"${target}"'","executable":"'"${escaped_destination}"'","releaseRepository":"'"${repository}"'","releaseTag":"'"${tag}"'","assetName":"'"${archive}"'","sha256":"'"${binary_digest}"'"}' > "${receipt_staged}"
+sync_file "${staged}"
+sync_file "${receipt_staged}"
 
 if [ -e "${destination}" ] || [ -L "${destination}" ]; then had_destination=1; fi
 if [ -e "${receipt}" ] || [ -L "${receipt}" ]; then had_receipt=1; fi

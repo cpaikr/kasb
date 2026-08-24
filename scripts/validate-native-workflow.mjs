@@ -121,10 +121,21 @@ for (const expected of ["native-*", "cli-*", "root-package"]) {
 check(
   (artifactJob?.steps ?? []).some(
     (step) => typeof step?.run === "string"
-      && step.run.includes("node scripts/write-release-checksums.mjs --ci")
-      && step.run.includes("node scripts/validate-release-artifacts.mjs --ci"),
+      && commandsInOrder(
+        step.run,
+        "node scripts/write-release-checksums.mjs --ci",
+        "node scripts/validate-release-artifacts.mjs --ci",
+      ),
   ),
   "artifact-set must generate checksums before the continuous-CI artifact validator",
+);
+check(
+  !commandsInOrder(
+    "node scripts/validate-release-artifacts.mjs --ci && node scripts/write-release-checksums.mjs --ci",
+    "node scripts/write-release-checksums.mjs --ci",
+    "node scripts/validate-release-artifacts.mjs --ci",
+  ),
+  "native workflow validator self-test accepted reversed checksum and artifact validation commands",
 );
 for (const [name, job] of [["deterministic", deterministicJob], ["root-package", jobs["root-package"]], ["artifact-set", artifactJob]]) {
   check(
@@ -155,6 +166,12 @@ function matrix(job) {
 
 function hasRun(job, command) {
   return (job?.steps ?? []).some((step) => typeof step?.run === "string" && step.run.includes(command));
+}
+
+function commandsInOrder(run, first, second) {
+  const firstIndex = run.indexOf(first);
+  const secondIndex = run.indexOf(second);
+  return firstIndex >= 0 && secondIndex >= 0 && firstIndex < secondIndex;
 }
 
 function assertConsumerMatrix(name, job) {

@@ -16,8 +16,7 @@ const packageDirectory = resolve(repositoryRoot, manifest.nativePackageRoot, tar
 const outputDirectory = resolve(repositoryRoot, process.argv[3] ?? "dist/cli");
 await mkdir(outputDirectory, { recursive: true });
 const archive = resolve(outputDirectory, target.archiveName);
-const entries = [target.cliFile, "LICENSE.md", "README.md", "THIRD_PARTY_LICENSES.html"];
-const result = spawnSync("tar", ["-czf", archive, ...entries], {
+const result = spawnSync("tar", ["--format=ustar", "-czf", archive, ...target.archiveEntries], {
   cwd: packageDirectory,
   encoding: "utf8",
 });
