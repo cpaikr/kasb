@@ -72,17 +72,17 @@
       },
       {
         "name": "install.sh",
-        "file": "dist/release/install.sh",
+        "file": "dist/installers/install.sh",
         "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       },
       {
         "name": "install.ps1",
-        "file": "dist/release/install.ps1",
+        "file": "dist/installers/install.ps1",
         "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       },
       {
         "name": "provenance.json",
-        "file": "dist/release/provenance.json",
+        "file": "dist/provenance/provenance.json",
         "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       }
     ],

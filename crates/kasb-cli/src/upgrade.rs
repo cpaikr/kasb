@@ -651,7 +651,7 @@ impl GithubReleaseSource {
     fn new(policy: &ReleasePolicy) -> Result<Self, UpgradeError> {
         #[cfg(test)]
         RELEASE_TRANSPORT_CONSTRUCTIONS.fetch_add(1, Ordering::SeqCst);
-        let latest_url = test_latest_url()?.unwrap_or_else(|| {
+        let latest_url = test_latest_url(&policy.repository)?.unwrap_or_else(|| {
             format!(
                 "https://api.github.com/repos/{}/releases/latest",
                 policy.repository
@@ -729,7 +729,7 @@ impl GithubReleaseSource {
     }
 }
 
-fn test_latest_url() -> Result<Option<String>, UpgradeError> {
+fn test_latest_url(repository: &str) -> Result<Option<String>, UpgradeError> {
     let allow = std::env::var("KASB_UPGRADE_TEST_ALLOW_NONCANONICAL_URLS").ok();
     let latest = std::env::var("KASB_UPGRADE_TEST_LATEST_URL").ok();
     if allow.is_none() && latest.is_none() {
@@ -738,7 +738,7 @@ fn test_latest_url() -> Result<Option<String>, UpgradeError> {
     if allow.as_deref() != Some("1")
         || latest
             .as_deref()
-            .is_none_or(|url| !is_loopback_test_url(url))
+            .is_none_or(|url| !is_loopback_test_url(url, repository))
     {
         return Err(UpgradeError::new(
             "upgrade_test_contract_invalid",
@@ -748,7 +748,7 @@ fn test_latest_url() -> Result<Option<String>, UpgradeError> {
     Ok(latest)
 }
 
-fn is_loopback_test_url(value: &str) -> bool {
+fn is_loopback_test_url(value: &str, repository: &str) -> bool {
     let Some(authority_and_path) = value.strip_prefix("http://127.0.0.1:") else {
         return false;
     };
@@ -758,7 +758,7 @@ fn is_loopback_test_url(value: &str) -> bool {
     !port.is_empty()
         && port.bytes().all(|byte| byte.is_ascii_digit())
         && port.parse::<u16>().is_ok_and(|port| port > 0)
-        && path == "repos/cpaikr/kasb/releases/latest"
+        && path == format!("repos/{repository}/releases/latest")
 }
 
 fn http_status_error(status: u16) -> Option<UpgradeError> {
@@ -2030,7 +2030,8 @@ mod tests {
     #[test]
     fn upgrade_test_url_is_restricted_to_the_canonical_loopback_route() {
         assert!(is_loopback_test_url(
-            "http://127.0.0.1:49152/repos/cpaikr/kasb/releases/latest"
+            "http://127.0.0.1:49152/repos/cpaikr/kasb/releases/latest",
+            "cpaikr/kasb",
         ));
         for rejected in [
             "https://127.0.0.1:49152/repos/cpaikr/kasb/releases/latest",
@@ -2040,8 +2041,15 @@ mod tests {
             "http://127.0.0.1:49152/repos/cpaikr/kasb/releases/latest/extra",
             "http://127.0.0.1:49152@evil.example/repos/cpaikr/kasb/releases/latest",
         ] {
-            assert!(!is_loopback_test_url(rejected), "accepted {rejected}");
+            assert!(
+                !is_loopback_test_url(rejected, "cpaikr/kasb"),
+                "accepted {rejected}"
+            );
         }
+        assert!(is_loopback_test_url(
+            "http://127.0.0.1:49152/repos/other/kasb/releases/latest",
+            "other/kasb",
+        ));
     }
 
     #[cfg(unix)]

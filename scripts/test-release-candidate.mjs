@@ -12,11 +12,38 @@ const identity = await canonicalCandidateIdentity({ mode: "rehearsal", ref: `ref
 const directory = await mkdtemp(join(repositoryRoot, ".release-candidate-test-"));
 
 try {
+  for (const script of ["scripts/write-release-checksums.mjs", "scripts/validate-release-artifacts.mjs"]) {
+    for (const flags of [["--candidate", "--ci"], ["--ci", "--candidate"]]) {
+      const result = spawnSync(process.execPath, [script, ...flags], { cwd: repositoryRoot, encoding: "utf8" });
+      assert.notEqual(result.status, 0, `${script} accepted mutually exclusive flags in order ${flags.join(" ")}`);
+      assert.match(result.stderr, /mutually exclusive/u);
+    }
+  }
+
   const manifest = await validManifest();
   const candidate = await validateArtifactManifest(identity, manifest);
   assert.equal(candidate.phase, "artifacts");
   assert.equal(candidate.npmPackages.length, 5);
   assert.equal(candidate.githubAssets.length, 8);
+  const contract = await loadReleaseContract();
+  const rootPackageManifest = join(contract.manifest.rootPackage, "package.json");
+  await mkdir(join(directory, contract.manifest.rootPackage), { recursive: true });
+  await writeFile(
+    join(directory, rootPackageManifest),
+    await readFile(resolve(repositoryRoot, rootPackageManifest)),
+  );
+  const rootedManifest = {
+    ...manifest,
+    githubAssets: manifest.githubAssets.map((asset) => ({
+      ...asset,
+      file: relative(directory, resolve(repositoryRoot, asset.file)),
+    })),
+    npmPackages: manifest.npmPackages.map((pkg) => ({
+      ...pkg,
+      file: relative(directory, resolve(repositoryRoot, pkg.file)),
+    })),
+  };
+  assert.equal((await validateArtifactManifest(identity, rootedManifest, directory)).phase, "artifacts");
   validatePublicationStateSource("rehearsal", { schemaVersion: 1, source: "fixture" });
   validatePublicationStateSource("strict", { schemaVersion: 1, source: "live" });
   assert.throws(() => validateCandidateVersion("1.2.3-01", "rehearsal"), /stable MAJOR\.MINOR\.PATCH/u);
@@ -85,6 +112,9 @@ try {
   const provenanceAsset = manifest.githubAssets.find(({ name }) => name === "provenance.json");
   const provenancePath = resolve(repositoryRoot, provenanceAsset.file);
   const provenance = JSON.parse(await readFile(provenancePath, "utf8"));
+  const emptyProvenancePath = join(directory, "empty-provenance.json");
+  await writeFile(emptyProvenancePath, "");
+  await assert.rejects(validateCandidateProvenance(emptyProvenancePath, identity), /provenance is empty/u);
   await writeFile(provenancePath, JSON.stringify({ ...provenance, repository: "private/fork" }));
   await assert.rejects(validateCandidateProvenance(provenancePath, identity), /repository differs/u);
   await writeFile(provenancePath, JSON.stringify(provenance));
@@ -101,6 +131,8 @@ try {
   const archiveAsset = manifest.githubAssets.find(({ name }) => name === identity.targets[0].archiveName);
   await standaloneFixture(identity.targets[0], "-----BEGIN PRIVATE KEY-----\n", resolve(repositoryRoot, archiveAsset.file));
   await assert.rejects(scanCandidateText({ githubAssets: manifest.githubAssets, npmPackages: manifest.npmPackages }), /forbidden secret/u);
+  await standaloneFixture(identity.targets[0], "", resolve(repositoryRoot, archiveAsset.file));
+  await assert.rejects(scanCandidateText({ githubAssets: manifest.githubAssets, npmPackages: manifest.npmPackages }), /README\.md is empty/u);
   await standaloneFixture(identity.targets[0], "fixture README\n", resolve(repositoryRoot, archiveAsset.file));
 
   const packageFile = resolve(repositoryRoot, manifest.npmPackages[0].file);
