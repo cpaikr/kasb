@@ -496,7 +496,7 @@ $InstallDir = if ($env:KASB_INSTALL_DIR) { $env:KASB_INSTALL_DIR } elseif ($Runn
 $Destination = Join-Path $InstallDir $Executable
 $Receipt = Join-Path $InstallDir $ReceiptName
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-$Work = Join-Path $InstallDir (".kasb-install-" + [guid]::NewGuid())
+$Work = Join-Path $InstallDir (".kasb-install." + [guid]::NewGuid())
 New-Item -ItemType Directory -Force -Path $Work | Out-Null
 $Backup = Join-Path $Work "previous-kasb"
 $ReceiptBackup = Join-Path $Work "previous-receipt"
