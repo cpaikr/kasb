@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { archiveInvocation } from "./assemble-cli-archive.mjs";
+import { localArchivePath } from "./local-archive-path.mjs";
 import { canonicalCandidateIdentity, requiredCandidateGates, validateArtifactManifest, validateCandidateVersion, validatePrebuildPublicationState, validatePublicationStateSource } from "./release-candidate-contract.mjs";
 import { scanCandidateText, scanText, validateCandidateProvenance } from "./release-candidate-inspection.mjs";
 import { checksummedReleaseAssetNames, loadReleaseContract, releaseAssetNames, repositoryRoot } from "./release-contract.mjs";
@@ -21,6 +22,11 @@ try {
   assert.equal(windowsArchive.args[2], windowsTarget.archiveName, "tar archive output must not expose a Windows drive path to remote-archive parsing");
   assert.deepEqual(windowsArchive.args.slice(3, 5), ["-C", windowsPackageDirectory], "tar must read canonical entries from the native package directory");
   assert.equal(windowsArchive.options.cwd, windowsOutputDirectory, "tar must create the archive from its output directory");
+  assert.deepEqual(
+    localArchivePath(`${windowsOutputDirectory}\\${windowsTarget.archiveName}`),
+    { directory: windowsOutputDirectory, name: windowsTarget.archiveName },
+    "tar readers must keep Windows drive paths in cwd instead of archive operands",
+  );
 
   for (const script of ["scripts/write-release-checksums.mjs", "scripts/validate-release-artifacts.mjs"]) {
     for (const flags of [["--candidate", "--ci"], ["--ci", "--candidate"]]) {
