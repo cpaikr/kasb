@@ -1,3 +1,5 @@
+import { requiredCandidateGates } from "./release-candidate-contract.mjs";
+
 const SHA256 = /^[0-9a-f]{64}$/u;
 const COMMIT = /^[0-9a-f]{40}$/u;
 const STABLE_SEMVER = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
@@ -15,6 +17,27 @@ export function validateCandidateForPublication(candidate) {
   requireObject(candidate, "candidate metadata");
   requireEqual(candidate.schemaVersion, 1, "candidate_schema", "candidate metadata schemaVersion must be 1");
   requireOneOf(candidate.mode, ["strict", "rehearsal"], "candidate_mode", "candidate mode must be strict or rehearsal");
+  requireEqual(candidate.phase, "artifacts", "candidate_phase", "publication requires an artifact-validated candidate");
+  const expectedStateSource = candidate.mode === "strict" ? "live" : "fixture";
+  requireEqual(
+    candidate.publicationStateSource,
+    expectedStateSource,
+    "candidate_publication_state_source",
+    `${candidate.mode} publication requires candidate proof from a ${expectedStateSource} publication-state snapshot`,
+  );
+  requireObject(candidate.gates, "candidate deterministic gates");
+  const candidateGateNames = new Set(Object.keys(candidate.gates));
+  const expectedGateNames = new Set(requiredCandidateGates);
+  if (
+    candidateGateNames.size !== expectedGateNames.size
+    || [...candidateGateNames].some((gate) => !expectedGateNames.has(gate))
+    || requiredCandidateGates.some((gate) => candidate.gates[gate] !== true)
+  ) {
+    fail("candidate_gates", "publication requires the exact all-passing canonical deterministic gate set", {
+      expected: [...expectedGateNames].sort(),
+      actual: [...candidateGateNames].sort(),
+    });
+  }
   requireEqual(candidate.repository, "cpaikr/kasb", "candidate_repository", "candidate repository must be cpaikr/kasb");
   if (typeof candidate.version !== "string" || !STABLE_SEMVER.test(candidate.version)) {
     fail("candidate_version", "candidate version must be stable canonical SemVer");
@@ -118,7 +141,11 @@ export function planGitHubPublication(candidateInput, state, phase = "stage") {
   requireEqual(release.tag, candidate.canonicalTag, "github_release_tag_mismatch", "GitHub Release tag differs from the candidate tag");
   requireEqual(release.targetSha, candidate.commit, "github_release_sha_mismatch", "GitHub Release target differs from the validated candidate commit");
   requireBoolean(release.draft, "GitHub release draft");
+  requireBoolean(release.prerelease, "GitHub release prerelease");
   requireBoolean(release.immutable, "GitHub release immutable");
+  if (release.prerelease) {
+    fail("github_release_prerelease", "canonical publication cannot resume, finalize, or verify a prerelease");
+  }
   if (release.draft && release.immutable) {
     fail("github_invalid_release_state", "a draft GitHub Release cannot already be immutable");
   }
@@ -201,7 +228,7 @@ export function planNpmPublication(candidateInput, state) {
     };
   });
   const ordered = [
-    ...candidate.npmPackages.filter(({ role }) => role === "native").sort(byName),
+    ...candidate.npmPackages.filter(({ role }) => role === "native"),
     ...candidate.npmPackages.filter(({ role }) => role === "root"),
   ];
   const actions = ordered
@@ -350,10 +377,6 @@ function assetDecision(asset, status, action) {
 
 function packageIdentity(pkg) {
   return `${pkg.name}@${pkg.version}`;
-}
-
-function byName(left, right) {
-  return left.name.localeCompare(right.name, "en");
 }
 
 function requireObject(value, label) {

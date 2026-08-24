@@ -80,15 +80,28 @@ the following external state rather than infer it from a passing build:
 - Repository release immutability is enabled and the publication path verifies
   the final release as immutable before npm publication. Published tags and
   assets are never moved or replaced; a correction uses a new version.
-- A dedicated protected release environment limits deployment to the canonical
-  release refs through required reviewers and deployment rules configured
-  outside the repository. The publication workflow must explicitly enter that
-  environment.
+- The `github-release` environment limits deployment to canonical release refs
+  through required reviewers and deployment rules configured outside the
+  repository. It defines `KASB_GITHUB_RELEASE_SENTINEL` with the exact value
+  `github-release:v1`; that secret must not exist at repository or organization
+  scope. It also holds environment secret `KASB_RELEASE_APP_PRIVATE_KEY` and
+  defines environment variable `KASB_RELEASE_APP_CLIENT_ID`. Those values
+  identify a GitHub App installation limited to `cpaikr/kasb`; the App has
+  repository Administration read and Contents read permissions and no write
+  permission. The workflow mints a short-lived token in the preflight and again
+  immediately before GitHub mutation, so each live state read proves repository
+  release immutability is still enabled.
+- The separate `npm-release` environment has the same reviewer and canonical
+  ref restrictions and defines environment-only secret
+  `KASB_NPM_RELEASE_SENTINEL=npm-release:v1`. Missing sentinels stop each job
+  before mutation, so GitHub's automatic creation of an unconfigured
+  environment cannot silently authorize publication.
 - npm trusted publishers are registered for the root package and each native
   package against that exact GitHub repository, the final top-level workflow
-  filename, and, when the optional npm environment field is configured, the
-  exact protected environment name used by this project. Each new registration
-  must select whether it allows `npm publish`, staged publish, or both.
+  filename `.github/workflows/release.yml`, and the exact `npm-release`
+  environment name used by this project. The environment binding is required,
+  not optional. Each new registration must select whether it allows
+  `npm publish`, staged publish, or both.
   Publication uses a GitHub-hosted runner with `id-token: write` scoped to the
   npm job and no retained npm token; the repository and package must be public
   for provenance.

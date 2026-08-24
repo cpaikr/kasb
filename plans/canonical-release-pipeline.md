@@ -74,8 +74,12 @@ artifact set.
 - Implementing the workflow does not authorize choosing a release version,
   creating or moving a tag, publishing a GitHub Release, or publishing any
   registry package.
-- Strict publication jobs require a dedicated protected environment whose
-  reviewer and deployment rules constrain authorized release refs. npm
+- Strict publication jobs require separate `github-release` and `npm-release`
+  protected environments whose reviewer and deployment rules constrain
+  authorized release refs. Environment-only sentinel secrets fail closed before
+  mutation; the GitHub environment also supplies a repository-scoped
+  Contents-read and Administration-read credential for the immutable-release
+  settings preflight. npm
   trusted-publisher registrations must bind each native package and the root
   package to the canonical repository, the exact final top-level workflow
   filename, and, when the npm registration uses its optional environment field,
@@ -106,8 +110,10 @@ artifact set.
   on every supported target.
 - Publish the staged GitHub Release and then the validated npm tarballs through
   protected release jobs with least-privilege permissions and explicit failure
-  reporting. Enable repository release immutability before release, publish the
-  draft only after every asset has been uploaded and verified, then, before npm
+  reporting. Require repository release immutability to already be enabled and
+  verify it with a short-lived, environment-protected GitHub App token holding
+  only Administration read and Contents read. Publish the draft only after
+  every asset has been uploaded and verified, then, before npm
   publication, verify `release.immutable` is true, `tag_name` is the canonical
   tag, and the tag resolves to the validated candidate commit.
 - Update release operator documentation with trusted-publisher setup,

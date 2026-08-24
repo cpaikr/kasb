@@ -31,7 +31,7 @@
     "release:check": "node scripts/validate-release-contract.mjs",
     "release:candidate": "node scripts/validate-release-candidate.mjs",
     "release:checksums": "node scripts/write-release-checksums.mjs",
-    "test:release-pipeline": "node scripts/test-release-candidate.mjs && node scripts/test-release-publication.mjs",
+    "test:release-pipeline": "node scripts/test-release-candidate.mjs && node scripts/test-release-publication.mjs && node scripts/execute-release-publication.mjs --self-test",
     "licenses:generate": "node scripts/check-third-party-licenses.mjs --write && node scripts/generate-native-packages.mjs",
     "licenses:check": "node scripts/check-third-party-licenses.mjs"
   },

@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { canonicalCandidateIdentity, requiredCandidateGates, validateArtifactManifest, validateCandidateVersion, validatePrebuildPublicationState, validatePublicationStateSource } from "./release-candidate-contract.mjs";
+import { scanCandidateText, validateCandidateProvenance } from "./release-candidate-inspection.mjs";
 import { checksummedReleaseAssetNames, loadReleaseContract, releaseAssetNames, repositoryRoot } from "./release-contract.mjs";
 
 const sha = "a".repeat(40);
@@ -23,6 +24,24 @@ try {
   assert.throws(() => validateCandidateVersion("0.2.1", "strict"), /newer than retired version/u);
   const occupied = prebuildState();
   await validatePrebuildPublicationState(identity, occupied);
+  const existingRelease = {
+    ...occupied,
+    github: {
+      ...occupied.github,
+      release: {
+        tag: identity.canonicalTag,
+        targetSha: identity.commit,
+        draft: true,
+        prerelease: false,
+        immutable: false,
+        assets: [],
+      },
+    },
+  };
+  await assert.rejects(
+    validatePrebuildPublicationState({ ...identity, mode: "strict" }, existingRelease),
+    /rerun only the failed publication job/u,
+  );
   await assert.rejects(
     validatePrebuildPublicationState(identity, {
       ...occupied,
@@ -62,6 +81,31 @@ try {
   );
   assert.throws(() => validatePublicationStateSource("rehearsal", { schemaVersion: 1, source: "live" }), /requires a fixture/u);
   assert.throws(() => validatePublicationStateSource("strict", { schemaVersion: 1, source: "fixture" }), /requires a live/u);
+
+  const provenanceAsset = manifest.githubAssets.find(({ name }) => name === "provenance.json");
+  const provenancePath = resolve(repositoryRoot, provenanceAsset.file);
+  const provenance = JSON.parse(await readFile(provenancePath, "utf8"));
+  await writeFile(provenancePath, JSON.stringify({ ...provenance, repository: "private/fork" }));
+  await assert.rejects(validateCandidateProvenance(provenancePath, identity), /repository differs/u);
+  await writeFile(provenancePath, JSON.stringify(provenance));
+
+  const installer = manifest.githubAssets.find(({ name }) => name === "install.sh");
+  await writeFile(resolve(repositoryRoot, installer.file), "-----BEGIN PRIVATE KEY-----\n");
+  await assert.rejects(scanCandidateText({ githubAssets: manifest.githubAssets, npmPackages: manifest.npmPackages }), /forbidden secret/u);
+  await writeFile(resolve(repositoryRoot, installer.file), "fixture:install.sh\n");
+
+  await writeFile(provenancePath, `${JSON.stringify({ ...provenance, repository: "-----BEGIN PRIVATE KEY-----" })}\n`);
+  await assert.rejects(scanCandidateText({ githubAssets: manifest.githubAssets, npmPackages: manifest.npmPackages }), /forbidden secret/u);
+  await writeFile(provenancePath, `${JSON.stringify(provenance)}\n`);
+
+  const archiveAsset = manifest.githubAssets.find(({ name }) => name === identity.targets[0].archiveName);
+  await standaloneFixture(identity.targets[0], "-----BEGIN PRIVATE KEY-----\n", resolve(repositoryRoot, archiveAsset.file));
+  await assert.rejects(scanCandidateText({ githubAssets: manifest.githubAssets, npmPackages: manifest.npmPackages }), /forbidden secret/u);
+  await standaloneFixture(identity.targets[0], "fixture README\n", resolve(repositoryRoot, archiveAsset.file));
+
+  const packageFile = resolve(repositoryRoot, manifest.npmPackages[0].file);
+  await npmFixture(manifest.npmPackages[0].name, "native", "npm_abcdefghijklmnopqrstuvwxyz", packageFile);
+  await assert.rejects(scanCandidateText({ githubAssets: manifest.githubAssets, npmPackages: manifest.npmPackages }), /forbidden secret/u);
 } finally {
   await rm(directory, { recursive: true, force: true });
 }
@@ -77,9 +121,32 @@ async function validManifest() {
     npmPackages.push(await npmFixture(name, role));
   }
   const contract = await loadReleaseContract();
-  const githubNames = releaseAssetNames(contract).filter((name) => name !== contract.release.checksumAsset);
   const githubAssets = [];
-  for (const name of githubNames) githubAssets.push(await fixtureFile(name, { name }));
+  for (const target of identity.targets) {
+    const path = join(directory, target.archiveName);
+    await standaloneFixture(target, "fixture README\n", path);
+    githubAssets.push(fileDescriptor(path, { name: target.archiveName }, await readFile(path)));
+  }
+  for (const name of [contract.release.shellInstallerAsset, contract.release.powershellInstallerAsset]) {
+    githubAssets.push(await fixtureFile(name, { name }));
+  }
+  const provenance = {
+    schemaVersion: 1,
+    repository: identity.repository,
+    version: identity.version,
+    sourceRef: identity.sourceRef,
+    commit: identity.commit,
+    toolchain: contract.release.toolchain,
+    targets: contract.targets.map((target) => ({
+      rustTarget: target.rustTarget,
+      releaseTarget: target.releaseTarget,
+      packageName: target.packageName,
+      archiveName: target.archiveName,
+      runner: { label: target.releaseRunner, os: "fixture-os", arch: "fixture-arch" },
+      buildImage: target.buildContainer ?? null,
+    })),
+  };
+  githubAssets.push(await fixtureFile(contract.release.provenanceAsset, { name: contract.release.provenanceAsset }, `${JSON.stringify(provenance)}\n`));
   const checksumBody = `${checksummedReleaseAssetNames(contract)
     .map((name) => `${githubAssets.find((asset) => asset.name === name).sha256}  ${name}`)
     .join("\n")}\n`;
@@ -104,15 +171,29 @@ async function fixtureFile(name, fields, contents = `fixture:${name}\n`) {
   return fileDescriptor(path, fields, bytes);
 }
 
-async function npmFixture(name, role) {
+async function npmFixture(name, role, marker = undefined, destination = undefined) {
   const slug = name.replace(/[^a-z0-9]+/giu, "-");
   const source = join(directory, `${slug}-source`);
   await mkdir(join(source, "package"), { recursive: true });
   await writeFile(join(source, "package", "package.json"), `${JSON.stringify({ name, version: identity.version })}\n`);
-  const path = join(directory, `${slug}.tgz`);
+  if (marker) await writeFile(join(source, "package", "README.md"), marker);
+  const path = destination ?? join(directory, `${slug}.tgz`);
   const packed = spawnSync("tar", ["-czf", path, "-C", source, "package"], { encoding: "utf8" });
   assert.equal(packed.status, 0, packed.stderr);
   return fileDescriptor(path, { name, version: identity.version, role }, await readFile(path));
+}
+
+async function standaloneFixture(target, readme, path) {
+  const source = join(directory, `${target.releaseTarget}-archive`);
+  await rm(source, { recursive: true, force: true });
+  await mkdir(source, { recursive: true });
+  const executable = target.rustTarget.includes("windows") ? "kasb.exe" : "kasb";
+  await writeFile(join(source, executable), Buffer.from([0, 1, 2, 3]));
+  await writeFile(join(source, "LICENSE.md"), "fixture license\n");
+  await writeFile(join(source, "README.md"), readme);
+  await writeFile(join(source, "THIRD_PARTY_LICENSES.html"), "fixture notices\n");
+  const packed = spawnSync("tar", ["-czf", path, "-C", source, executable, "LICENSE.md", "README.md", "THIRD_PARTY_LICENSES.html"], { encoding: "utf8" });
+  assert.equal(packed.status, 0, packed.stderr);
 }
 
 function fileDescriptor(path, fields, bytes) {

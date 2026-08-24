@@ -19,32 +19,46 @@ async function main() {
   const output = resolve(repositoryRoot, options.output ?? "dist/release/publication-state.json");
   const temporary = await mkdtemp(join(tmpdir(), "kasb-publication-state-"));
   try {
-    const github = await githubSnapshot(contract, tag, commit, temporary);
-    const npm = await npmSnapshot(contract, temporary);
+    const github = await githubSnapshot(contract, tag, commit, temporary, options);
+    const snapshot = { schemaVersion: 1, source: "live", github };
+    if (options["github-only"] !== "true") snapshot.npm = await npmSnapshot(contract, temporary);
     await mkdir(dirname(output), { recursive: true });
-    await writeFile(output, `${JSON.stringify({ schemaVersion: 1, source: "live", github, npm }, null, 2)}\n`);
+    await writeFile(output, `${JSON.stringify(snapshot, null, 2)}\n`);
     console.log(`captured read-only publication state for ${tag}`);
   } finally {
     await rm(temporary, { recursive: true, force: true });
   }
 }
 
-async function githubSnapshot(contract, tag, expectedCommit, directory) {
+async function githubSnapshot(contract, tag, expectedCommit, directory, options) {
   const { release, repository } = contract;
   const limits = commandLimits(release);
   const repositoryResponse = await command("gh", ["api", `repos/${repository}`], limits);
   const repositoryMetadata = JSON.parse(repositoryResponse.stdout);
   if (repositoryMetadata.private !== false) throw new Error("canonical release repository must be public before strict publication");
-  const immutableResponse = await command("gh", ["api", `repos/${repository}/immutable-releases`], limits);
-  const immutableSettings = JSON.parse(immutableResponse.stdout);
-  if (immutableSettings.enabled !== true) throw new Error("canonical repository must enable immutable releases before strict publication");
+  let immutableReleases;
+  if (options["verify-immutable-release-only"] === "true") {
+    immutableReleases = undefined;
+  } else {
+    const immutableResponse = await command("gh", ["api", `repos/${repository}/immutable-releases`], limits);
+    const immutableSettings = JSON.parse(immutableResponse.stdout);
+    if (immutableSettings.enabled !== true) throw new Error("canonical repository must enable immutable releases before strict publication");
+    immutableReleases = true;
+  }
   const tagSha = await resolveRemoteTag(repository, tag, limits);
   if (tagSha !== expectedCommit) throw new Error("remote release tag does not peel to the requested candidate commit");
   const response = await command("gh", ["api", `repos/${repository}/releases/tags/${tag}`], { ...limits, allowNotFound: true });
   if (response.notFound) {
+    if (immutableReleases !== true) throw new Error("release-only immutability verification requires an existing published immutable release");
     return { schemaVersion: 1, repository, repositoryPrivate: false, immutableReleases: true, tag, tagSha, release: null };
   }
   const published = JSON.parse(response.stdout);
+  if (immutableReleases === undefined) {
+    if (published.draft === true || published.immutable !== true) {
+      throw new Error("release-only immutability verification requires the exact published release to be immutable");
+    }
+    immutableReleases = true;
+  }
   const expectedAssets = new Set(releaseAssetNames(contract));
   if ((published.assets ?? []).length > expectedAssets.size) throw new Error("GitHub Release contains more assets than the canonical candidate allows");
   const assets = [];
@@ -72,13 +86,14 @@ async function githubSnapshot(contract, tag, expectedCommit, directory) {
     schemaVersion: 1,
     repository,
     repositoryPrivate: false,
-    immutableReleases: true,
+    immutableReleases,
     tag,
     tagSha,
     release: {
       tag: published.tag_name,
       targetSha: tagSha,
       draft: published.draft,
+      prerelease: published.prerelease,
       immutable: published.immutable === true,
       assets,
     },
@@ -250,11 +265,12 @@ function parseOptions(args) {
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index];
     const value = args[index + 1];
-    if (!["--commit", "--output"].includes(name) || value === undefined) {
-      throw new Error("Usage: node scripts/capture-release-publication-state.mjs --commit <sha> [--output <path>]");
+    if (!["--commit", "--output", "--github-only", "--verify-immutable-release-only"].includes(name) || value === undefined) {
+      throw new Error("Usage: node scripts/capture-release-publication-state.mjs --commit <sha> [--output <path>] [--github-only true | --verify-immutable-release-only true]");
     }
     result[name.slice(2)] = value;
   }
+  if (result["github-only"] !== undefined && result["github-only"] !== "true") throw new Error("--github-only only accepts true");
   return result;
 }
 

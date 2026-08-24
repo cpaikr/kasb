@@ -19,10 +19,18 @@ if (!target) throw new Error(`Unknown native target: ${rustTarget}`);
 assert.equal(process.platform, target.npmPlatform, `candidate runner platform must be ${target.npmPlatform}`);
 assert.equal(process.arch, target.npmArch, `candidate runner architecture must be ${target.npmArch}`);
 
-const archive = await resolveArchive(process.argv[3] ?? "dist/cli");
+const candidateRoot = resolve(repositoryRoot, process.argv[3] ?? "dist");
+const archive = await resolveArchive(resolve(candidateRoot, "cli"));
 const archiveBytes = await readFile(archive);
 const archiveDigest = sha256(archiveBytes);
-const checksums = Buffer.from(`${archiveDigest}  ${target.archiveName}\n`);
+const checksums = await readFile(resolve(candidateRoot, "cli", contract.release.checksumAsset));
+const candidate = JSON.parse(await readFile(resolve(candidateRoot, "release", contract.release.candidateReceiptFile), "utf8"));
+assert.equal(candidate.version, contract.version);
+assert.equal(
+  candidate.commit,
+  process.env.KASB_CANDIDATE_SHA ?? process.env.GITHUB_SHA,
+  "candidate receipt must bind the checked-out commit",
+);
 const tag = releaseTag(contract.release, contract.version);
 const requests = [];
 const metadata = Buffer.from(JSON.stringify({
@@ -31,8 +39,12 @@ const metadata = Buffer.from(JSON.stringify({
   draft: false,
   prerelease: false,
   assets: [
-    releaseAsset(target.archiveName, archiveBytes, archiveDigest),
-    releaseAsset(contract.release.checksumAsset, checksums, sha256(checksums)),
+    ...candidate.githubAssets.map(({ name, size, sha256: digest }) => ({
+      name,
+      size,
+      digest: `sha256:${digest}`,
+      browser_download_url: `https://github.com/${contract.release.repository}/releases/download/${tag}/${name}`,
+    })),
   ],
 }));
 const routes = new Map([
@@ -75,9 +87,10 @@ try {
     KASB_INSTALLER_TEST_ALLOW_NONCANONICAL_URLS: "1",
     KASB_INSTALL_DIR: installDirectory,
   };
+  const installerPath = resolve(candidateRoot, "installers", process.platform === "win32" ? contract.release.powershellInstallerAsset : contract.release.shellInstallerAsset);
   const installer = process.platform === "win32"
-    ? await run("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", resolve(repositoryRoot, "installers/install.ps1")], { env: installerEnvironment })
-    : await run("sh", [resolve(repositoryRoot, "installers/install.sh")], { env: installerEnvironment });
+    ? await run("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", installerPath], { env: installerEnvironment })
+    : await run("sh", [installerPath], { env: installerEnvironment });
   assertProcessSucceeded(installer, `${process.platform === "win32" ? "PowerShell" : "shell"} candidate installer`);
 
   const exactExecutable = resolve(extracted, target.executableName);
@@ -91,7 +104,8 @@ try {
   assert.deepEqual(installedExecutableBytes, exactExecutableBytes, "installer must preserve the exact candidate executable bytes");
 
   const receiptPath = resolve(installDirectory, contract.release.receiptFile);
-  const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+  const receiptBytes = await readFile(receiptPath);
+  const receipt = JSON.parse(receiptBytes.toString("utf8"));
   assert.deepEqual(Object.keys(receipt).sort(), [
     "assetName", "executable", "manager", "releaseRepository", "releaseTag", "schemaVersion", "sha256", "target", "version",
   ].sort(), "candidate receipt field set drifted");
@@ -134,6 +148,8 @@ try {
     releaseRepository: contract.release.repository,
     target: target.releaseTarget,
   });
+  assert.deepEqual(await readFile(installedExecutable), installedExecutableBytes, "same-version upgrade check must not change the managed binary");
+  assert.deepEqual(await readFile(receiptPath), receiptBytes, "same-version upgrade check must not change the managed receipt");
 
   for (const requiredPath of routes.keys()) {
     assert(requests.includes(requiredPath), `candidate consumer did not exercise ${requiredPath}`);
@@ -142,15 +158,6 @@ try {
 } finally {
   await new Promise((closed) => server.close(closed));
   await rm(temporary, { recursive: true, force: true });
-}
-
-function releaseAsset(name, bytes, digest) {
-  return {
-    name,
-    size: bytes.length,
-    digest: `sha256:${digest}`,
-    browser_download_url: `https://github.com/${contract.release.repository}/releases/download/${tag}/${name}`,
-  };
 }
 
 async function resolveArchive(input) {

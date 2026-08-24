@@ -50,6 +50,16 @@ const expectedChecksums = candidate
 if (JSON.stringify([...checksums.keys()].sort()) !== JSON.stringify([...expectedChecksums].sort())) {
   throw new Error(`Expected the exact ${candidate ? "publishable candidate asset" : "standalone archive"} checksum set.`);
 }
+if (candidate) {
+  for (const name of [manifest.release.shellInstallerAsset, manifest.release.powershellInstallerAsset]) {
+    const bytes = await readFile(resolve(repositoryRoot, "dist/installers", name));
+    if (checksums.get(name) !== hash(bytes)) throw new Error(`${name} checksum differs from ${manifest.release.checksumAsset}.`);
+  }
+  const provenance = await readFile(resolve(repositoryRoot, "dist/provenance", manifest.release.provenanceAsset));
+  if (checksums.get(manifest.release.provenanceAsset) !== hash(provenance)) {
+    throw new Error(`${manifest.release.provenanceAsset} checksum differs from ${manifest.release.checksumAsset}.`);
+  }
+}
 
 const seen = new Set();
 for (const tarball of nativeTarballs) {
@@ -147,7 +157,7 @@ if (!isExecutableMode(tarballMode(rootTarball, "package/dist/cli.js"))) {
   throw new Error("Root launcher is not executable in the npm tarball.");
 }
 
-console.log(`${ciOnly ? "continuous-CI" : "complete"} native artifact set passed for ${root.name}@${root.version}`);
+console.log(`${ciOnly ? "continuous-CI" : candidate ? "complete candidate" : "complete"} native artifact set passed for ${root.name}@${root.version}`);
 
 async function tarballs(directory) {
   return (await readdir(directory, { withFileTypes: true }))

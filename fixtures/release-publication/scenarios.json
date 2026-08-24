@@ -2,6 +2,21 @@
   "candidate": {
     "schemaVersion": 1,
     "mode": "rehearsal",
+    "phase": "artifacts",
+    "publicationStateSource": "fixture",
+    "gates": {
+      "contracts": true,
+      "generated": true,
+      "licenses": true,
+      "typecheck": true,
+      "tests": true,
+      "conformance": true,
+      "build": true,
+      "rustfmt": true,
+      "clippy": true,
+      "nativeArtifacts": true,
+      "cleanConsumers": true
+    },
     "repository": "cpaikr/kasb",
     "version": "1.2.3",
     "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

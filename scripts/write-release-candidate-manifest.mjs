@@ -54,7 +54,7 @@ console.log(`wrote canonical release artifact manifest to ${output}`);
 
 function parseArgs(args) {
   let sha;
-  let output = "dist/release/artifact-manifest.json";
+  let output = "dist/release/candidate.json";
   for (let index = 0; index < args.length; index += 2) {
     const flag = args[index];
     const value = args[index + 1];

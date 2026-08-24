@@ -13,6 +13,7 @@ import {
   validatePublicationStateSnapshot,
 } from "./release-publication-contract.mjs";
 import { executeGitHubPublication, executeNpmPublication } from "./release-publication.mjs";
+import { requiredCandidateGates } from "./release-candidate-contract.mjs";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const fixture = JSON.parse(await readFile(resolve(repositoryRoot, "fixtures/release-publication/scenarios.json"), "utf8"));
@@ -25,17 +26,27 @@ assert.equal(initial.npm.mutationAllowed, false);
 assert.deepEqual(initial.github.actions.map(({ type }) => type), ["createDraft", ...Array(8).fill("uploadAsset")]);
 assert.deepEqual(initial.npm.actions.map(({ role }) => role), ["native", "native", "native", "native", "root"]);
 assert.deepEqual(initial.npm.actions.map(({ name }) => name), [
-  "@sjunepark/kasb-darwin-arm64",
-  "@sjunepark/kasb-linux-arm64-gnu",
   "@sjunepark/kasb-linux-x64-gnu",
+  "@sjunepark/kasb-linux-arm64-gnu",
+  "@sjunepark/kasb-darwin-arm64",
   "@sjunepark/kasb-win32-x64-msvc",
   "@sjunepark/kasb",
 ]);
 assert.equal(initial.npm.rootGate.status, "afterNativePublication");
+expectCode(() => planGitHubPublication({ ...candidate, phase: "identity" }, vacant.github), "candidate_phase");
+expectCode(() => planGitHubPublication({
+  ...candidate,
+  gates: { ...candidate.gates, tests: false },
+}, vacant.github), "candidate_gates");
+expectCode(() => planGitHubPublication({
+  ...candidate,
+  publicationStateSource: "live",
+}, vacant.github), "candidate_publication_state_source");
 expectCode(() => validatePublicationStateSnapshot({
   ...candidate,
   mode: "strict",
   sourceRef: `refs/tags/${candidate.canonicalTag}`,
+  publicationStateSource: "live",
 }, vacant), "snapshot_source");
 expectCode(() => planGitHubPublication({ ...candidate, repository: "other/repository" }, vacant.github), "candidate_repository");
 expectCode(() => planGitHubPublication({
@@ -94,11 +105,18 @@ const githubRerun = planGitHubPublication(candidate, immutablePublished, "verify
 assert.equal(githubRerun.status, "published");
 assert.deepEqual(githubRerun.actions, []);
 assert(githubRerun.assets.every(({ status, action }) => status === "exact" && action === "skip"));
+expectCode(() => planGitHubPublication(candidate, githubState({
+  draft: false,
+  prerelease: true,
+  immutable: true,
+  assets: candidate.githubAssets.map(publishedAsset),
+}), "verify"), "github_release_prerelease");
 
 const strictCandidate = {
   ...candidate,
   mode: "strict",
   sourceRef: `refs/tags/${candidate.canonicalTag}`,
+  publicationStateSource: "live",
 };
 const strictPublished = {
   schemaVersion: 1,
@@ -156,7 +174,7 @@ const npmResume = planNpmPublication(candidate, partialNpm);
 assert.equal(npmResume.status, "partial");
 assert.equal(npmResume.classifications.find(({ name }) => name === firstNative.name).action, "skip");
 assert.deepEqual(npmResume.actions.map(({ name }) => name), [
-  ...[secondNative, ...otherNatives].sort((left, right) => left.name.localeCompare(right.name, "en")).map(({ name }) => name),
+  ...candidate.npmPackages.filter(({ role, name }) => role === "native" && name !== firstNative.name).map(({ name }) => name),
   rootPackage.name,
 ]);
 assert.equal(npmResume.rootGate.status, "afterNativePublication");
@@ -212,7 +230,10 @@ await testGuardedExecutionAdapters();
 console.log("release publication failure injection passed for safe GitHub and npm reruns");
 
 function githubState(release) {
-  return { ...vacant.github, release: { tag: candidate.canonicalTag, targetSha: candidate.commit, ...release } };
+  return {
+    ...vacant.github,
+    release: { tag: candidate.canonicalTag, targetSha: candidate.commit, prerelease: false, ...release },
+  };
 }
 
 function npmState(packages) {
@@ -294,17 +315,27 @@ async function testGuardedExecutionAdapters() {
   const built = strictCandidateFixture();
   const strict = built.candidate;
 
-  // Every possible post-upload interruption is resumable: the subsequent run
-  // observes exact bytes and uploads only the remaining assets.
+  // Every possible post-upload response loss is reconciled in the same run by
+  // observing the exact uploaded bytes.
   for (let failAfterUpload = 1; failAfterUpload <= strict.githubAssets.length; failAfterUpload += 1) {
     const adapter = githubAdapter(strict, built.files, { failAfterUpload });
-    await assert.rejects(executeGitHubPublication(strict, adapter), /injected upload interruption/u);
-    adapter.failAfterUpload = undefined;
     const resumed = await executeGitHubPublication(strict, adapter);
     assert.equal(resumed.ok, true);
     assert.equal(resumed.immutable, true);
+    assert(resumed.operations.some(({ status }) => status === "skippedExactRace"));
     assert.equal(adapter.state.release.assets.length, strict.githubAssets.length);
     assert.equal(new Set(adapter.state.release.assets.map(({ name }) => name)).size, strict.githubAssets.length);
+  }
+
+  // A failure before the remote state changes remains externally visible, and
+  // the next run resumes from the exact partial draft.
+  for (let failBeforeUpload = 1; failBeforeUpload <= strict.githubAssets.length; failBeforeUpload += 1) {
+    const adapter = githubAdapter(strict, built.files, { failBeforeUpload });
+    await assert.rejects(executeGitHubPublication(strict, adapter), /injected pre-upload interruption/u);
+    adapter.failBeforeUpload = undefined;
+    const resumed = await executeGitHubPublication(strict, adapter);
+    assert.equal(resumed.ok, true);
+    assert.equal(resumed.immutable, true);
   }
 
   const exactGithub = githubAdapter(strict, built.files);
@@ -333,14 +364,19 @@ async function testGuardedExecutionAdapters() {
   rootFailure.failRoot = false;
   assert.equal((await executeNpmPublication(strict, immutableReceipt, rootFailure)).ok, true);
 
-  const raced = npmAdapter(built.files, { raceIdentity: identity(strict.npmPackages[0]), raceBytes: "exact" });
+  const raced = npmAdapter(built.files, { raceIdentity: identity(strict.npmPackages[0]), raceBytes: "exact", ambiguousFailure: true });
   const raceReceipt = await executeNpmPublication(strict, immutableReceipt, raced);
   assert(raceReceipt.operations.some(({ status }) => status === "skippedExactRace"));
   const mismatchedRace = npmAdapter(built.files, { raceIdentity: identity(strict.npmPackages[0]), raceBytes: "mismatch" });
   await assert.rejects(executeNpmPublication(strict, immutableReceipt, mismatchedRace), hasCode("npm_digest_mismatch"));
 
   await assert.rejects(executeNpmPublication(strict, { ...immutableReceipt, immutable: false }, npmAdapter(built.files)), hasCode("npm_github_gate"));
-  await assert.rejects(executeNpmPublication({ ...strict, mode: "rehearsal", sourceRef: `refs/kasb-rehearsal/${strict.commit}` }, immutableReceipt, npmAdapter(built.files)), hasCode("publication_rehearsal"));
+  await assert.rejects(executeNpmPublication({
+    ...strict,
+    mode: "rehearsal",
+    sourceRef: `refs/kasb-rehearsal/${strict.commit}`,
+    publicationStateSource: "fixture",
+  }, immutableReceipt, npmAdapter(built.files)), hasCode("publication_rehearsal"));
 }
 
 function strictCandidateFixture() {
@@ -375,6 +411,9 @@ function strictCandidateFixture() {
     candidate: {
       schemaVersion: 1,
       mode: "strict",
+      phase: "artifacts",
+      publicationStateSource: "live",
+      gates: Object.fromEntries(requiredCandidateGates.map((gate) => [gate, true])),
       repository: "cpaikr/kasb",
       version,
       canonicalTag: `v${version}`,
@@ -400,15 +439,17 @@ function githubAdapter(candidate, files, options = {}) {
     },
     files,
     failAfterUpload: options.failAfterUpload,
+    failBeforeUpload: options.failBeforeUpload,
     uploads: 0,
     async readState() { return structuredClone(this.state); },
     async readCandidateFile(path) { return this.files.get(path); },
     async createDraft({ tag, targetSha }) {
-      this.state.release = { tag, targetSha, draft: true, immutable: false, assets: [] };
+      this.state.release = { tag, targetSha, draft: true, prerelease: false, immutable: false, assets: [] };
     },
     async uploadAsset({ name, bytes }) {
-      this.state.release.assets.push({ name, sha256: sha(bytes) });
       this.uploads += 1;
+      if (this.uploads === this.failBeforeUpload) throw new Error("injected pre-upload interruption");
+      this.state.release.assets.push({ name, sha256: sha(bytes) });
       if (this.uploads === this.failAfterUpload) throw new Error("injected upload interruption");
     },
     async publishDraft() {
@@ -423,6 +464,7 @@ function completeRelease(candidate, immutable) {
     tag: candidate.canonicalTag,
     targetSha: candidate.commit,
     draft: false,
+    prerelease: false,
     immutable,
     assets: candidate.githubAssets.map(({ name, sha256 }) => ({ name, sha256 })),
   };
@@ -436,6 +478,7 @@ function npmAdapter(files, options = {}) {
     failRoot: options.failRoot,
     raceIdentity: options.raceIdentity,
     raceBytes: options.raceBytes,
+    ambiguousFailure: options.ambiguousFailure,
     async readCandidateFile(path) { return this.files.get(path); },
     async inspectPackage(pkg) {
       const bytes = this.registry.get(identity(pkg));
@@ -446,8 +489,8 @@ function npmAdapter(files, options = {}) {
       if (this.raceIdentity === key) {
         this.registry.set(key, this.raceBytes === "exact" ? pkg.bytes : Buffer.from("different registry bytes"));
         this.raceIdentity = undefined;
-        const error = new Error("publish conflict");
-        error.code = "E409";
+        const error = new Error(this.ambiguousFailure ? "publish response timed out" : "publish conflict");
+        if (!this.ambiguousFailure) error.code = "E409";
         throw error;
       }
       if (pkg.role === "root" && this.failRoot) throw new Error("injected root failure");

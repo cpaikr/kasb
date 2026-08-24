@@ -14,6 +14,11 @@
     "powershellInstallerAsset": "install.ps1",
     "provenanceAsset": "provenance.json",
     "candidateReceiptFile": "candidate.json",
+    "toolchain": {
+      "rust": "1.88.0",
+      "node": "24",
+      "npm": "11.6.2"
+    },
     "receiptFile": ".kasb-receipt.json",
     "receiptSchemaVersion": 1,
     "metadataLimitBytes": 1048576,

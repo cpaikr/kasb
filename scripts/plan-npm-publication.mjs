@@ -12,7 +12,7 @@ let outputPath = resolve(repositoryRoot, "dist/release/npm-publication-plan.json
 try {
   const options = parseOptions(process.argv.slice(2));
   outputPath = resolve(repositoryRoot, options.output ?? "dist/release/npm-publication-plan.json");
-  const candidatePath = resolve(repositoryRoot, options.candidate ?? "dist/release/candidate-metadata.json");
+  const candidatePath = resolve(repositoryRoot, options.candidate ?? "dist/release/candidate.json");
   const statePath = resolve(repositoryRoot, required(options.state, "--state is required"));
   const candidate = await readJson(candidatePath);
   const snapshot = await readJson(statePath);

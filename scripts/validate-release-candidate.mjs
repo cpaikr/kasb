@@ -32,7 +32,7 @@ await writeFile(output, `${JSON.stringify(candidate, null, 2)}\n`);
 console.log(`${identity.mode} ${candidate.phase} candidate metadata is valid at ${options.output}`);
 
 function parseArgs(args) {
-  const parsed = { output: "dist/release/candidate-metadata.json", skipCheckoutValidation: false };
+  const parsed = { output: "dist/release/candidate.json", skipCheckoutValidation: false };
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index];
     if (flag === "--skip-checkout-validation") {

@@ -19,6 +19,8 @@ inputs:
   build_image:
     required: false
     default: ""
+  validation_node_versions:
+    required: true
 
 runs:
   using: composite
@@ -57,21 +59,16 @@ runs:
       with:
         name: ${{ inputs.root_artifact }}
         path: dist/root
-    - name: Exercise exact standalone candidate installation and upgrade contract
-      shell: bash
-      run: |
-        set -euo pipefail
-        node scripts/test-release-candidate-consumer.mjs "${{ inputs.rust_target }}" dist/cli
     - name: Exercise clean consumers on Node 20.18.1 through 26
       shell: bash
       run: |
         set -euo pipefail
-        for node_version in 20.18.1 21 22 23 24 25 26; do
+        while IFS= read -r node_version; do
           archive=()
           [[ "$node_version" != 24 ]] || archive=(dist/cli)
           npx --yes --package "node@$node_version" node scripts/test-native-consumer.mjs \
             "${{ inputs.rust_target }}" dist/root dist/native "${archive[@]}"
-        done
+        done < <(node -e 'for (const version of JSON.parse(process.argv[1])) console.log(version)' '${{ inputs.validation_node_versions }}')
     - name: Record bounded target provenance
       shell: bash
       run: |

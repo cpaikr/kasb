@@ -19,21 +19,39 @@ export async function executeGitHubPublication(candidateInput, adapter) {
       if (plan.actions.length === 0) break;
       const [action] = plan.actions;
       if (action.type === "createDraft") {
-        await adapter.createDraft({ tag: action.tag, targetSha: action.targetSha });
-        receipt.operations.push({ type: "createDraft", status: "completed", tag: action.tag });
+        try {
+          await adapter.createDraft({ tag: action.tag, targetSha: action.targetSha });
+          receipt.operations.push({ type: "createDraft", status: "completed", tag: action.tag });
+        } catch (error) {
+          const raced = planGitHubPublication(candidate, await adapter.readState(), "stage");
+          if (raced.actions.some(({ type }) => type === "createDraft")) throw error;
+          receipt.operations.push({ type: "createDraft", status: "skippedExactRace", tag: action.tag });
+        }
         continue;
       }
       if (action.type !== "uploadAsset") fail("github_unexpected_action", `unexpected GitHub action ${action.type}`);
       const artifact = candidate.githubAssets.find(({ name }) => name === action.name);
       const bytes = await verifiedCandidateBytes(adapter, artifact);
-      await adapter.uploadAsset({ ...artifact, bytes });
-      receipt.operations.push({ type: "uploadAsset", status: "completed", name: artifact.name, sha256: artifact.sha256 });
+      try {
+        await adapter.uploadAsset({ ...artifact, bytes });
+        receipt.operations.push({ type: "uploadAsset", status: "completed", name: artifact.name, sha256: artifact.sha256 });
+      } catch (error) {
+        const raced = planGitHubPublication(candidate, await adapter.readState(), "stage");
+        if (raced.actions.some(({ type, name }) => type === "uploadAsset" && name === artifact.name)) throw error;
+        receipt.operations.push({ type: "uploadAsset", status: "skippedExactRace", name: artifact.name, sha256: artifact.sha256 });
+      }
     }
 
     const finalization = planGitHubPublication(candidate, await adapter.readState(), "finalize");
     if (finalization.actions.length === 1) {
-      await adapter.publishDraft({ tag: candidate.canonicalTag });
-      receipt.operations.push({ type: "publishDraft", status: "completed", tag: candidate.canonicalTag });
+      try {
+        await adapter.publishDraft({ tag: candidate.canonicalTag });
+        receipt.operations.push({ type: "publishDraft", status: "completed", tag: candidate.canonicalTag });
+      } catch (error) {
+        const raced = planGitHubPublication(candidate, await adapter.readState(), "verify");
+        if (raced.status !== "published") throw error;
+        receipt.operations.push({ type: "publishDraft", status: "skippedExactRace", tag: candidate.canonicalTag });
+      }
     } else if (finalization.actions.length !== 0) {
       fail("github_finalize_actions", "GitHub finalization produced an invalid action set");
     }
@@ -72,8 +90,13 @@ export async function executeNpmPublication(candidateInput, githubReceipt, adapt
         await adapter.publishPackage({ ...pkg, bytes }, { access: "public", provenance: true });
         receipt.operations.push({ type: "publishPackage", status: "completed", name: pkg.name, version: pkg.version, role: pkg.role });
       } catch (error) {
-        if (!adapter.isConflict?.(error)) throw error;
-        const raced = await inspectOne(pkg, adapter, maxRegistryTarballBytes);
+        let raced;
+        try {
+          raced = await inspectOne(pkg, adapter, maxRegistryTarballBytes);
+        } catch {
+          throw error;
+        }
+        if (raced.state === "vacant") throw error;
         if (raced.state !== "published" || raced.sha256 !== pkg.sha256) npmMismatch(pkg, raced.sha256);
         receipt.operations.push({ type: "publishPackage", status: "skippedExactRace", name: pkg.name, version: pkg.version });
       }

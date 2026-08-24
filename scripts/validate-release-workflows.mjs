@@ -1,7 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-
 import { parseDocument } from "yaml";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -9,161 +8,124 @@ const manifest = JSON.parse(await readFile(resolve(root, "native-targets.json"),
 const candidateText = await readFile(resolve(root, ".github/workflows/candidate.yml"), "utf8");
 const releaseText = await readFile(resolve(root, ".github/workflows/release.yml"), "utf8");
 const actionText = await readFile(resolve(root, ".github/actions/build-release-target/action.yml"), "utf8");
-const candidateConsumerText = await readFile(resolve(root, "scripts/test-release-candidate-consumer.mjs"), "utf8");
+const consumerText = await readFile(resolve(root, "scripts/test-release-candidate-consumer.mjs"), "utf8");
+const executorText = await readFile(resolve(root, "scripts/execute-release-publication.mjs"), "utf8");
+const candidateContractText = await readFile(resolve(root, "scripts/release-candidate-contract.mjs"), "utf8");
 const candidate = parse("candidate.yml", candidateText);
 const release = parse("release.yml", releaseText);
 const action = parse("build-release-target/action.yml", actionText);
 const failures = [];
 
-check(candidate.permissions?.contents === "read", "candidate workflow must have read-only top-level permissions");
-check(!candidate.on?.pull_request_target, "candidate workflow must never use pull_request_target");
-check(Boolean(candidate.on?.pull_request), "candidate workflow must run an exact non-publishing PR rehearsal");
-check(Boolean(candidate.on?.workflow_call), "candidate workflow must be reusable by the strict tag caller");
-check(Object.hasOwn(candidate.on ?? {}, "workflow_dispatch"), "candidate workflow must support an explicit rehearsal dispatch");
-check(candidate.concurrency?.["cancel-in-progress"] === false, "candidate workflow must not cancel an in-flight immutable build");
+check(candidate.permissions?.contents === "read", "candidate workflow must be read-only");
+check(Object.hasOwn(candidate.on ?? {}, "pull_request"), "candidate must run a non-publishing PR rehearsal");
+for (const requiredPath of [".github/actions/build-release-target/**", "crates/**", "packages/**", "README.md", "LICENSE.md", "THIRD_PARTY_LICENSES.html"]) {
+  check(!candidate.on.pull_request?.paths || candidate.on.pull_request.paths.includes(requiredPath), `candidate PR trigger must include ${requiredPath}`);
+}
+check(Object.hasOwn(candidate.on ?? {}, "workflow_call") && Object.hasOwn(candidate.on ?? {}, "workflow_dispatch"), "candidate must support strict reuse and manual rehearsal");
+check(!candidate.on?.pull_request_target, "candidate must never use pull_request_target");
+check(candidate.concurrency?.["cancel-in-progress"] === false, "candidate builds must not be cancelled in flight");
 
 const jobs = candidate.jobs ?? {};
 check(needs(jobs.deterministic, ["metadata"]), "deterministic gates must follow metadata");
-check(needs(jobs["root-package"], ["metadata", "deterministic"]), "root package must follow metadata and deterministic gates");
-for (const name of ["native-linux", "native-portable"]) {
-  check(needs(jobs[name], ["metadata", "deterministic", "root-package"]), `${name} must depend on deterministic validation and the root tarball`);
+check(needs(jobs["root-package"], ["metadata", "deterministic"]), "root package must follow deterministic gates");
+for (const name of ["native-linux", "native-portable"]) check(needs(jobs[name], ["metadata", "deterministic", "root-package"]), `${name} must follow every shared gate`);
+check(needs(jobs.aggregate, ["metadata", "deterministic", "root-package", "native-linux", "native-portable"]), "aggregate must follow every producer");
+check(needs(jobs["sealed-candidate-e2e"], ["metadata", "aggregate"]), "sealed native E2E must consume the aggregate");
+check(needs(jobs.seal, ["aggregate", "sealed-candidate-e2e"]), "candidate outputs must remain hidden until every native E2E passes");
+check(candidate.on.workflow_call.outputs.candidate_artifact_id.value.includes("jobs.seal.outputs"), "workflow outputs must be emitted only by the final seal job");
+
+const metadataRun = runs(jobs.metadata).join("\n");
+for (const evidence of [".targets[]", ".releaseRunner", ".buildContainer", ".validationNodeVersions", "e2e_matrix="]) {
+  check(metadataRun.includes(evidence), `metadata must derive ${evidence} from native-targets.json`);
 }
-check(
-  needs(jobs.aggregate, ["metadata", "deterministic", "root-package", "native-linux", "native-portable"]),
-  "aggregate must depend on every deterministic and four-target producer",
-);
+check(String(jobs["native-linux"]?.strategy?.matrix).includes("needs.metadata.outputs.linux_matrix"), "Linux matrix must be metadata-derived");
+check(String(jobs["native-portable"]?.strategy?.matrix).includes("needs.metadata.outputs.portable_matrix"), "portable matrix must be metadata-derived");
+check(String(jobs["sealed-candidate-e2e"]?.strategy?.matrix).includes("needs.metadata.outputs.e2e_matrix"), "E2E matrix must be metadata-derived");
+check(action.inputs?.validation_node_versions?.required === true, "target consumer versions must be passed from manifest authority");
+check(actionText.includes("JSON.parse(process.argv[1])") && actionText.includes("inputs.validation_node_versions"), "target consumers must iterate the manifest-derived Node versions");
 
-const observedTargets = [
-  ...matrix(jobs["native-linux"]),
-  ...matrix(jobs["native-portable"]),
-].map(({ rust_target }) => rust_target);
-check(equal(observedTargets, manifest.targets.map(({ rustTarget }) => rustTarget)), "candidate matrix must build the exact four supported targets");
-check(matrix(jobs["native-portable"]).some(({ rust_target, runner }) => rust_target === "aarch64-apple-darwin" && runner === "macos-15"), "macOS ARM64 must use the GitHub-hosted macos-15 runner");
-check(matrix(jobs["native-portable"]).some(({ rust_target, runner }) => rust_target === "x86_64-pc-windows-msvc" && runner === "windows-2025"), "Windows x64 must use windows-2025");
+for (const command of ["bun run contracts:check", "bun run native:check", "bun run licenses:check", "bun run typecheck", "bun run test", "bun run test:release-pipeline", "bun run conformance:judge", "bun run build", "cargo fmt --all --check", "cargo clippy --locked --workspace --all-targets -- -D warnings"]) {
+  check(hasRun(jobs.deterministic, command), `deterministic candidate gate is missing ${command}`);
+}
+for (const command of ["cargo build --locked --release --target", "assemble-native-package.mjs", "assemble-cli-archive.mjs", "test-native-consumer.mjs", "write-release-target-provenance.mjs"]) {
+  check(actionText.includes(command), `target builder is missing ${command}`);
+}
+check(!actionText.includes("jq "), "cross-platform target action must not assume jq is installed");
+check(actionText.includes("npm install --global npm@11.6.2") && hasRun(jobs["root-package"], "npm install --global npm@11.6.2"), "all npm packaging must pin 11.6.2 on Node 24");
+check(actionText.includes("dist/native/*.tgz") && actionText.includes("dist/cli/*.tar.gz") && !actionText.includes("dist/**"), "target uploads must be allowlisted");
 
-for (const command of [
-  "bun run contracts:check",
-  "bun run native:check",
-  "bun run licenses:check",
-  "bun run typecheck",
-  "bun run test",
-  "bun run test:release-pipeline",
-  "bun run conformance:judge",
-  "bun run build",
-  "cargo fmt --all --check",
-  "cargo clippy --locked --workspace --all-targets -- -D warnings",
-]) check(hasRun(jobs.deterministic, command), `deterministic candidate gate is missing ${command}`);
-
-for (const command of [
-  "cargo build --locked --release --target",
-  "node scripts/assemble-native-package.mjs",
-  "node scripts/assemble-cli-archive.mjs",
-  "node scripts/test-release-candidate-consumer.mjs",
-  "node scripts/test-native-consumer.mjs",
-  "node scripts/write-release-target-provenance.mjs",
-]) check(actionText.includes(command), `target builder is missing ${command}`);
-check(!actionText.includes("jq "), "cross-platform target provenance must not assume jq is installed");
-check(actionText.includes("npm install --global npm@11.6.2"), "target packaging must pin the manifest-owned npm version");
-check(hasRun(jobs["root-package"], "npm install --global npm@11.6.2"), "root packaging must pin the manifest-owned npm version");
-for (const version of manifest.validationNodeVersions) check(actionText.includes(version), `target builder is missing Node ${version} consumer coverage`);
-check(actionText.includes("dist/native/*.tgz") && actionText.includes("dist/cli/*.tar.gz"), "target upload must allowlist native and standalone artifacts");
-check(!actionText.includes("dist/**"), "target upload must not use a broad dist glob");
-
-check(hasRun(jobs.aggregate, "node scripts/write-release-checksums.mjs --candidate"), "aggregate must checksum every publishable candidate asset");
-check(hasRun(jobs.aggregate, "node scripts/validate-release-artifacts.mjs --candidate"), "aggregate must independently validate the complete candidate asset set");
-check(actionText.includes('node scripts/test-release-candidate-consumer.mjs "${{ inputs.rust_target }}" dist/cli'), "every target runner must exercise its exact standalone archive without rebuilding");
-for (const evidence of [
-  'process.platform === "win32"',
-  '"powershell.exe"',
-  '"installers/install.ps1"',
-  '"installers/install.sh"',
-  "contract.release.receiptFile",
-  'installedExecutableBytes, exactExecutableBytes',
-  '["upgrade", "--check"]',
-  "KASB_UPGRADE_TEST_LATEST_URL",
-]) check(candidateConsumerText.includes(evidence), `exact candidate consumer is missing ${evidence}`);
-check(!/\b(?:cargo build|npm pack|bun run build)\b/u.test(candidateConsumerText), "exact candidate consumer must never rebuild its input archive");
-check(hasRun(
-  jobs.aggregate,
-  "node scripts/write-release-candidate-manifest.mjs --sha \"$CANDIDATE_SHA\" --output dist/release/artifact-manifest.json",
-), "aggregate must emit the raw hashed artifact manifest at its canonical path");
-check(hasRun(
-  jobs.aggregate,
-  "--artifact-manifest dist/release/artifact-manifest.json --output dist/release/candidate.json",
-), "aggregate must reconcile proof-bearing candidate metadata at the publication planner's canonical path");
+check(hasRun(jobs.aggregate, "write-release-checksums.mjs --candidate"), "aggregate must checksum all publishable assets");
+check(hasRun(jobs.aggregate, "validate-release-artifacts.mjs --candidate"), "aggregate must run full candidate-aware artifact validation");
+check(hasRun(jobs.aggregate, "write-release-candidate-manifest.mjs --sha \"$CANDIDATE_SHA\" --output dist/release/artifact-manifest.json"), "aggregate must write the raw artifact manifest to its canonical path");
+check(hasRun(jobs.aggregate, "--artifact-manifest dist/release/artifact-manifest.json --output dist/release/candidate.json"), "candidate validator must turn the raw manifest into the proof-bearing candidate receipt");
 const aggregateUpload = (jobs.aggregate?.steps ?? []).find(({ id }) => id === "upload");
-const candidatePaths = String(aggregateUpload?.with?.path ?? "").trim().split(/\r?\n/u).sort();
-check(equal(candidatePaths, [
-  "dist/cli/*.tar.gz",
-  "dist/cli/SHA256SUMS",
-  "dist/installers/install.ps1",
-  "dist/installers/install.sh",
-  "dist/native/*.tgz",
-  "dist/provenance/provenance.json",
-  "dist/release/artifact-manifest.json",
-  "dist/release/candidate.json",
-  "dist/root/*.tgz",
-].sort()), "final candidate upload must use the exact allowlisted artifact paths");
+check(equal(paths(aggregateUpload), ["dist/cli/*.tar.gz", "dist/cli/SHA256SUMS", "dist/installers/install.ps1", "dist/installers/install.sh", "dist/native/*.tgz", "dist/provenance/provenance.json", "dist/release/artifact-manifest.json", "dist/release/candidate.json", "dist/root/*.tgz"].sort()), "sealed candidate upload must contain the raw manifest, proof-bearing receipt, and only canonical artifacts");
+const e2e = jobs["sealed-candidate-e2e"];
+check(hasInput(e2e, "artifact-ids") && hasRun(e2e, "test-release-candidate-consumer.mjs"), "every native E2E must download the aggregate by ID and consume it");
+for (const evidence of ["candidateReceiptFile", "candidateRoot", "installers", "receiptBytes", '["upgrade", "--check"]', "same-version upgrade check must not change the managed binary", "same-version upgrade check must not change the managed receipt"]) {
+  check(consumerText.includes(evidence), `sealed candidate consumer is missing ${evidence}`);
+}
+check(!/\b(?:cargo build|npm pack|bun run build)\b/u.test(consumerText), "sealed candidate consumer must never rebuild");
 
-check(equal(Object.keys(release.on ?? {}), ["push"]), "publication workflow must be tag-push-only");
-check(equal(release.on?.push?.tags, ["v*"]), "publication workflow must accept only canonical version tag shapes");
-check(release.permissions?.contents === "read", "publication workflow top-level permissions must be read-only");
-check(release.concurrency?.["cancel-in-progress"] === false, "publication workflow must not cancel an in-flight release");
+check(equal(Object.keys(release.on ?? {}), ["push"]) && equal(release.on.push.tags, ["v*"]), "publication must be canonical-tag-only");
+check(release.permissions?.contents === "read" && release.concurrency?.["cancel-in-progress"] === false, "publication defaults must be read-only and non-cancelling");
 const releaseJobs = release.jobs ?? {};
-check(releaseJobs.candidate?.uses === "./.github/workflows/candidate.yml", "publication must call the repository-owned candidate workflow");
-check(releaseJobs.candidate?.with?.mode === "strict", "publication must use strict candidate metadata");
-check(releaseJobs["github-release"]?.environment === "github-release", "GitHub mutation must use its protected environment");
-check(equal(releaseJobs["github-release"]?.permissions, { contents: "write" }), "GitHub mutation must have only contents:write");
-check(releaseJobs["npm-release"]?.environment === "npm-release", "npm mutation must use its protected environment");
-check(releaseJobs["npm-release"]?.["runs-on"] === "ubuntu-24.04", "npm trusted publishing must use a GitHub-hosted runner");
-check(equal(releaseJobs["npm-release"]?.permissions, { contents: "read", "id-token": "write" }), "npm trusted publishing must have only contents:read and id-token:write");
+const preflight = releaseJobs["publication-state"];
+check(preflight?.environment === "github-release" && equal(preflight.permissions, { contents: "read" }), "immutability preflight must run read-only inside github-release");
+const appSteps = (job) => (job?.steps ?? []).filter(({ uses }) => String(uses).startsWith("actions/create-github-app-token@"));
+const validatePolicyAppStep = (step, jobName) => {
+  check(step?.uses === "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1", `${jobName} must pin create-github-app-token v3`);
+  check(step?.with?.["permission-administration"] === "read" && step?.with?.["permission-contents"] === "read", `${jobName} release-policy App token must be administration/read and contents/read only`);
+  check(String(step?.with?.["client-id"]).includes("KASB_RELEASE_APP_CLIENT_ID") && String(step?.with?.["private-key"]).includes("KASB_RELEASE_APP_PRIVATE_KEY"), `${jobName} release-policy App credentials must use the documented variable and secret`);
+};
+check(appSteps(preflight).length === 1, "immutability preflight must mint exactly one release-policy App token");
+validatePolicyAppStep(appSteps(preflight)[0], "immutability preflight");
+check(hasRun(preflight, "github-release:v1"), "immutability preflight must require the environment-only GitHub sentinel");
+check(releaseJobs.candidate?.uses === "./.github/workflows/candidate.yml" && releaseJobs.candidate?.with?.mode === "strict", "tag workflow must invoke the strict reusable candidate");
+
+check(releaseJobs["github-release"]?.environment === "github-release" && equal(releaseJobs["github-release"]?.permissions, { contents: "write" }), "GitHub executor must be the sole contents:write job");
+check(releaseJobs["npm-release"]?.environment === "npm-release" && equal(releaseJobs["npm-release"]?.permissions, { contents: "read", "id-token": "write" }), "npm executor must use protected OIDC trusted publishing");
+check(appSteps(releaseJobs["github-release"]).length === 1, "GitHub executor must mint exactly one fresh release-policy App token");
+validatePolicyAppStep(appSteps(releaseJobs["github-release"])[0], "GitHub executor");
+check(appSteps(releaseJobs["npm-release"]).length === 0, "npm executor must not mint a release-policy App token");
+check(hasRun(releaseJobs["github-release"], "github-release:v1"), "GitHub executor must require the environment-only sentinel");
+check(hasRun(releaseJobs["npm-release"], "npm-release:v1"), "npm executor must require the environment-only sentinel");
 for (const name of ["github-release", "npm-release"]) {
-  check(hasInput(releaseJobs[name], "artifact-ids"), `${name} must consume the immutable candidate artifact by ID`);
-  check(!hasAnyRun(releaseJobs[name], /\b(?:cargo build|npm pack|bun run build)\b/u), `${name} must never rebuild candidate artifacts`);
+  check(hasInput(releaseJobs[name], "artifact-ids"), `${name} must consume the exact candidate artifact by ID`);
+  check(hasRun(releaseJobs[name], "--artifact-manifest dist/release/artifact-manifest.json") && hasRun(releaseJobs[name], "--output dist/release/candidate.json"), `${name} must revalidate the raw manifest into the default planner candidate path`);
+  check(!hasAnyRun(releaseJobs[name], /\b(?:cargo build|npm pack|bun run build)\b/u), `${name} must never rebuild`);
+  check(hasRun(releaseJobs[name], "execute-release-publication.mjs"), `${name} must invoke the tested deterministic executor`);
 }
-for (const job of [releaseJobs["github-release"], releaseJobs["npm-release"]]) {
-  check(hasRun(job, "plan-github-publication.mjs") || hasRun(job, "plan-npm-publication.mjs"), "publication jobs must invoke a canonical planner");
-  check(!hasRun(job, "--candidate"), "publication planners must consume the uploaded canonical dist/release/candidate.json receipt");
-}
-check(releaseText.includes("path: dist"), "publication must download the candidate artifact so dist/release/candidate.json retains its canonical path");
-check(hasRun(releaseJobs["github-release"], "--phase verify"), "GitHub publication must verify immutable exact release state");
-check(hasRun(releaseJobs["npm-release"], "--phase verify"), "npm publication must reverify GitHub state before registry mutation");
-check(hasRun(releaseJobs["npm-release"], "npm publish"), "npm publication must use trusted npm publish");
-check(releaseText.includes("if ! npm publish") && releaseText.includes("capture-release-publication-state.mjs") && releaseText.includes("plan-npm-publication.mjs"), "npm publish races must recapture and replan exact registry state");
-check(hasRun(releaseJobs["npm-release"], "publication-report.json"), "npm publication must always record machine-readable partial state");
-check((releaseJobs["npm-release"]?.steps ?? []).some((step) => step?.if === "always()" && step?.uses?.startsWith("actions/upload-artifact@")), "publication report must upload even after partial failure");
-check(releaseText.includes("candidate_artifact_digest"), "publication must intentionally record the server-computed candidate digest");
-check(releaseText.indexOf("role == \"native\"") < releaseText.indexOf("role == \"root\""), "native packages must publish before the root package");
-check(!candidateText.includes("npm publish") && !candidateText.includes("gh release"), "rehearsal workflow must contain no publication commands");
+check(!releaseText.includes("gh release") && !releaseText.includes("npm publish"), "workflow YAML must not duplicate publication mutation logic");
+check(releaseText.includes("KASB_RELEASE_POLICY_TOKEN: ${{ steps.release-policy-token.outputs.token }}") && executorText.includes("KASB_RELEASE_POLICY_TOKEN"), "GitHub executor must use the fresh read-only App token for live policy rereads");
+check(!releaseText.includes("--immutability-confirmation"), "publication must not trust an unauthenticated immutability confirmation file");
+check(!releaseText.includes("(?:sha256:)"), "workflow digest validation must use portable Bash ERE syntax");
+check(releaseText.includes("--verify-immutable-release-only true") && hasRun(releaseJobs["npm-release"], "plan-github-publication.mjs"), "npm must reverify the exact immutable release using contents:read only");
+check(releaseText.includes("npm install --global npm@11.6.2"), "npm inspection and publishing CLI must be pinned to 11.6.2");
+check((releaseJobs["github-release"]?.steps ?? []).some((step) => step.if === "always()" && String(step.uses).startsWith("actions/upload-artifact@")), "GitHub receipt must upload on failure");
+check((releaseJobs["npm-release"]?.steps ?? []).some((step) => step.if === "always()" && String(step.uses).startsWith("actions/upload-artifact@")), "npm receipt must upload on failure");
+check(executorText.includes("executeGitHubPublication") && executorText.includes("executeNpmPublication"), "production CLI must use the deterministically tested executors");
+check(candidateContractText.includes("rerun only the failed publication job"), "strict fresh candidates must fail closed when release state already exists");
+check(!candidateText.includes("npm publish") && !candidateText.includes("gh release"), "rehearsal must remain structurally non-publishing");
 
 for (const [name, text] of [["candidate", candidateText], ["release", releaseText], ["target action", actionText]]) {
   for (const line of text.split(/\r?\n/u).filter((entry) => /\buses:/u.test(entry) && !entry.includes("./"))) {
     check(/@[0-9a-f]{40}\s+#\s+v\d+\b/iu.test(line), `${name} has an unpinned or unannotated action: ${line.trim()}`);
   }
-  if (name !== "target action") {
-    for (const job of Object.values(parse(`${name} workflow`, text).jobs ?? {})) {
-      for (const step of job?.steps ?? []) {
-        if (typeof step?.uses === "string" && step.uses.startsWith("actions/checkout@")) {
-          check(step.with?.["persist-credentials"] === false, `${name} checkout must disable credential persistence`);
-        }
-      }
-    }
+  if (name !== "target action") for (const job of Object.values(parse(`${name} workflow`, text).jobs ?? {})) for (const step of job?.steps ?? []) {
+    if (String(step?.uses).startsWith("actions/checkout@")) check(step.with?.["persist-credentials"] === false, `${name} checkout must disable credential persistence`);
   }
 }
 
-if (failures.length > 0) throw new Error(`Release workflow validation failed:\n${failures.map((failure) => `- ${failure}`).join("\n")}`);
-console.log("release workflows enforce non-publishing four-target rehearsal and guarded immutable publication");
+if (failures.length) throw new Error(`Release workflow validation failed:\n${failures.map((failure) => `- ${failure}`).join("\n")}`);
+console.log("release workflows derive one four-target candidate and guard tested receipt-owning publication");
 
-function parse(name, text) {
-  const document = parseDocument(text);
-  if (document.errors.length > 0) throw new Error(`${name} is invalid YAML: ${document.errors.map(({ message }) => message).join("; ")}`);
-  return document.toJS();
-}
-
-function matrix(job) { return job?.strategy?.matrix?.include ?? []; }
-function needs(job, expected) { return equal(Array.isArray(job?.needs) ? job.needs : [job?.needs].filter(Boolean), expected); }
-function equal(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
-function hasRun(job, text) { return (job?.steps ?? []).some((step) => typeof step?.run === "string" && step.run.includes(text)); }
-function hasAnyRun(job, expression) { return (job?.steps ?? []).some((step) => typeof step?.run === "string" && expression.test(step.run)); }
+function parse(name, text) { const document = parseDocument(text); if (document.errors.length) throw new Error(`${name} is invalid YAML: ${document.errors.map(({ message }) => message).join("; ")}`); return document.toJS(); }
+function runs(job) { return (job?.steps ?? []).filter(({ run }) => typeof run === "string").map(({ run }) => run); }
+function hasRun(job, value) { return runs(job).some((run) => run.includes(value)); }
+function hasAnyRun(job, value) { return runs(job).some((run) => value.test(run)); }
 function hasInput(job, input) { return (job?.steps ?? []).some((step) => Object.hasOwn(step?.with ?? {}, input)); }
-function check(condition, message) { if (!condition) failures.push(message); }
+function needs(job, expected) { return equal(Array.isArray(job?.needs) ? job.needs : [job?.needs].filter(Boolean), expected); }
+function paths(step) { return String(step?.with?.path ?? "").trim().split(/\r?\n/u).sort(); }
+function equal(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
+function check(value, message) { if (!value) failures.push(message); }

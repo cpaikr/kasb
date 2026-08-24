@@ -3,6 +3,7 @@ import { spawnSync } from "node:child_process";
 import { lstat, readFile, realpath } from "node:fs/promises";
 import { basename, isAbsolute, relative, resolve, sep } from "node:path";
 import { checksummedReleaseAssetNames, loadReleaseContract, releaseAssetNames, releaseTag, repositoryRoot } from "./release-contract.mjs";
+import { scanCandidateText, validateCandidateProvenance } from "./release-candidate-inspection.mjs";
 
 export const candidateSchemaVersion = 1;
 export const rehearsalRefPrefix = "refs/kasb-rehearsal/";
@@ -79,7 +80,10 @@ export async function validateArtifactManifest(identity, manifest, root = reposi
   }
 
   const expectedTargets = identity.targets.map(({ releaseTarget }) => releaseTarget);
-  assertExactStrings(manifest.targets, expectedTargets, "artifact manifest target set");
+  const manifestTargets = Array.isArray(manifest.targets)
+    ? manifest.targets.map((target) => typeof target === "string" ? target : target?.releaseTarget)
+    : manifest.targets;
+  assertExactStrings(manifestTargets, expectedTargets, "artifact manifest target set");
   validateGates(manifest.gates);
 
   const contract = await loadReleaseContract();
@@ -121,6 +125,9 @@ export async function validateArtifactManifest(identity, manifest, root = reposi
     if (asset.size > limit) throw new Error(`${asset.name} exceeds the candidate artifact size limit`);
   }
   await validateChecksumManifest(contract, githubAssets, root);
+  const provenance = githubAssets.find(({ name }) => name === contract.release.provenanceAsset);
+  await validateCandidateProvenance(resolve(root, provenance.file), identity);
+  await scanCandidateText({ githubAssets, npmPackages });
 
   return { ...identity, phase: "artifacts", gates: { ...manifest.gates }, npmPackages, githubAssets };
 }
@@ -173,9 +180,15 @@ export async function validatePrebuildPublicationState(identity, state) {
     if (github.release.tag !== identity.canonicalTag || github.release.targetSha !== identity.commit) {
       throw new Error("publication-state GitHub release identity differs from the candidate");
     }
-    if (typeof github.release.draft !== "boolean" || typeof github.release.immutable !== "boolean" || !Array.isArray(github.release.assets)) {
+    if (
+      typeof github.release.draft !== "boolean"
+      || typeof github.release.prerelease !== "boolean"
+      || typeof github.release.immutable !== "boolean"
+      || !Array.isArray(github.release.assets)
+    ) {
       throw new Error("publication-state GitHub release has an invalid shape");
     }
+    if (github.release.prerelease) throw new Error("canonical publication-state GitHub release must not be a prerelease");
     const contract = await loadReleaseContract();
     const expectedAssets = new Set(releaseAssetNames(contract));
     const seen = new Set();
@@ -185,6 +198,9 @@ export async function validatePrebuildPublicationState(identity, state) {
         throw new Error("publication-state GitHub assets contain an unexpected, duplicate, or invalid identity");
       }
       seen.add(asset.name);
+    }
+    if (identity.mode === "strict") {
+      throw new Error("strict fresh candidate build found an existing GitHub Release; rerun only the failed publication job so it reuses the original successful candidate artifact");
     }
   }
 

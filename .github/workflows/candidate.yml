@@ -3,15 +3,27 @@ name: Canonical release candidate
 on:
   pull_request:
     paths:
+      - ".github/actions/build-release-target/**"
       - ".github/workflows/candidate.yml"
       - ".github/workflows/release.yml"
-      - "scripts/**"
-      - "fixtures/release/**"
-      - "native-targets.json"
       - "Cargo.toml"
       - "Cargo.lock"
+      - "crates/**"
       - "packages/**"
+      - "scripts/**"
       - "installers/**"
+      - "fixtures/release/**"
+      - "fixtures/release-publication/**"
+      - "conformance/**"
+      - "evals/**"
+      - "native-targets.json"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.json"
+      - "README.md"
+      - "LICENSE.md"
+      - "THIRD_PARTY_LICENSES.html"
+      - "about.toml"
       - "docs/release.md"
       - "plans/canonical-release-pipeline.md"
   workflow_call:
@@ -31,9 +43,9 @@ on:
         default: ""
     outputs:
       candidate_artifact_id:
-        value: ${{ jobs.aggregate.outputs.artifact_id }}
+        value: ${{ jobs.seal.outputs.artifact_id }}
       candidate_artifact_digest:
-        value: ${{ jobs.aggregate.outputs.artifact_digest }}
+        value: ${{ jobs.seal.outputs.artifact_digest }}
       candidate_artifact_name:
         value: release-candidate
   workflow_dispatch:
@@ -53,6 +65,10 @@ jobs:
       mode: ${{ steps.identity.outputs.mode }}
       ref: ${{ steps.identity.outputs.ref }}
       sha: ${{ steps.identity.outputs.sha }}
+      linux_matrix: ${{ steps.authority.outputs.linux_matrix }}
+      portable_matrix: ${{ steps.authority.outputs.portable_matrix }}
+      e2e_matrix: ${{ steps.authority.outputs.e2e_matrix }}
+      node_versions: ${{ steps.authority.outputs.node_versions }}
     steps:
       - name: Resolve immutable candidate identity
         id: identity
@@ -90,6 +106,15 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
+      - name: Derive release matrices from native-targets.json
+        id: authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -c '{include:[.targets[] | select(.buildContainer != null) | {rust_target:.rustTarget,runner:.releaseRunner,package_directory:.packageDirectory,build_container:.buildContainer}]}' native-targets.json | sed 's/^/linux_matrix=/' >> "$GITHUB_OUTPUT"
+          jq -c '{include:[.targets[] | select(.buildContainer == null) | {rust_target:.rustTarget,runner:.releaseRunner,package_directory:.packageDirectory}]}' native-targets.json | sed 's/^/portable_matrix=/' >> "$GITHUB_OUTPUT"
+          jq -c '{include:[.targets[] | {rust_target:.rustTarget,runner:.releaseRunner}]}' native-targets.json | sed 's/^/e2e_matrix=/' >> "$GITHUB_OUTPUT"
+          jq -c '.validationNodeVersions' native-targets.json | sed 's/^/node_versions=/' >> "$GITHUB_OUTPUT"
       - name: Download strict publication snapshot
         if: steps.identity.outputs.mode == 'strict'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -192,16 +217,7 @@ jobs:
     needs: [metadata, deterministic, root-package]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - rust_target: x86_64-unknown-linux-gnu
-            runner: blacksmith-2vcpu-ubuntu-2404
-            package_directory: linux-x64-gnu
-            build_container: quay.io/pypa/manylinux_2_28_x86_64:2026.08.15-1@sha256:0c87ccb5996dab6c3b7612ee4fda7b80c4ab3c44a86c2541e4a872afdf4f131b
-          - rust_target: aarch64-unknown-linux-gnu
-            runner: blacksmith-2vcpu-ubuntu-2404-arm
-            package_directory: linux-arm64-gnu
-            build_container: quay.io/pypa/manylinux_2_28_aarch64:2026.08.15-1@sha256:561427136aabf3787bffb294b3515748241e0962d1527ae28bea1e076bfb9d99
+      matrix: ${{ fromJSON(needs.metadata.outputs.linux_matrix) }}
     runs-on: ${{ matrix.runner }}
     container:
       image: ${{ matrix.build_container }}
@@ -224,20 +240,14 @@ jobs:
           enforce_glibc: "true"
           declared_runner: ${{ matrix.runner }}
           build_image: ${{ matrix.build_container }}
+          validation_node_versions: ${{ needs.metadata.outputs.node_versions }}
 
   native-portable:
     name: Candidate ${{ matrix.rust_target }}
     needs: [metadata, deterministic, root-package]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - rust_target: aarch64-apple-darwin
-            runner: macos-15
-            package_directory: darwin-arm64
-          - rust_target: x86_64-pc-windows-msvc
-            runner: windows-2025
-            package_directory: win32-x64-msvc
+      matrix: ${{ fromJSON(needs.metadata.outputs.portable_matrix) }}
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Check out exact candidate commit
@@ -255,6 +265,7 @@ jobs:
           root_artifact: candidate-root-package
           enforce_glibc: "false"
           declared_runner: ${{ matrix.runner }}
+          validation_node_versions: ${{ needs.metadata.outputs.node_versions }}
 
   aggregate:
     name: Validate complete four-target candidate
@@ -313,7 +324,8 @@ jobs:
             dist/provenance/fragments/*.json >/dev/null
           jq -s --arg repository "$GITHUB_REPOSITORY" --arg commit "$CANDIDATE_SHA" \
             --arg version "$version" --arg sourceRef "${{ needs.metadata.outputs.ref }}" \
-            '{schemaVersion:1,repository:$repository,version:$version,sourceRef:$sourceRef,commit:$commit,toolchain:.[0].toolchain,targets:(map(.target) | sort_by(.rustTarget))}' \
+            --slurpfile manifest native-targets.json \
+            '{schemaVersion:1,repository:$repository,version:$version,sourceRef:$sourceRef,commit:$commit,toolchain:.[0].toolchain,targets:([$manifest[0].targets[].rustTarget as $target | .[] | .target | select(.rustTarget == $target)])}' \
             dist/provenance/fragments/*.json > dist/provenance/provenance.json
           node scripts/write-release-checksums.mjs --candidate
           node scripts/validate-release-artifacts.mjs --candidate
@@ -346,3 +358,40 @@ jobs:
             dist/release/candidate.json
           if-no-files-found: error
           retention-days: 7
+
+  sealed-candidate-e2e:
+    name: Sealed candidate ${{ matrix.rust_target }} installer and upgrade
+    needs: [metadata, aggregate]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.metadata.outputs.e2e_matrix) }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out exact candidate commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.metadata.outputs.sha }}
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - name: Download exact sealed candidate by artifact ID
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.aggregate.outputs.artifact_id }}
+          path: dist
+      - name: Exercise exact installer, receipt, and same-version upgrade check
+        env:
+          KASB_CANDIDATE_SHA: ${{ needs.metadata.outputs.sha }}
+        run: node scripts/test-release-candidate-consumer.mjs "${{ matrix.rust_target }}" dist
+
+  seal:
+    name: Expose only the fully consumed candidate
+    needs: [aggregate, sealed-candidate-e2e]
+    runs-on: ubuntu-24.04
+    outputs:
+      artifact_id: ${{ needs.aggregate.outputs.artifact_id }}
+      artifact_digest: ${{ needs.aggregate.outputs.artifact_digest }}
+    steps:
+      - run: echo "All four native runners consumed the exact sealed candidate." >> "$GITHUB_STEP_SUMMARY"
