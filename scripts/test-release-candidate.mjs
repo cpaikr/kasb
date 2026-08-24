@@ -57,6 +57,25 @@ try {
   assert.equal(candidate.phase, "artifacts");
   assert.equal(candidate.npmPackages.length, 5);
   assert.equal(candidate.githubAssets.length, 8);
+  const cliManifest = join(directory, "artifact-manifest.json");
+  const cliCandidate = join(directory, "candidate.json");
+  await writeFile(cliManifest, `${JSON.stringify(manifest)}\n`);
+  const cliValidation = spawnSync(process.execPath, [
+    "scripts/validate-release-candidate.mjs",
+    "--mode", identity.mode,
+    "--ref", identity.sourceRef,
+    "--sha", identity.commit,
+    "--publication-state", "fixtures/release/publication-vacant.json",
+    "--artifact-manifest", relative(repositoryRoot, cliManifest),
+    "--output", relative(repositoryRoot, cliCandidate),
+    "--skip-checkout-validation",
+  ], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    env: { ...process.env, KASB_CANDIDATE_TEST_ALLOW_SKIP_CHECKOUT: "1" },
+  });
+  assert.equal(cliValidation.status, 0, cliValidation.stderr);
+  assert.equal(JSON.parse(await readFile(cliCandidate, "utf8")).publicationStateSource, "fixture");
   const rootedManifest = {
     ...manifest,
     githubAssets: manifest.githubAssets.map((asset) => ({

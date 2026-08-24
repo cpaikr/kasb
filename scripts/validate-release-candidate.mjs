@@ -17,6 +17,7 @@ let candidate = { ...identity, phase: "identity" };
 if (options.artifactManifest) {
   const manifest = JSON.parse(await readFile(resolve(repositoryRoot, options.artifactManifest), "utf8"));
   candidate = await validateArtifactManifest(identity, manifest);
+  candidate.publicationStateSource = publicationState.source;
   const { validatePublicationStateSnapshot } = await import("./release-publication-contract.mjs");
   validatePublicationStateSnapshot(candidate, publicationState);
 } else {
