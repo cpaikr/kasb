@@ -19,6 +19,7 @@
     },
     "repository": "cpaikr/kasb",
     "version": "1.2.3",
+    "retiredThroughVersion": "0.2.1",
     "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "canonicalTag": "v1.2.3",
     "sourceRef": "refs/kasb-rehearsal/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -132,12 +133,14 @@
       "repository": "cpaikr/kasb",
       "repositoryPrivate": false,
       "immutableReleases": true,
+      "highestPublishedVersion": "0.2.1",
       "tag": "v1.2.3",
       "tagSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "release": null
     },
     "npm": {
       "schemaVersion": 1,
+      "highestPublishedVersion": "0.2.1",
       "packages": [
         { "name": "@sjunepark/kasb-linux-x64-gnu", "version": "1.2.3", "state": "vacant" },
         { "name": "@sjunepark/kasb-linux-arm64-gnu", "version": "1.2.3", "state": "vacant" },

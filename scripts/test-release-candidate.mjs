@@ -57,7 +57,15 @@ try {
       assert.notEqual(result.status, 0, `${script} accepted mutually exclusive flags in order ${flags.join(" ")}`);
       assert.match(result.stderr, /mutually exclusive/u);
     }
+    const mixed = spawnSync(process.execPath, [script, "--candidate", "dist/custom"], { cwd: repositoryRoot, encoding: "utf8" });
+    assert.notEqual(mixed.status, 0, `${script} accepted a positional directory in candidate mode`);
+    assert.match(mixed.stderr, /does not accept/u);
   }
+  const duplicateOption = spawnSync(process.execPath, [
+    "scripts/validate-release-candidate.mjs", "--mode", "rehearsal", "--mode", "strict",
+  ], { cwd: repositoryRoot, encoding: "utf8" });
+  assert.notEqual(duplicateOption.status, 0, "candidate validator accepted a duplicate option");
+  assert.match(duplicateOption.stderr, /duplicate candidate metadata option --mode/u);
 
   const manifest = await validManifest();
   const candidate = await validateArtifactManifest(identity, manifest);
@@ -109,9 +117,9 @@ try {
   }, alternateRoot);
   validatePublicationStateSource("rehearsal", { schemaVersion: 1, source: "fixture" });
   validatePublicationStateSource("strict", { schemaVersion: 1, source: "live" });
-  assert.throws(() => validateCandidateVersion("1.2.3-01", "rehearsal"), /stable MAJOR\.MINOR\.PATCH/u);
-  assert.throws(() => validateCandidateVersion("1.2.3-..", "strict"), /stable MAJOR\.MINOR\.PATCH/u);
-  assert.throws(() => validateCandidateVersion("0.2.1", "strict"), /newer than retired version/u);
+  assert.throws(() => validateCandidateVersion("1.2.3-01", "rehearsal", "0.2.1"), /stable MAJOR\.MINOR\.PATCH/u);
+  assert.throws(() => validateCandidateVersion("1.2.3-..", "strict", "0.2.1"), /stable MAJOR\.MINOR\.PATCH/u);
+  assert.throws(() => validateCandidateVersion("0.2.1", "strict", "0.2.1"), /newer than retired version/u);
   const occupied = prebuildState();
   await validatePrebuildPublicationState(identity, occupied);
   const existingRelease = {
@@ -350,12 +358,14 @@ function prebuildState() {
       repository: identity.repository,
       repositoryPrivate: false,
       immutableReleases: true,
+      highestPublishedVersion: null,
       tag: identity.canonicalTag,
       tagSha: identity.commit,
       release: null,
     },
     npm: {
       schemaVersion: 1,
+      highestPublishedVersion: null,
       packages: [
         ...identity.targets.map(({ packageName }) => ({ name: packageName, version: identity.version, state: "published", sha256: "b".repeat(64) })),
         { name: "@sjunepark/kasb", version: identity.version, state: "published", sha256: "c".repeat(64) },

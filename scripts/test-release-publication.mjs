@@ -144,6 +144,14 @@ expectCode(() => planGitHubPublication(candidate, {
   ...vacant.github,
   immutableReleases: false,
 }, "stage"), "github_immutability_disabled");
+expectCode(() => planGitHubPublication(strictCandidate, {
+  ...vacant.github,
+  highestPublishedVersion: "2.0.0",
+}, "stage"), "candidate_version_regression");
+expectCode(() => planNpmPublication(strictCandidate, {
+  ...vacant.npm,
+  highestPublishedVersion: "2.0.0",
+}), "candidate_version_regression");
 expectCode(() => planGitHubPublication(candidate, githubState({
   draft: true,
   immutable: false,
@@ -237,7 +245,7 @@ function githubState(release) {
 }
 
 function npmState(packages) {
-  return { schemaVersion: 1, packages };
+  return { schemaVersion: 1, highestPublishedVersion: "0.2.1", packages };
 }
 
 function publishedAsset(asset) {
@@ -394,6 +402,12 @@ async function testGuardedExecutionAdapters() {
   rootFailure.failRoot = false;
   assert.equal((await executeNpmPublication(strict, immutableReceipt, rootFailure)).ok, true);
 
+  const regressed = npmAdapter(built.files, { highestPublishedVersion: "2.0.0" });
+  await assert.rejects(executeNpmPublication(strict, immutableReceipt, regressed), hasCode("candidate_version_regression"));
+
+  const driftedNative = npmAdapter(built.files, { driftNativeAfterNativePublish: true });
+  await assert.rejects(executeNpmPublication(strict, immutableReceipt, driftedNative), hasCode("npm_root_blocked"));
+
   const raced = npmAdapter(built.files, { raceIdentity: identity(strict.npmPackages[0]), raceBytes: "exact", ambiguousFailure: true });
   const raceReceipt = await executeNpmPublication(strict, immutableReceipt, raced);
   assert(raceReceipt.operations.some(({ status }) => status === "skippedExactRace"));
@@ -461,6 +475,7 @@ function strictCandidateFixture() {
       gates: Object.fromEntries(requiredCandidateGates.map((gate) => [gate, true])),
       repository: "cpaikr/kasb",
       version,
+      retiredThroughVersion: "0.2.1",
       canonicalTag: `v${version}`,
       sourceRef: `refs/tags/v${version}`,
       commit,
@@ -478,6 +493,7 @@ function githubAdapter(candidate, files, options = {}) {
       repository: candidate.repository,
       repositoryPrivate: false,
       immutableReleases: true,
+      highestPublishedVersion: "0.2.1",
       tag: candidate.canonicalTag,
       tagSha: candidate.commit,
       release: null,
@@ -539,12 +555,20 @@ function npmAdapter(files, options = {}) {
     ambiguousFailure: options.ambiguousFailure,
     doubleFailureIdentity: options.doubleFailureIdentity,
     failNextInspectIdentity: undefined,
+    highestVersion: options.highestPublishedVersion ?? "0.2.1",
+    driftNativeAfterNativePublish: options.driftNativeAfterNativePublish,
+    driftApplied: false,
     async readCandidateFile(path) { return this.files.get(path); },
+    async highestPublishedVersion() { return this.highestVersion; },
     async inspectPackage(pkg) {
       const key = identity(pkg);
       if (this.failNextInspectIdentity === key) {
         this.failNextInspectIdentity = undefined;
         throw new Error("injected npm reconciliation failure");
+      }
+      if (this.driftNativeAfterNativePublish && !this.driftApplied && pkg.name !== "@sjunepark/kasb" && this.registry.size === 4) {
+        this.registry.set(key, Buffer.from("drifted native registry bytes"));
+        this.driftApplied = true;
       }
       const bytes = this.registry.get(key);
       return bytes ? { state: "published", bytes } : { state: "vacant" };

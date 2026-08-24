@@ -1,4 +1,5 @@
 import { requiredCandidateGates } from "./release-candidate-contract.mjs";
+import { compareStableVersions } from "./release-contract.mjs";
 
 const SHA256 = /^[0-9a-f]{64}$/u;
 const COMMIT = /^[0-9a-f]{40}$/u;
@@ -42,8 +43,11 @@ export function validateCandidateForPublication(candidate) {
   if (typeof candidate.version !== "string" || !STABLE_SEMVER.test(candidate.version)) {
     fail("candidate_version", "candidate version must be stable canonical SemVer");
   }
-  if (candidate.mode === "strict" && compareSemver(candidate.version, "0.2.1") <= 0) {
-    fail("candidate_version_retired", "strict candidate version must be newer than retired version 0.2.1");
+  if (typeof candidate.retiredThroughVersion !== "string" || !STABLE_SEMVER.test(candidate.retiredThroughVersion)) {
+    fail("candidate_retired_version", "candidate retiredThroughVersion must be stable canonical SemVer");
+  }
+  if (candidate.mode === "strict" && compareStableVersions(candidate.version, candidate.retiredThroughVersion) <= 0) {
+    fail("candidate_version_retired", `strict candidate version must be newer than retired version ${candidate.retiredThroughVersion}`);
   }
   if (typeof candidate.commit !== "string" || !COMMIT.test(candidate.commit)) {
     fail("candidate_commit", "candidate commit must be a full lowercase Git commit ID");
@@ -186,6 +190,7 @@ export function planNpmPublication(candidateInput, state) {
   const candidate = validateCandidateForPublication(candidateInput);
   requireObject(state, "npm publication snapshot");
   requireEqual(state.schemaVersion, 1, "npm_snapshot_schema", "npm publication snapshot schemaVersion must be 1");
+  validateHighestPublishedVersion(candidate, state.highestPublishedVersion, "npm");
   requireArray(state.packages, "npm publication packages");
 
   const expected = new Map(candidate.npmPackages.map((pkg) => [packageIdentity(pkg), pkg]));
@@ -280,6 +285,7 @@ export function planNpmPublicationAfterGitHub(candidateInput, snapshot) {
 function validateGitHubIdentity(candidate, state) {
   requireObject(state, "GitHub publication snapshot");
   requireEqual(state.schemaVersion, 1, "github_snapshot_schema", "GitHub publication snapshot schemaVersion must be 1");
+  validateHighestPublishedVersion(candidate, state.highestPublishedVersion, "GitHub");
   requireEqual(state.repository, candidate.repository, "github_repository_mismatch", "GitHub publication repository differs from the candidate repository");
   requireEqual(state.repositoryPrivate, false, "github_repository_private", "canonical release repository must be public before publication");
   requireEqual(state.immutableReleases, true, "github_immutability_disabled", "canonical repository must enforce immutable releases before publication");
@@ -423,19 +429,11 @@ function fail(code, message, details) {
   throw new PublicationContractError(code, message, details);
 }
 
-function compareSemver(left, right) {
-  const parse = (value) => {
-    const match = value.match(/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z.-]+))?$/u);
-    if (!match) fail("candidate_version", `candidate version ${value} is not SemVer`);
-    return { core: match.slice(1, 4).map(Number), prerelease: match[4] };
-  };
-  const a = parse(left);
-  const b = parse(right);
-  for (let index = 0; index < 3; index += 1) {
-    if (a.core[index] !== b.core[index]) return Math.sign(a.core[index] - b.core[index]);
+function validateHighestPublishedVersion(candidate, value, source) {
+  if (value !== null && (typeof value !== "string" || !STABLE_SEMVER.test(value))) {
+    fail("published_version_state", `${source} highestPublishedVersion must be stable canonical SemVer or null`);
   }
-  if (a.prerelease === b.prerelease) return 0;
-  if (a.prerelease === undefined) return 1;
-  if (b.prerelease === undefined) return -1;
-  return a.prerelease.localeCompare(b.prerelease, "en");
+  if (candidate.mode === "strict" && value !== null && compareStableVersions(candidate.version, value) < 0) {
+    fail("candidate_version_regression", `${candidate.version} is older than published ${source} version ${value}`);
+  }
 }

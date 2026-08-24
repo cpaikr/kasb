@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 
-import { loadReleaseContract, releaseAssetNames, releaseTag, repositoryRoot } from "./release-contract.mjs";
+import { highestStableVersion, loadReleaseContract, releaseAssetNames, releaseTag, repositoryRoot } from "./release-contract.mjs";
 
 if (process.argv[2] === "--self-test") await selfTest();
 else await main();
@@ -48,10 +48,18 @@ async function githubSnapshot(contract, tag, expectedCommit, directory, options)
   }
   const tagSha = await resolveRemoteTag(repository, tag, limits);
   if (tagSha !== expectedCommit) throw new Error("remote release tag does not peel to the requested candidate commit");
+  const releasePages = JSON.parse((await command("gh", ["api", `repos/${repository}/releases?per_page=100`, "--paginate", "--slurp"], limits)).stdout);
+  if (!Array.isArray(releasePages) || releasePages.some((page) => !Array.isArray(page))) throw new Error("GitHub returned invalid release history");
+  const releaseHistory = releasePages.flat();
+  const highestPublishedVersion = highestStableVersion(releaseHistory
+    .filter((entry) => entry && entry.draft === false && entry.prerelease === false)
+    .map(({ tag_name: releaseTagName }) => typeof releaseTagName === "string" && releaseTagName.startsWith(release.tagPrefix)
+      ? releaseTagName.slice(release.tagPrefix.length)
+      : null));
   const response = await command("gh", ["api", `repos/${repository}/releases/tags/${tag}`], { ...limits, allowNotFound: true });
   if (response.notFound) {
     if (immutableReleases !== true) throw new Error("release-only immutability verification requires an existing published immutable release");
-    return { schemaVersion: 1, repository, repositoryPrivate: false, immutableReleases: true, tag, tagSha, release: null };
+    return { schemaVersion: 1, repository, repositoryPrivate: false, immutableReleases: true, highestPublishedVersion, tag, tagSha, release: null };
   }
   const published = JSON.parse(response.stdout);
   if (immutableReleases === undefined) {
@@ -88,6 +96,7 @@ async function githubSnapshot(contract, tag, expectedCommit, directory, options)
     repository,
     repositoryPrivate: false,
     immutableReleases,
+    highestPublishedVersion,
     tag,
     tagSha,
     release: {
@@ -119,8 +128,18 @@ async function npmSnapshot(contract, directory) {
     root.name,
   ];
   const packages = [];
+  const publishedVersions = [];
   for (const name of identities) {
     const identity = `${name}@${contract.version}`;
+    const versionsResponse = await command("npm", ["view", name, "versions", "--json"], { ...limits, allowNotFound: true });
+    const versions = versionsResponse.notFound ? [] : JSON.parse(versionsResponse.stdout);
+    const versionList = Array.isArray(versions) ? versions : [versions];
+    if (versionList.some((version) => typeof version !== "string")) throw new Error(`npm returned invalid version history for ${name}`);
+    publishedVersions.push(...versionList);
+    if (!versionList.includes(contract.version)) {
+      packages.push({ name, version: contract.version, state: "vacant" });
+      continue;
+    }
     const response = await command("npm", ["view", identity, "dist.tarball", "--json"], { ...limits, allowNotFound: true });
     if (response.notFound) {
       packages.push({ name, version: contract.version, state: "vacant" });
@@ -136,7 +155,7 @@ async function npmSnapshot(contract, directory) {
     });
     packages.push({ name, version: contract.version, state: "published", sha256: await sha256(destination) });
   }
-  return { schemaVersion: 1, packages };
+  return { schemaVersion: 1, highestPublishedVersion: highestStableVersion(publishedVersions), packages };
 }
 
 function command(executable, args, { allowNotFound = false, maxOutputBytes = 1024 * 1024, timeoutMs = 15_000 } = {}) {

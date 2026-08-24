@@ -25,7 +25,7 @@ if (metadata.status === 0) {
 const root = JSON.parse(await readFile(resolve(repositoryRoot, contract.manifest.rootPackage, "package.json"), "utf8"));
 check(root.version === contract.version, `root npm version ${root.version} differs from Cargo workspace ${contract.version}`);
 const expectedOptional = Object.fromEntries(contract.targets.map((target) => [target.packageName, contract.version]));
-check(JSON.stringify(root.optionalDependencies) === JSON.stringify(expectedOptional), "root optional dependency versions are not exact Cargo-derived identities");
+check(sameEntries(root.optionalDependencies, expectedOptional), "root optional dependency versions are not exact Cargo-derived identities");
 const bunLockText = await readFile(resolve(repositoryRoot, "bun.lock"), "utf8");
 const bunLock = JSON.parse(bunLockText.replace(/,\s*([}\]])/gu, "$1"));
 check(bunLock.workspaces?.[contract.manifest.rootPackage]?.version === contract.version, "bun.lock root workspace version differs from Cargo workspace");
@@ -48,6 +48,7 @@ for (const target of contract.targets) {
 }
 check(contract.targets.length === 4, "release identity must cover all four supported targets exactly");
 check(contract.release.repository === "cpaikr/kasb", "release repository identity must remain cpaikr/kasb");
+check(contract.release.retiredThroughVersion === "0.2.1", "retired product version floor must remain explicit");
 check(contract.release.shellInstallerAsset === "install.sh", "shell installer release identity must remain install.sh");
 check(contract.release.powershellInstallerAsset === "install.ps1", "PowerShell installer release identity must remain install.ps1");
 check(contract.release.provenanceAsset === "provenance.json", "release provenance identity must remain provenance.json");

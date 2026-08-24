@@ -6,12 +6,14 @@
     "repository": "cpaikr/kasb",
     "repositoryPrivate": false,
     "immutableReleases": true,
+    "highestPublishedVersion": "0.2.1",
     "tag": "__CANDIDATE_TAG__",
     "tagSha": "__CANDIDATE_SHA__",
     "release": null
   },
   "npm": {
     "schemaVersion": 1,
+    "highestPublishedVersion": "0.2.1",
     "packages": [
       { "name": "@sjunepark/kasb-linux-x64-gnu", "version": "__CANDIDATE_VERSION__", "state": "vacant" },
       { "name": "@sjunepark/kasb-linux-arm64-gnu", "version": "__CANDIDATE_VERSION__", "state": "vacant" },

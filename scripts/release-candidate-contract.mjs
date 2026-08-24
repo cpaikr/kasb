@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { lstat, readFile, realpath } from "node:fs/promises";
 import { basename, isAbsolute, relative, resolve, sep } from "node:path";
-import { checksummedReleaseAssetNames, loadReleaseContract, releaseAssetNames, releaseTag, repositoryRoot } from "./release-contract.mjs";
+import { checksummedReleaseAssetNames, compareStableVersions, loadReleaseContract, releaseAssetNames, releaseTag, repositoryRoot } from "./release-contract.mjs";
 import { scanCandidateText, validateCandidateProvenance } from "./release-candidate-inspection.mjs";
 
 export const candidateSchemaVersion = 1;
@@ -31,7 +31,7 @@ export async function canonicalCandidateIdentity({ mode, ref, sha }) {
   if (!commitPattern.test(sha)) throw new Error("candidate SHA must be a full lowercase Git commit ID");
 
   const contract = await loadReleaseContract();
-  validateCandidateVersion(contract.version, mode);
+  validateCandidateVersion(contract.version, mode, contract.release.retiredThroughVersion);
   const tag = releaseTag(contract.release, contract.version);
   const rootPackage = JSON.parse(await readFile(resolve(repositoryRoot, contract.manifest.rootPackage, "package.json"), "utf8"));
   if (mode === "strict" && ref !== `refs/tags/${tag}`) {
@@ -46,6 +46,7 @@ export async function canonicalCandidateIdentity({ mode, ref, sha }) {
     mode,
     repository: contract.release.repository,
     version: contract.version,
+    retiredThroughVersion: contract.release.retiredThroughVersion,
     canonicalTag: tag,
     sourceRef: ref,
     commit: sha,
@@ -63,12 +64,12 @@ export async function canonicalCandidateIdentity({ mode, ref, sha }) {
   };
 }
 
-export function validateCandidateVersion(version, mode) {
+export function validateCandidateVersion(version, mode, retiredThroughVersion) {
   if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u.test(version)) {
     throw new Error(`canonical candidate version ${version} must be stable MAJOR.MINOR.PATCH`);
   }
-  if (mode === "strict" && compareStableVersion(version, "0.2.1") <= 0) {
-    throw new Error("strict candidate version must be newer than retired version 0.2.1");
+  if (mode === "strict" && compareStableVersions(version, retiredThroughVersion) <= 0) {
+    throw new Error(`strict candidate version must be newer than retired version ${retiredThroughVersion}`);
   }
 }
 
@@ -126,6 +127,7 @@ export async function validateArtifactManifest(identity, manifest, root = reposi
   }
   await validateChecksumManifest(contract, githubAssets, root);
   const provenance = githubAssets.find(({ name }) => name === contract.release.provenanceAsset);
+  if (!provenance) throw new Error(`artifact manifest is missing ${contract.release.provenanceAsset}`);
   await validateCandidateProvenance(resolve(root, provenance.file), identity);
   await scanCandidateText({ githubAssets, npmPackages }, root);
 
@@ -134,7 +136,8 @@ export async function validateArtifactManifest(identity, manifest, root = reposi
 
 function packageJson(tarball) {
   const result = spawnSync("tar", ["-xOf", tarball, "package/package.json"], { encoding: "utf8" });
-  if (result.status !== 0) throw new Error(`could not read package.json from ${tarball}: ${result.stderr.trim()}`);
+  if (result.error) throw new Error(`could not launch tar for ${tarball}: ${result.error.message}`);
+  if (result.status !== 0) throw new Error(`could not read package.json from ${tarball}: ${(result.stderr ?? "").trim()}`);
   try {
     return JSON.parse(result.stdout);
   } catch (error) {
@@ -144,6 +147,7 @@ function packageJson(tarball) {
 
 async function validateChecksumManifest(contract, assets, root) {
   const checksumAsset = assets.find(({ name }) => name === contract.release.checksumAsset);
+  if (!checksumAsset) throw new Error(`artifact manifest is missing ${contract.release.checksumAsset}`);
   const lines = (await readFile(resolve(root, checksumAsset.file), "utf8")).trimEnd().split(/\r?\n/u);
   const checksums = new Map();
   for (const line of lines) {
@@ -175,6 +179,7 @@ export async function validatePrebuildPublicationState(identity, state) {
   }
   if (github.repositoryPrivate !== false) throw new Error("canonical release repository must be public before candidate publication");
   if (github.immutableReleases !== true) throw new Error("canonical repository must enable immutable releases before candidate publication");
+  validatePublishedVersionFloor(identity, github.highestPublishedVersion, "GitHub");
   if (github.release !== null) {
     assertObject(github.release, "publication-state GitHub release");
     if (github.release.tag !== identity.canonicalTag || github.release.targetSha !== identity.commit) {
@@ -209,6 +214,7 @@ export async function validatePrebuildPublicationState(identity, state) {
   if (state.npm?.schemaVersion !== 1 || !Array.isArray(packages) || packages.length !== expectedPackages.size) {
     throw new Error("publication-state must contain every candidate npm identity exactly once");
   }
+  validatePublishedVersionFloor(identity, state.npm.highestPublishedVersion, "npm");
   for (const pkg of packages) {
     assertObject(pkg, "publication-state npm package");
     if (!expectedPackages.delete(pkg.name) || pkg.version !== identity.version || !["vacant", "published"].includes(pkg.state)) {
@@ -285,11 +291,11 @@ function assertObject(value, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be an object`);
 }
 
-function compareStableVersion(left, right) {
-  const a = left.split(".").map(Number);
-  const b = right.split(".").map(Number);
-  for (let index = 0; index < 3; index += 1) {
-    if (a[index] !== b[index]) return Math.sign(a[index] - b[index]);
+function validatePublishedVersionFloor(identity, highestPublishedVersion, source) {
+  if (highestPublishedVersion !== null && (typeof highestPublishedVersion !== "string" || !/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.test(highestPublishedVersion))) {
+    throw new Error(`publication-state ${source} highestPublishedVersion must be stable MAJOR.MINOR.PATCH or null`);
   }
-  return 0;
+  if (identity.mode === "strict" && highestPublishedVersion !== null && compareStableVersions(identity.version, highestPublishedVersion) <= 0) {
+    throw new Error(`strict candidate version must be newer than the highest published ${source} version ${highestPublishedVersion}`);
+  }
 }

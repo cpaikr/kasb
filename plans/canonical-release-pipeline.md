@@ -144,10 +144,12 @@ artifact set.
   publication, exact-match resume, occupied-package mismatch, root-package
   failure, and safe rerun behavior without moving a published tag or replacing
   an immutable asset.
-- The release workflow carries only the permissions needed by each job and uses
-  trusted publishing rather than retained npm tokens. Provenance validation
-  requires public repository and npm package visibility, a GitHub-hosted runner,
-  and `id-token: write` only on the publishing job.
+- Candidate rehearsal validates the provenance contract without public
+  repository visibility or `id-token: write`. The protected publication jobs
+  use only their scoped permissions and trusted publishing rather than retained
+  npm tokens; public repository and npm package visibility, GitHub-hosted
+  execution, and `id-token: write` are strict-publication prerequisites. See
+  `docs/release.md` for the canonical operator contract.
 - The existing deterministic and continuous Linux validation remains green and
   the full candidate workflow can be exercised without performing external
   publication.

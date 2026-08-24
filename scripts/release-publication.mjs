@@ -5,6 +5,7 @@ import {
   PublicationContractError,
   validateCandidateForPublication,
 } from "./release-publication-contract.mjs";
+import { compareStableVersions } from "./release-contract.mjs";
 
 const defaultRegistryLimit = 128 * 1024 * 1024;
 
@@ -123,12 +124,13 @@ export async function executeGitHubPublication(candidateInput, adapter) {
 export async function executeNpmPublication(candidateInput, githubReceipt, adapter, { maxRegistryTarballBytes = defaultRegistryLimit } = {}) {
   const candidate = strictCandidate(candidateInput);
   requireImmutableGitHubReceipt(candidate, githubReceipt);
-  requireAdapter(adapter, ["inspectPackage", "readCandidateFile", "publishPackage"]);
+  requireAdapter(adapter, ["highestPublishedVersion", "inspectPackage", "readCandidateFile", "publishPackage"]);
   if (!Number.isSafeInteger(maxRegistryTarballBytes) || maxRegistryTarballBytes <= 0) {
     fail("npm_tarball_limit", "npm registry tarball limit must be a positive safe integer");
   }
   const receipt = baseReceipt("npm", candidate);
   try {
+    await requireNoNpmVersionRegression(candidate, adapter);
     const snapshot = await npmSnapshot(candidate, adapter, maxRegistryTarballBytes);
     const initial = planNpmPublication(candidate, snapshot);
     for (const action of initial.actions) {
@@ -141,6 +143,7 @@ export async function executeNpmPublication(candidateInput, githubReceipt, adapt
         continue;
       }
       const bytes = await verifiedCandidateBytes(adapter, pkg);
+      await requireNoNpmVersionRegression(candidate, adapter);
       const operation = pendingOperation(receipt, {
         type: "publishPackage",
         name: pkg.name,
@@ -182,7 +185,8 @@ export async function executeNpmPublication(candidateInput, githubReceipt, adapt
 async function npmSnapshot(candidate, adapter, limit) {
   const packages = [];
   for (const pkg of candidate.npmPackages) packages.push(await inspectOne(pkg, adapter, limit));
-  return { schemaVersion: 1, packages };
+  const highestPublishedVersion = await adapter.highestPublishedVersion(candidate.npmPackages.map(({ name }) => name));
+  return { schemaVersion: 1, highestPublishedVersion, packages };
 }
 
 async function inspectOne(pkg, adapter, limit) {
@@ -211,6 +215,16 @@ async function requireAllNativesExact(candidate, adapter, limit) {
     if (observed.state !== "published" || observed.sha256 !== pkg.sha256) {
       fail("npm_root_blocked", "root npm publication is blocked until every native identity is exact");
     }
+  }
+}
+
+async function requireNoNpmVersionRegression(candidate, adapter) {
+  const highest = await adapter.highestPublishedVersion(candidate.npmPackages.map(({ name }) => name));
+  if (highest !== null && (typeof highest !== "string" || !/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u.test(highest))) {
+    fail("npm_version_state", "npm highest published version must be stable MAJOR.MINOR.PATCH or null");
+  }
+  if (highest !== null && compareStableVersions(candidate.version, highest) < 0) {
+    fail("candidate_version_regression", `${candidate.version} is older than published npm version ${highest}`);
   }
 }
 

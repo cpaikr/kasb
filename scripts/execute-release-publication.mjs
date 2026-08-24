@@ -6,7 +6,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 
 import { executeGitHubPublication, executeNpmPublication } from "./release-publication.mjs";
-import { loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
+import { highestStableVersion, loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
 
 const contract = await loadReleaseContract();
 const metadataCommandLimits = {
@@ -50,6 +50,13 @@ async function writeReceiptAtomically(output, receipt) {
 }
 
 function githubAdapter(candidate, runCommand = command, policyToken = required(process.env.KASB_RELEASE_POLICY_TOKEN, "KASB_RELEASE_POLICY_TOKEN is required for live release-policy checks")) {
+  const stateCommandLimits = {
+    maxOutputBytes: contract.release.metadataLimitBytes,
+    timeoutMs: (
+      (candidate.githubAssets?.length ?? contract.targets.length + 4) * contract.release.archiveRequestTimeoutSeconds
+      + 10 * contract.release.requestTimeoutSeconds
+    ) * 1000,
+  };
   return {
     async readCandidateFile(path) { return readFile(resolve(repositoryRoot, path)); },
     async readState() {
@@ -61,7 +68,7 @@ function githubAdapter(candidate, runCommand = command, policyToken = required(p
           "--commit", candidate.commit,
           "--output", outputPath,
           "--github-only", "true",
-        ], { ...metadataCommandLimits, env: { ...process.env, GH_TOKEN: policyToken } });
+        ], { ...stateCommandLimits, env: { ...process.env, GH_TOKEN: policyToken } });
         return JSON.parse(await readFile(outputPath, "utf8")).github;
       } finally { await rm(directory, { recursive: true, force: true }); }
     },
@@ -84,6 +91,18 @@ function githubAdapter(candidate, runCommand = command, policyToken = required(p
 function npmAdapter(runCommand = command, downloadFile = commandToFile) {
   return {
     async readCandidateFile(path) { return readFile(resolve(repositoryRoot, path)); },
+    async highestPublishedVersion(packageNames) {
+      const versions = [];
+      for (const name of packageNames) {
+        const viewed = await runCommand("npm", ["view", name, "versions", "--json"], { ...metadataCommandLimits, allowNotFound: true });
+        if (viewed.notFound) continue;
+        const value = JSON.parse(viewed.stdout);
+        const entries = Array.isArray(value) ? value : [value];
+        if (entries.some((entry) => typeof entry !== "string")) throw new Error(`npm returned invalid version history for ${name}`);
+        versions.push(...entries);
+      }
+      return highestStableVersion(versions);
+    },
     async inspectPackage({ name, version, maxBytes }) {
       const viewed = await runCommand("npm", ["view", `${name}@${version}`, "dist.tarball", "--json"], { ...metadataCommandLimits, allowNotFound: true });
       if (viewed.notFound) return { state: "vacant" };
@@ -266,6 +285,7 @@ async function selfTest() {
     githubCalls.push({ executable, args });
     if (executable === process.execPath) {
       assert.equal(options.env.GH_TOKEN, "policy-token");
+      assert(options.timeoutMs > contract.release.archiveRequestTimeoutSeconds * 1000);
       const outputPath = args[args.indexOf("--output") + 1];
       await writeFile(outputPath, `${JSON.stringify({ github: { state: "vacant" } })}\n`);
     } else if (args[1] === "upload") {

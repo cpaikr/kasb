@@ -24,8 +24,8 @@ binary without runtime addon downloads.
   verification, recoverable replacement, and ordinary-command isolation.
 - Deterministic, installer, Rust, Node, formatting, clippy, license, freshness,
   and continuous native validation passed before merge. The final hosted run
-  also executed the generated PowerShell installer and compiled the Windows
-  replacement protocol, closing the local macOS host's `pwsh` coverage gap.
+  also executed the generated PowerShell installer and the Windows replacement
+  behavior tests, closing the local macOS host's `pwsh` coverage gap.
 - `cpaikr/kasb` is currently private. Its release assets cannot be the
   unauthenticated canonical installation source until the separately
   authorized visibility change makes that repository public.
@@ -135,9 +135,11 @@ binary without runtime addon downloads.
 
 - PR #22 merged at `e9c707d` after CodeRabbit feedback was resolved.
 - Its final hosted CI run `32690717196` passed deterministic validation,
-  PowerShell installer behavior on hosted Linux and Windows, Windows upgrade
-  compilation, immutable root npm validation, Linux GNU x64/ARM64 native and
-  clean-consumer validation, and aggregate artifact validation.
+  PowerShell installer behavior on hosted Linux and Windows, and
+  `cargo test --locked -p kasb-cli --lib` on Windows, including
+  `windows_helper_executes_success_rollback_failure_and_crash_protocols`.
+  Immutable root npm validation, Linux GNU x64/ARM64 native and clean-consumer
+  validation, and aggregate artifact validation also passed.
 - The repository contract derives identities for all four supported targets.
   Fresh macOS ARM64 and Windows x64 native artifacts were produced and
   validated by the completed pipeline plan, not by continuous CI.
