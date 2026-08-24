@@ -48,6 +48,7 @@ struct ReleasePolicy {
     archive_limit_bytes: usize,
     request_timeout_seconds: u64,
     archive_request_timeout_seconds: u64,
+    transfer_stall_timeout_seconds: u64,
     connect_timeout_seconds: u64,
     redirect_limit: usize,
 }
@@ -640,6 +641,7 @@ struct GithubReleaseSource {
     metadata_limit: usize,
     metadata_timeout: Duration,
     archive_timeout: Duration,
+    stall_timeout: Duration,
 }
 
 impl GithubReleaseSource {
@@ -662,6 +664,7 @@ impl GithubReleaseSource {
             metadata_limit: policy.metadata_limit_bytes,
             metadata_timeout: Duration::from_secs(policy.request_timeout_seconds),
             archive_timeout: Duration::from_secs(policy.archive_request_timeout_seconds),
+            stall_timeout: Duration::from_secs(policy.transfer_stall_timeout_seconds),
         })
     }
 
@@ -677,6 +680,7 @@ impl GithubReleaseSource {
             .header(ACCEPT, "application/vnd.github+json")
             .header(USER_AGENT, format!("kasb/{VERSION}"))
             .timeout(timeout)
+            .read_timeout(self.stall_timeout)
             .send()
             .await
             .map_err(|error| {
@@ -2175,6 +2179,10 @@ mod tests {
             Duration::from_secs(manifest.release.archive_request_timeout_seconds)
         );
         assert!(source.archive_timeout > source.metadata_timeout);
+        assert_eq!(
+            source.stall_timeout,
+            Duration::from_secs(manifest.release.transfer_stall_timeout_seconds)
+        );
     }
 
     #[test]
