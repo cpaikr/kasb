@@ -97,6 +97,20 @@ function Flush-DurableFile([string]$Path) {
   $Stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
   try { $Stream.Flush($true) } finally { $Stream.Dispose() }
 }
+function Get-Sha256Hex([string]$Path) {
+  $Stream = [System.IO.File]::Open($Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+  try {
+    $Algorithm = [System.Security.Cryptography.SHA256]::Create()
+    try {
+      $Digest = $Algorithm.ComputeHash($Stream)
+      return ([System.BitConverter]::ToString($Digest)).Replace('-', '').ToLowerInvariant()
+    } finally {
+      $Algorithm.Dispose()
+    }
+  } finally {
+    $Stream.Dispose()
+  }
+}
 function Test-AnyPath([string]$Path) {
   return [System.IO.File]::Exists($Path) -or [System.IO.Directory]::Exists($Path)
 }
@@ -234,9 +248,18 @@ try {
   if ($Metadata.immutable -isnot [bool] -or $Metadata.immutable -ne $true) { throw "kasb: release is not immutable" }
   if ($Metadata.draft -isnot [bool] -or $Metadata.prerelease -isnot [bool]) { throw "kasb: release production flags are invalid" }
   if ($Metadata.draft -ne $false -or $Metadata.prerelease -ne $false) { throw "kasb: release is not a production release" }
-  if ($Metadata.tag_name -ne $Tag) { throw "kasb: release tag identity mismatch" }
-  $ArchiveAssets = @($Metadata.assets | Where-Object { $_.name -eq $Archive })
-  $ChecksumAssets = @($Metadata.assets | Where-Object { $_.name -eq $ChecksumAsset })
+  if ($Metadata.tag_name -isnot [string] -or $Metadata.tag_name -cne $Tag) { throw "kasb: release tag identity mismatch" }
+  $ReleaseAssets = @($Metadata.assets)
+  foreach ($Asset in $ReleaseAssets) {
+    if ($null -eq $Asset -or $Asset.name -isnot [string]) { throw "kasb: release asset name identity is invalid" }
+  }
+  $CaseVariantAssets = @($ReleaseAssets | Where-Object {
+    ($_.name -ieq $Archive -and $_.name -cne $Archive) -or
+    ($_.name -ieq $ChecksumAsset -and $_.name -cne $ChecksumAsset)
+  })
+  if ($CaseVariantAssets.Count -ne 0) { throw "kasb: release asset name identity is invalid" }
+  $ArchiveAssets = @($ReleaseAssets | Where-Object { $_.name -ceq $Archive })
+  $ChecksumAssets = @($ReleaseAssets | Where-Object { $_.name -ceq $ChecksumAsset })
   if ($ArchiveAssets.Count -ne 1) { throw "kasb: release archive is missing or duplicated" }
   if ($ChecksumAssets.Count -ne 1) { throw "kasb: release checksum manifest is missing or duplicated" }
   $ArchiveAsset = $ArchiveAssets[0]
@@ -249,16 +272,16 @@ try {
   Save-BoundedReleaseFile "$DownloadBase/$Repository/releases/download/$Tag/$ChecksumAsset" $Checksums 1048576
   if ((Get-Item -LiteralPath $ArchivePath).Length -ne [long]$ArchiveAsset.size) { throw "kasb: release archive size identity mismatch" }
   if ((Get-Item -LiteralPath $Checksums).Length -ne [long]$ChecksumAssetMetadata.size) { throw "kasb: release checksum size identity mismatch" }
-  $Line = @(Get-Content $Checksums | Where-Object { $_ -match "^[0-9a-fA-F]{64}  $([regex]::Escape($Archive))$" })
+  $Line = @(Get-Content $Checksums | Where-Object { $_ -cmatch "^[0-9a-fA-F]{64}  $([regex]::Escape($Archive))$" })
   if ($Line.Count -ne 1) { throw "kasb: invalid or missing archive checksum" }
   $Expected = $Line[0].Substring(0, 64).ToLowerInvariant()
-  $Actual = (Get-FileHash -Algorithm SHA256 $ArchivePath).Hash.ToLowerInvariant()
+  $Actual = Get-Sha256Hex $ArchivePath
   if ($Actual -ne $Expected) { throw "kasb: archive checksum mismatch" }
   $Staged = Join-Path $Work $Executable
   Extract-TarExecutable $ArchivePath $Executable $Staged 134217728
   if (-not $RunningWindows) { [System.IO.File]::SetUnixFileMode($Staged, [System.IO.UnixFileMode]493) }
   Test-BoundedExecutableIdentity $Staged "kasb $Version"
-  $Digest = (Get-FileHash -Algorithm SHA256 $Staged).Hash.ToLowerInvariant()
+  $Digest = Get-Sha256Hex $Staged
   $ReceiptStaged = Join-Path $Work "receipt.new"
   $ReceiptJson = [ordered]@{ schemaVersion = 1; manager = 'standalone'; version = $Version; target = $Target; executable = [System.IO.Path]::GetFullPath($Destination); releaseRepository = $Repository; releaseTag = $Tag; assetName = $Archive; sha256 = $Digest } | ConvertTo-Json -Compress
   [System.IO.File]::WriteAllText($ReceiptStaged, $ReceiptJson + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))

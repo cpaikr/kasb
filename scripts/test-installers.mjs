@@ -288,6 +288,7 @@ async function fixtureFor(target, options = {}) {
 function configureRelease(fixture, options = {}) {
   routes.clear();
   const { target, archive, checksums } = fixture;
+  const checksumBody = options.checksumBody ?? checksums;
   const tag = releaseTag(contract.release, contract.version);
   const downloadUrl = (name) => `https://github.com/${contract.release.repository}/releases/download/${tag}/${name}`;
   const archiveAsset = {
@@ -298,7 +299,7 @@ function configureRelease(fixture, options = {}) {
   const assets = [
     ...(!options.omitArchive ? [archiveAsset] : []),
     ...(options.duplicateArchive ? [archiveAsset] : []),
-    { name: contract.release.checksumAsset, size: checksums.length + (options.checksumSizeDelta ?? 0), browser_download_url: downloadUrl(contract.release.checksumAsset) },
+    { name: contract.release.checksumAsset, size: checksumBody.length + (options.checksumSizeDelta ?? 0), browser_download_url: downloadUrl(contract.release.checksumAsset) },
   ];
   const metadata = {
     tag_name: options.tagName ?? tag,
@@ -316,7 +317,7 @@ function configureRelease(fixture, options = {}) {
     body: options.archiveBody ?? archive,
   });
   routes.set(`/${contract.release.repository}/releases/download/${tag}/${contract.release.checksumAsset}`, {
-    body: checksums,
+    body: checksumBody,
   });
 }
 
@@ -341,9 +342,10 @@ function runShell(target, installDir, extra = {}) {
 async function validatePowerShellInstaller() {
   const text = await readFile(resolve(repositoryRoot, "installers/install.ps1"), "utf8");
   for (const target of contract.targets) assert(text.includes(target.archiveName), `PowerShell installer lacks ${target.archiveName}`);
-  for (const required of ["immutable", "Get-FileHash", "schemaVersion", "manager = 'standalone'", "Save-BoundedReleaseFile", "ResponseHeadersRead", "Move-ExactFile", "finally", "Extract-TarExecutable", "pre-existing installation paths must be regular files", ".kasb-install."]) {
+  for (const required of ["immutable", "Get-Sha256Hex", "[System.Security.Cryptography.SHA256]::Create()", "schemaVersion", "manager = 'standalone'", "Save-BoundedReleaseFile", "ResponseHeadersRead", "Move-ExactFile", "finally", "Extract-TarExecutable", "pre-existing installation paths must be regular files", ".kasb-install.", "-cne $Tag", "-ceq $Archive", "-cmatch"]) {
     assert(text.includes(required), `PowerShell installer lacks ${required} contract`);
   }
+  assert(!text.includes("Get-FileHash"), "PowerShell installer depends on an optional hashing cmdlet");
   assert(!/\btar\s+-/u.test(text), "PowerShell installer depends on an external tar executable");
   const executable = process.platform === "win32"
     ? "powershell.exe"
@@ -407,12 +409,25 @@ async function validatePowerShellInstaller() {
     configureRelease(fixture, { metadataBody: (metadata) => Buffer.from(JSON.stringify(mutate(metadata))) });
     assert((await runPowerShell(executable, target, join(root, `PowerShell ${name}`))).code !== 0, `${name} PowerShell release flags were accepted`);
   }
+  for (const [name, mutate] of [
+    ["array tag", (metadata) => ({ ...metadata, tag_name: [metadata.tag_name] })],
+    ["case-variant tag", (metadata) => ({ ...metadata, tag_name: metadata.tag_name.toUpperCase() })],
+    ["array asset name", (metadata) => ({ ...metadata, assets: metadata.assets.map((asset, index) => index === 0 ? { ...asset, name: [asset.name] } : asset) })],
+    ["case-variant archive name", (metadata) => ({ ...metadata, assets: metadata.assets.map((asset, index) => index === 0 ? { ...asset, name: asset.name.toUpperCase() } : asset) })],
+    ["case-variant checksum name", (metadata) => ({ ...metadata, assets: metadata.assets.map((asset, index) => index === 1 ? { ...asset, name: asset.name.toLowerCase() } : asset) })],
+    ["additional case-variant asset", (metadata) => ({ ...metadata, assets: [...metadata.assets, { ...metadata.assets[0], name: metadata.assets[0].name.toUpperCase() }] })],
+  ]) {
+    configureRelease(fixture, { metadataBody: (metadata) => Buffer.from(JSON.stringify(mutate(metadata))) });
+    assert((await runPowerShell(executable, target, join(root, `PowerShell ${name}`))).code !== 0, `${name} PowerShell release identity was accepted`);
+  }
   configureRelease(fixture, { omitArchive: true });
   assert((await runPowerShell(executable, target, join(root, "PowerShell missing"))).code !== 0, "missing PowerShell archive was accepted");
   configureRelease(fixture, { duplicateArchive: true });
   assert((await runPowerShell(executable, target, join(root, "PowerShell duplicated archive metadata"))).code !== 0, "duplicated PowerShell archive metadata was accepted");
   configureRelease(fixture, { archiveSizeDelta: 1 });
   assert((await runPowerShell(executable, target, join(root, "PowerShell mismatched archive size"))).code !== 0, "mismatched PowerShell archive size was accepted");
+  configureRelease(fixture, { checksumBody: Buffer.from(fixture.checksums.toString("utf8").replace(target.archiveName, target.archiveName.toUpperCase())) });
+  assert((await runPowerShell(executable, target, join(root, "PowerShell case-variant checksum entry"))).code !== 0, "case-variant PowerShell checksum entry was accepted");
   configureRelease(fixture, { metadataBody: Buffer.alloc(contract.release.metadataLimitBytes + 1, 0x20) });
   assert((await runPowerShell(executable, target, join(root, "PowerShell oversized metadata"))).code !== 0, "oversized PowerShell release metadata was accepted");
 
