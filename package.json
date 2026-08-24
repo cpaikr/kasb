@@ -29,7 +29,9 @@
     "native:artifacts": "node scripts/validate-release-artifacts.mjs",
     "release:generate": "node scripts/generate-native-packages.mjs && node scripts/generate-release-assets.mjs",
     "release:check": "node scripts/validate-release-contract.mjs",
+    "release:candidate": "node scripts/validate-release-candidate.mjs",
     "release:checksums": "node scripts/write-release-checksums.mjs",
+    "test:release-pipeline": "node scripts/test-release-candidate.mjs && node scripts/test-release-publication.mjs",
     "licenses:generate": "node scripts/check-third-party-licenses.mjs --write && node scripts/generate-native-packages.mjs",
     "licenses:check": "node scripts/check-third-party-licenses.mjs"
   },

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { loadReleaseContract, releaseDownloadUrl, releaseTag, repositoryRoot } from "./release-contract.mjs";
+import { loadReleaseContract, releaseAssetNames, releaseDownloadUrl, releaseTag, repositoryRoot } from "./release-contract.mjs";
 
 const failures = [];
 const check = (condition, message) => { if (!condition) failures.push(message); };
@@ -43,8 +43,15 @@ for (const target of contract.targets) {
 }
 check(contract.targets.length === 4, "release identity must cover all four supported targets exactly");
 check(contract.release.repository === "cpaikr/kasb", "release repository identity must remain cpaikr/kasb");
+check(contract.release.shellInstallerAsset === "install.sh", "shell installer release identity must remain install.sh");
+check(contract.release.powershellInstallerAsset === "install.ps1", "PowerShell installer release identity must remain install.ps1");
+check(contract.release.provenanceAsset === "provenance.json", "release provenance identity must remain provenance.json");
 check(contract.release.receiptSchemaVersion === 1, "receipt schema version must remain explicit");
 check(contract.release.receiptFile === ".kasb-receipt.json", "receipt filename must remain stable");
+check(contract.release.candidateReceiptFile === "candidate.json", "candidate receipt filename must remain stable");
+for (const target of contract.targets) {
+  check(typeof target.releaseRunner === "string" && target.releaseRunner.length > 0, `${target.rustTarget} is missing a release runner`);
+}
 check(
   JSON.stringify(contract.release.archiveEntries) === JSON.stringify(["{executable}", "LICENSE.md", "README.md", "THIRD_PARTY_LICENSES.html"]),
   "standalone archive entries must remain one exact shared release contract",
@@ -81,7 +88,7 @@ if (process.env.KASB_RELEASE_METADATA) {
   failures.push(...releaseMetadataFailures(release, contract));
 }
 
-const expectedMetadataAssets = [...contract.targets.map(({ archiveName }) => archiveName), contract.release.checksumAsset];
+const expectedMetadataAssets = releaseAssetNames(contract);
 const validMetadataFixture = {
   immutable: true,
   draft: false,
@@ -119,7 +126,7 @@ function releaseMetadataFailures(release, releaseContract) {
   requireMetadata(release.immutable === true, "release metadata must be immutable");
   requireMetadata(release.draft === false && release.prerelease === false, "release metadata must describe a production release");
   requireMetadata(release.tag_name === releaseTag(releaseContract.release, releaseContract.version), "release metadata tag differs from canonical version");
-  const expectedAssets = [...releaseContract.targets.map(({ archiveName }) => archiveName), releaseContract.release.checksumAsset];
+  const expectedAssets = releaseAssetNames(releaseContract);
   const actualAssets = (release.assets ?? []).map(({ name }) => name);
   requireMetadata(
     JSON.stringify([...actualAssets].sort()) === JSON.stringify([...expectedAssets].sort()),
@@ -130,7 +137,9 @@ function releaseMetadataFailures(release, releaseContract) {
     requireMetadata(matches.length === 1, `release metadata must contain exactly one ${expected}`);
     const [asset] = matches;
     if (!asset) continue;
-    const limit = expected === releaseContract.release.checksumAsset ? releaseContract.release.metadataLimitBytes : releaseContract.release.archiveLimitBytes;
+    const limit = releaseContract.targets.some(({ archiveName }) => archiveName === expected)
+      ? releaseContract.release.archiveLimitBytes
+      : releaseContract.release.metadataLimitBytes;
     requireMetadata(Number.isSafeInteger(asset.size) && asset.size > 0 && asset.size <= limit, `${expected} metadata has an invalid bounded size`);
     requireMetadata(asset.browser_download_url === releaseDownloadUrl(releaseContract.release, release.tag_name, expected), `${expected} metadata has a noncanonical download URL`);
   }

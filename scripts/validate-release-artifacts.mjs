@@ -2,11 +2,14 @@ import { readdir, readFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
+import { checksummedReleaseAssetNames, loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
 
 const inputs = process.argv.slice(2);
 const ciOnly = inputs[0] === "--ci";
 if (ciOnly) inputs.shift();
+const candidate = inputs[0] === "--candidate";
+if (candidate) inputs.shift();
+if (ciOnly && candidate) throw new Error("--ci and --candidate are mutually exclusive.");
 const nativeDirectory = resolve(repositoryRoot, inputs[0] ?? "dist/native");
 const rootDirectory = resolve(repositoryRoot, inputs[1] ?? "dist/root");
 const cliDirectory = resolve(repositoryRoot, inputs[2] ?? "dist/cli");
@@ -41,8 +44,11 @@ if (rootTarballs.length !== 1) throw new Error(`Expected one root tarball, found
 if (cliArchives.length !== expectedNative.size) {
   throw new Error(`Expected ${expectedNative.size} direct CLI archives, found ${cliArchives.length}.`);
 }
-if (checksums.size !== expectedNative.size) {
-  throw new Error(`Expected ${expectedNative.size} exact checksum entries, found ${checksums.size}.`);
+const expectedChecksums = candidate
+  ? checksummedReleaseAssetNames(contract)
+  : validatedTargets.map(({ archiveName }) => archiveName);
+if (JSON.stringify([...checksums.keys()].sort()) !== JSON.stringify([...expectedChecksums].sort())) {
+  throw new Error(`Expected the exact ${candidate ? "publishable candidate asset" : "standalone archive"} checksum set.`);
 }
 
 const seen = new Set();

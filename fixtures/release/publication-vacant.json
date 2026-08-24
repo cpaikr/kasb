@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "source": "fixture",
+  "github": {
+    "schemaVersion": 1,
+    "repository": "cpaikr/kasb",
+    "repositoryPrivate": false,
+    "immutableReleases": true,
+    "tag": "__CANDIDATE_TAG__",
+    "tagSha": "__CANDIDATE_SHA__",
+    "release": null
+  },
+  "npm": {
+    "schemaVersion": 1,
+    "packages": [
+      { "name": "@sjunepark/kasb-linux-x64-gnu", "version": "__CANDIDATE_VERSION__", "state": "vacant" },
+      { "name": "@sjunepark/kasb-linux-arm64-gnu", "version": "__CANDIDATE_VERSION__", "state": "vacant" },
+      { "name": "@sjunepark/kasb-darwin-arm64", "version": "__CANDIDATE_VERSION__", "state": "vacant" },
+      { "name": "@sjunepark/kasb-win32-x64-msvc", "version": "__CANDIDATE_VERSION__", "state": "vacant" },
+      { "name": "@sjunepark/kasb", "version": "__CANDIDATE_VERSION__", "state": "vacant" }
+    ]
+  }
+}
