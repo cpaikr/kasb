@@ -25,9 +25,9 @@ artifact set.
 - Historical tags, GitHub Releases, and npm versions through `0.2.1` describe
   the retired TypeScript/Pi product. The latest GitHub Release has no standalone
   binary assets.
-- The source repository is private, so the release contract must choose either
-  a public source repository or a separate public release repository before
-  unauthenticated GitHub installation and upgrades can work.
+- The source and canonical release repository is private, so unauthenticated
+  installation and upgrades require the separately authorized visibility
+  change before the first real release.
 
 ## Decisions
 
@@ -40,6 +40,11 @@ artifact set.
   artifact validation.
 - Release jobs consume the immutable artifacts already validated by the
   candidate workflow. GitHub and npm publication do not rebuild them.
+- Candidate metadata has shared strict and rehearsal modes. Strict mode requires
+  the real `v<version>` tag and live publication-vacancy checks. Rehearsal mode
+  binds the canonical source version to an unmistakable synthetic candidate
+  ref and deterministic publication-state fixtures, while exercising the same
+  artifact generators and validators without claiming or reserving a version.
 - GitHub Release assets include every supported standalone archive, the
   checksum manifest, generated shell and PowerShell installers, and bounded
   source/revision/toolchain provenance.
@@ -61,12 +66,12 @@ artifact set.
 - Extract or add reusable validation and full-target candidate workflows so PR
   CI and tagged releases invoke the same repository-owned contracts at their
   appropriate breadth.
-- Add a release metadata gate that verifies the canonical version, `v<version>`
-  tag, checked-out commit, clean generated state, target set, and absence of an
-  already-published candidate identity before build or mutation.
+- Add a shared release metadata gate whose strict mode verifies the canonical
+  version, `v<version>` tag, checked-out commit, clean generated state, target
+  set, and absence of an already-published candidate identity before build or
+  mutation, while rehearsal mode replaces only the tag and live-vacancy inputs.
 - Bind workflow permissions, release URLs, provenance, installers, and upgrade
-  discovery to the approved public release repository without silently
-  duplicating canonical release state across repositories.
+  discovery to `cpaikr/kasb` without duplicating canonical release state.
 - Build the Node addon and Rust CLI once per target, then derive the native npm
   tarball and standalone archive from those exact binaries.
 - Generate installers, checksums, and provenance from the release contract and
@@ -102,8 +107,34 @@ artifact set.
   the full candidate workflow can be exercised without performing external
   publication.
 
+## Completion criteria
+
+- One reusable candidate workflow runs deterministic validation and builds,
+  consumes, and aggregates the exact Linux GNU x64/ARM64, macOS ARM64, and
+  Windows x64 artifacts derived from the canonical release contract.
+- Strict and rehearsal metadata modes share all artifact and identity
+  validation; only the real tag and live publication-vacancy inputs are
+  substituted by explicit synthetic rehearsal inputs.
+- Protected GitHub and npm publication jobs consume the validated candidate
+  without rebuilding, declare least-privilege permissions, use npm trusted
+  publishing, preserve immutable tag/asset rules, and cannot run from the
+  non-publishing rehearsal path.
+- Deterministic failure injection proves incomplete matrices, failed gates,
+  interrupted uploads, occupied identities, partial npm publication, root
+  failure, and safe reruns are detected and reported without moving tags or
+  replacing immutable assets.
+- Operator documentation identifies public repository visibility, protected
+  environment configuration, and npm trusted-publisher registration as
+  externally authorized first-release prerequisites and gives verification
+  steps without performing them.
+- The non-publishing four-target rehearsal passes on the exact candidate
+  workflow, existing continuous validation remains green, repository-required
+  review passes, the implementation PR is merged, and planning records the
+  evidence truthfully.
+
 ## Next action
 
-After the release and managed-upgrade contract is implemented and reviewable,
-factor its build and validation commands into a non-publishing full-target
-candidate workflow before adding GitHub or npm mutation jobs.
+After the release and managed-upgrade contract satisfies its completion
+criteria and merges, factor its build and validation commands into a
+non-publishing full-target candidate workflow before adding guarded GitHub or
+npm mutation jobs.

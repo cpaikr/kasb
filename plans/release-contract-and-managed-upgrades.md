@@ -32,6 +32,10 @@ binary without runtime addon downloads.
 
 - Publicly accessible GitHub Releases are the canonical standalone CLI source.
   Tags and published assets are immutable; corrections use a new version.
+- `cpaikr/kasb` is the single canonical source and release repository. This
+  work binds artifacts, installers, receipts, provenance, and upgrade discovery
+  to that identity without changing its visibility; public visibility remains
+  a separately authorized first-release prerequisite.
 - One canonical product version must reconcile the source tag, Rust workspace,
   npm root, native npm packages, CLI-reported version, archive names, and release
   metadata. The first Rust/Node release must use an unpublished version newer
@@ -61,9 +65,8 @@ binary without runtime addon downloads.
 
 - Choose and enforce the canonical version source; generate or reconcile every
   derived version and reject tag, checkout, package, archive, or binary skew.
-- Decide whether `cpaikr/kasb` becomes public or a separate public release
-  repository owns the canonical assets, then keep release discovery, receipts,
-  installers, and provenance bound to that single host identity.
+- Bind release discovery, receipts, installers, provenance, and validation to
+  `cpaikr/kasb`, with no second release repository or duplicated tag authority.
 - Add stable CLI version discovery suitable for installer and upgrade identity
   checks.
 - Extend the target model and generators for versioned archives, a checksum
@@ -98,9 +101,29 @@ binary without runtime addon downloads.
 - Exact standalone binaries remain byte-identical to the CLI binaries carried
   by their corresponding npm platform packages.
 
+## Completion criteria
+
+- Cargo workspace metadata is the canonical product-version source, and a
+  repository-owned freshness gate rejects every Cargo, npm, generated package,
+  binary, archive, installer, checksum, receipt, and release-metadata skew.
+- `native-targets.json` derives the complete four-target standalone asset,
+  checksum, installer-selection, and receipt identities without duplicating the
+  target matrix elsewhere.
+- Shell and PowerShell installer tests pass for every specified success and
+  failure path, and their installed binaries and receipts satisfy the canonical
+  identity and digest checks.
+- `kasb --version`, `kasb upgrade --check`, and recoverable `kasb upgrade`
+  satisfy the managed/unmanaged, rollback, Windows replacement, network-bound,
+  and ordinary-command isolation contracts in deterministic tests.
+- Architecture, product, CLI, and release documentation describe the same
+  standalone/npm ownership boundary, current private-host prerequisite, and
+  separately authorized production release.
+- Repository-required validation and review pass, the implementation PR is
+  merged, and this plan leaves `ROADMAP.md` Current only after those gates are
+  recorded truthfully.
+
 ## Next action
 
-Choose the canonical product-version source—prefer the Cargo workspace version
-unless a dedicated release manifest proves simpler—and add a repository-owned
-validator that rejects the current Cargo/npm/version-tag skew before extending
-artifact or upgrade behavior.
+Make Cargo workspace metadata the canonical product-version source and add a
+repository-owned validator that rejects the current Cargo/npm/version-tag skew
+before extending artifact or upgrade behavior.

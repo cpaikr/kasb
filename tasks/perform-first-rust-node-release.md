@@ -18,6 +18,8 @@ GitHub Releases, and registry publication.
 ## Next action
 
 After both scheduled release plans pass review and exhaustive dry-run
-validation, request explicit authorization for the new version and real
-GitHub/npm publication; do not select a version, create a tag, or publish before
-that approval.
+validation, request explicit authorization to make `cpaikr/kasb` public,
+configure and verify protected release environments and npm trusted publishing,
+select the new version, create its tag, and perform real GitHub/npm publication.
+Do not mutate any of those external settings or release identities before that
+approval.
