@@ -1,0 +1,285 @@
+name: Canonical release publication
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canonical-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publication-state:
+    name: Capture strict pre-build publication state
+    runs-on: ubuntu-24.04
+    outputs:
+      artifact_name: strict-publication-state
+    steps:
+      - name: Check out immutable tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - name: Verify the tag peels to this checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/tags/$GITHUB_REF_NAME" ]]
+          [[ "$(git rev-list -n 1 "$GITHUB_REF_NAME")" == "$GITHUB_SHA" ]]
+      - name: Capture read-only live publication state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
+      - name: Upload immutable state snapshot
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: strict-publication-state
+          path: dist/release/publication-state.json
+          if-no-files-found: error
+          retention-days: 7
+
+  candidate:
+    name: Build and validate complete candidate
+    needs: publication-state
+    uses: ./.github/workflows/candidate.yml
+    with:
+      mode: strict
+      candidate_ref: ${{ github.ref }}
+      candidate_sha: ${{ github.sha }}
+      publication_state_artifact: ${{ needs.publication-state.outputs.artifact_name }}
+    permissions:
+      contents: read
+
+  github-release:
+    name: Stage and publish immutable GitHub Release
+    needs: [publication-state, candidate]
+    runs-on: ubuntu-24.04
+    environment: github-release
+    permissions:
+      contents: write
+    steps:
+      - name: Check out exact candidate commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - name: Download validated candidate by immutable artifact ID
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.candidate.outputs.candidate_artifact_id }}
+          path: dist
+      - name: Record server-computed candidate digest
+        env:
+          CANDIDATE_DIGEST: ${{ needs.candidate.outputs.candidate_artifact_digest }}
+        run: |
+          [[ "$CANDIDATE_DIGEST" =~ ^(?:sha256:)?[0-9a-f]{64}$ ]]
+          echo "Validated candidate artifact digest: $CANDIDATE_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+      - name: Recheck live state and plan safe staging
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
+          node scripts/plan-github-publication.mjs --state dist/release/publication-state.json --phase stage
+          jq -e '.ok and .mutationAllowed' dist/release/github-publication-plan.json >/dev/null
+      - name: Execute only planned staging actions
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r action; do
+            type=$(jq -r '.type' <<<"$action")
+            case "$type" in
+              createDraft)
+                tag=$(jq -r '.tag' <<<"$action")
+                target=$(jq -r '.targetSha' <<<"$action")
+                if ! gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag --target "$target" --draft --title "$tag" --generate-notes; then
+                  node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
+                  node scripts/plan-github-publication.mjs --state dist/release/publication-state.json --phase stage
+                  jq -e '[.actions[] | select(.type == "createDraft")] | length == 0' dist/release/github-publication-plan.json >/dev/null
+                fi
+                ;;
+              uploadAsset)
+                file=$(jq -r '.file' <<<"$action")
+                name=$(jq -r '.name' <<<"$action")
+                [[ -f "$file" ]] || { echo "planned asset is missing: $file" >&2; exit 1; }
+                if ! gh release upload "$GITHUB_REF_NAME" "$file" --repo "$GITHUB_REPOSITORY"; then
+                  node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
+                  node scripts/plan-github-publication.mjs --state dist/release/publication-state.json --phase stage
+                  jq -e --arg name "$name" '[.actions[] | select(.type == "uploadAsset" and .name == $name)] | length == 0' dist/release/github-publication-plan.json >/dev/null
+                fi
+                ;;
+              *) echo "unexpected GitHub staging action: $type" >&2; exit 1 ;;
+            esac
+          done < <(jq -c '.actions[]' dist/release/github-publication-plan.json)
+      - name: Require a complete exact draft before publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
+          node scripts/plan-github-publication.mjs --state dist/release/publication-state.json --phase finalize
+          jq -e '.ok and .mutationAllowed and ([.actions[].type] | all(. == "publishDraft"))' dist/release/github-publication-plan.json >/dev/null
+      - name: Publish only the completed draft
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          action_count=$(jq '.actions | length' dist/release/github-publication-plan.json)
+          if [[ "$action_count" -eq 1 ]]; then
+            if ! gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --latest; then
+              node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
+              node scripts/plan-github-publication.mjs --state dist/release/publication-state.json --phase verify
+              jq -e '.ok and .status == "published" and (.actions | length == 0)' dist/release/github-publication-plan.json >/dev/null
+            fi
+          elif [[ "$action_count" -ne 0 ]]; then
+            echo "finalization plan has an invalid action count" >&2
+            exit 1
+          fi
+      - name: Verify immutable release, tag commit, and exact asset digests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$(git rev-list -n 1 "$GITHUB_REF_NAME")" == "$GITHUB_SHA" ]]
+          node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
+          node scripts/plan-github-publication.mjs --state dist/release/publication-state.json --phase verify
+          jq -e '.ok and .mutationAllowed and .status == "published" and (.actions | length == 0)' dist/release/github-publication-plan.json >/dev/null
+
+  npm-release:
+    name: Publish exact npm projection through trusted publishing
+    needs: [candidate, github-release]
+    runs-on: ubuntu-24.04
+    environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out exact candidate commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node 24 for npm trusted publishing
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Download the same validated candidate by artifact ID
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.candidate.outputs.candidate_artifact_id }}
+          path: dist
+      - name: Plan resumable npm publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
+          node scripts/plan-github-publication.mjs --state dist/release/publication-state.json --phase verify
+          node scripts/plan-npm-publication.mjs --state dist/release/publication-state.json
+          jq -e '.ok and .mutationAllowed and .status == "published"' dist/release/github-publication-plan.json >/dev/null
+          jq -e '.ok and .mutationAllowed' dist/release/npm-publication-plan.json >/dev/null
+      - name: Publish missing native packages first
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r action; do
+            file=$(jq -r '.file' <<<"$action")
+            name=$(jq -r '.name' <<<"$action")
+            version=$(jq -r '.version' <<<"$action")
+            [[ -f "$file" ]] || { echo "planned npm tarball is missing: $file" >&2; exit 1; }
+            if ! npm publish "$file" --access public --provenance; then
+              node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
+              node scripts/plan-npm-publication.mjs --state dist/release/publication-state.json
+              jq -e --arg name "$name" --arg version "$version" \
+                '.classifications[] | select(.name == $name and .version == $version) | .status == "exact"' \
+                dist/release/npm-publication-plan.json >/dev/null
+            fi
+          done < <(jq -c '.actions[] | select(.type == "publishPackage" and .role == "native")' dist/release/npm-publication-plan.json)
+      - name: Reconcile native publication before releasing the root package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
+          node scripts/plan-npm-publication.mjs --state dist/release/publication-state.json
+          jq -e '.ok and .mutationAllowed and ([.actions[] | select(.role == "native")] | length == 0)' dist/release/npm-publication-plan.json >/dev/null
+          echo "All native identities are exact; root publication may proceed." >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish the missing root package last
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          root_count=$(jq '[.actions[] | select(.type == "publishPackage" and .role == "root")] | length' dist/release/npm-publication-plan.json)
+          [[ "$root_count" -le 1 ]]
+          if [[ "$root_count" -eq 1 ]]; then
+            file=$(jq -r '.actions[] | select(.type == "publishPackage" and .role == "root") | .file' dist/release/npm-publication-plan.json)
+            name=$(jq -r '.actions[] | select(.type == "publishPackage" and .role == "root") | .name' dist/release/npm-publication-plan.json)
+            version=$(jq -r '.actions[] | select(.type == "publishPackage" and .role == "root") | .version' dist/release/npm-publication-plan.json)
+            [[ -f "$file" ]] || { echo "planned npm root tarball is missing: $file" >&2; exit 1; }
+            if ! npm publish "$file" --access public --provenance; then
+              node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
+              node scripts/plan-npm-publication.mjs --state dist/release/publication-state.json
+              jq -e --arg name "$name" --arg version "$version" \
+                '.classifications[] | select(.name == $name and .version == $version) | .status == "exact"' \
+                dist/release/npm-publication-plan.json >/dev/null
+            fi
+          fi
+      - name: Verify complete npm publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
+          node scripts/plan-npm-publication.mjs --state dist/release/publication-state.json
+          jq -e '.ok and .mutationAllowed and .status == "published" and (.actions | length == 0)' dist/release/npm-publication-plan.json >/dev/null
+          echo "All four native packages and the root package match the validated candidate." >> "$GITHUB_STEP_SUMMARY"
+      - name: Record truthful machine-readable publication state
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set +e
+          mkdir -p dist/release
+          node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA"
+          capture_status=$?
+          node scripts/plan-github-publication.mjs --state dist/release/publication-state.json --phase verify
+          github_status=$?
+          node scripts/plan-npm-publication.mjs --state dist/release/publication-state.json
+          npm_status=$?
+          jq -n \
+            --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --argjson captureStatus "$capture_status" \
+            --argjson githubStatus "$github_status" \
+            --argjson npmStatus "$npm_status" \
+            --slurpfile github dist/release/github-publication-plan.json \
+            --slurpfile npm dist/release/npm-publication-plan.json \
+            '{schemaVersion:1,run:$run,captureStatus:$captureStatus,githubPlannerStatus:$githubStatus,npmPlannerStatus:$npmStatus,github:($github[0] // null),npm:($npm[0] // null)}' \
+            > dist/release/publication-report.json
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          jq '{github:.github.status,npm:.npm.status,npmClassifications:.npm.classifications}' dist/release/publication-report.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload publication report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: publication-report-${{ github.run_attempt }}
+          path: dist/release/publication-report.json
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,95 @@
+name: Build and validate one release target
+description: Build one addon and CLI once, then validate exact derived npm and standalone artifacts.
+
+inputs:
+  candidate_sha:
+    required: true
+  candidate_ref:
+    required: true
+  rust_target:
+    required: true
+  package_directory:
+    required: true
+  root_artifact:
+    required: true
+  enforce_glibc:
+    required: true
+  declared_runner:
+    required: true
+  build_image:
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Set up packaging Node 24
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      with:
+        node-version: 24
+    - name: Set up Rust 1.88 target
+      uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
+      with:
+        toolchain: 1.88.0
+        target: ${{ inputs.rust_target }}
+    - name: Build same-revision addon and CLI once
+      shell: bash
+      run: |
+        set -euo pipefail
+        cargo build --locked --release --target "${{ inputs.rust_target }}" -p kasb-node --lib --bin kasb-process-probe
+        cargo build --locked --release --target "${{ inputs.rust_target }}" -p kasb-cli --bin kasb
+    - name: Derive native package and standalone archive
+      shell: bash
+      run: |
+        set -euo pipefail
+        node scripts/assemble-native-package.mjs "${{ inputs.rust_target }}"
+        node scripts/assemble-cli-archive.mjs "${{ inputs.rust_target }}"
+        if [[ "${{ inputs.enforce_glibc }}" == true ]]; then
+          node scripts/validate-glibc-floor.mjs "${{ inputs.rust_target }}"
+        fi
+        mkdir -p dist/native
+        npm pack "./packages/native/${{ inputs.package_directory }}" --ignore-scripts --pack-destination dist/native
+    - name: Download immutable root package
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      with:
+        name: ${{ inputs.root_artifact }}
+        path: dist/root
+    - name: Exercise clean consumers on Node 20.18.1 through 26
+      shell: bash
+      run: |
+        set -euo pipefail
+        for node_version in 20.18.1 21 22 23 24 25 26; do
+          archive=()
+          [[ "$node_version" != 24 ]] || archive=(dist/cli)
+          npx --yes --package "node@$node_version" node scripts/test-native-consumer.mjs \
+            "${{ inputs.rust_target }}" dist/root dist/native "${archive[@]}"
+        done
+    - name: Record bounded target provenance
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p dist/provenance/fragments
+        jq -n \
+          --arg repository "$GITHUB_REPOSITORY" \
+          --arg commit "${{ inputs.candidate_sha }}" \
+          --arg sourceRef "${{ inputs.candidate_ref }}" \
+          --arg version "$(node -p "require('./packages/node/package.json').version")" \
+          --arg target "${{ inputs.rust_target }}" \
+          --arg rust "$(rustc --version)" \
+          --arg node "$(node --version)" \
+          --arg runner "${{ inputs.declared_runner }}" \
+          --arg runnerOs "$RUNNER_OS" \
+          --arg runnerArch "$RUNNER_ARCH" \
+          --arg buildImage "${{ inputs.build_image }}" \
+          '{schemaVersion:1,repository:$repository,version:$version,sourceRef:$sourceRef,commit:$commit,target:$target,rust:$rust,node:$node,runner:{label:$runner,os:$runnerOs,arch:$runnerArch},buildImage:(if $buildImage == "" then null else $buildImage end)}' \
+          > "dist/provenance/fragments/${{ inputs.rust_target }}.json"
+    - name: Upload allowlisted validated target artifacts
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      with:
+        name: candidate-target-${{ inputs.rust_target }}
+        path: |
+          dist/native/*.tgz
+          dist/cli/*.tar.gz
+          dist/provenance/fragments/${{ inputs.rust_target }}.json
+        if-no-files-found: error
+        retention-days: 7
