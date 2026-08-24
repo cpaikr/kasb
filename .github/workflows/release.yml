@@ -70,6 +70,7 @@ jobs:
           path: dist/release/publication-state.json
           if-no-files-found: error
           retention-days: 7
+          overwrite: true
 
   candidate:
     name: Build and validate complete candidate

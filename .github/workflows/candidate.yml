@@ -215,6 +215,7 @@ jobs:
           path: dist/root/*.tgz
           if-no-files-found: error
           retention-days: 7
+          overwrite: true
 
   native-linux:
     name: Candidate ${{ matrix.rust_target }} at glibc 2.28
@@ -414,6 +415,7 @@ jobs:
             dist/release/candidate.json
           if-no-files-found: error
           retention-days: 7
+          overwrite: true
 
   sealed-candidate-e2e:
     name: Sealed candidate ${{ matrix.rust_target }} installer and upgrade

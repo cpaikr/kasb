@@ -99,6 +99,15 @@ check(
   "candidate Rust setup must match native-targets.json",
 );
 check(actionText.includes("dist/native/*.tgz") && actionText.includes("dist/cli/*.tar.gz") && !actionText.includes("dist/**"), "target uploads must be allowlisted");
+for (const [label, step] of [
+  ["target artifact", actionSteps.find(({ name }) => name === "Upload allowlisted validated target artifacts")],
+  ["consumer probe", actionSteps.find(({ name }) => name === "Upload isolated consumer process probe")],
+  ["root package", (jobs["root-package"]?.steps ?? []).find(({ name }) => name === "Upload root tarball")],
+  ["sealed candidate", (jobs.aggregate?.steps ?? []).find(({ id }) => id === "upload")],
+  ["strict publication state", (release.jobs?.["publication-state"]?.steps ?? []).find(({ id }) => id === "upload")],
+]) {
+  check(step?.with?.overwrite === true, `${label} upload must overwrite its same-run name so failed-job reruns remain recoverable`);
+}
 for (const step of action.runs?.steps ?? []) {
   check(!String(step?.run ?? "").includes("${{ inputs."), `composite shell step ${step?.name ?? "<unnamed>"} must receive inputs through env`);
 }
