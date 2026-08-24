@@ -1,6 +1,6 @@
 # Goal: Make KASB release-ready without publishing
 
-Status: completed
+Status: complete
 Planning scope: ROADMAP.md
 
 ## Original contract
@@ -40,14 +40,13 @@ _None._
 ### Final delivery
 
 PR #23 delivered the final implementation slice to the release-readiness
-integration branch. No production version, repository visibility, tag, GitHub
-Release, npm package, or external KASB state changed.
+integration branch, and PR #25 delivered the reviewed closeout record. No
+production version, repository visibility, tag, GitHub Release, npm package,
+or external KASB state changed.
 
 ### Next in-scope action
 
-None. Selecting and publishing the first production version is tracked in
-`tasks/perform-first-rust-node-release.md` and requires separate explicit
-authorization.
+None — goal complete.
 
 ### Evidence and blockers
 
@@ -85,3 +84,9 @@ authorization.
   hosted CI and candidate runs, sealed artifact digest, and review closure is
   recorded in `plans/canonical-release-pipeline.md`. No real release or external
   publication mutation occurred.
+- PR #25 merged the reviewed closeout at `0a3c769`. Its exact-head CI run
+  `32718048460` and non-publishing four-target candidate run `32718048436`
+  passed, and all five Codex review threads were resolved before merge.
+- PR #24 was a divergent, conflicting duplicate whose latest candidate run
+  failed before aggregate sealing. It was closed as superseded by the green
+  PR #23 and PR #25 integration path and was not merged.
