@@ -331,12 +331,33 @@ async function testGuardedExecutionAdapters() {
   // the next run resumes from the exact partial draft.
   for (let failBeforeUpload = 1; failBeforeUpload <= strict.githubAssets.length; failBeforeUpload += 1) {
     const adapter = githubAdapter(strict, built.files, { failBeforeUpload });
-    await assert.rejects(executeGitHubPublication(strict, adapter), /injected pre-upload interruption/u);
+    await assert.rejects(executeGitHubPublication(strict, adapter), (error) => {
+      assert.equal(error.receipt.operations.at(-1).status, "failed");
+      return /injected pre-upload interruption/u.test(error.message);
+    });
     adapter.failBeforeUpload = undefined;
     const resumed = await executeGitHubPublication(strict, adapter);
     assert.equal(resumed.ok, true);
     assert.equal(resumed.immutable, true);
   }
+
+  // If the upload response and its immediate state reconciliation both fail,
+  // the receipt preserves the ambiguous attempted mutation. The exact remote
+  // bytes still make the next run safely resumable.
+  const unknownGithub = githubAdapter(strict, built.files, { doubleFailureAfterUpload: 1 });
+  await assert.rejects(executeGitHubPublication(strict, unknownGithub), (error) => {
+    assert.equal(error.receipt.error.code, "outcome_unknown");
+    const operation = error.receipt.operations.at(-1);
+    assert.deepEqual(
+      { type: operation.type, status: operation.status, name: operation.name },
+      { type: "uploadAsset", status: "outcomeUnknown", name: strict.githubAssets[0].name },
+    );
+    return /injected upload interruption/u.test(error.message);
+  });
+  const resumedUnknownGithub = await executeGitHubPublication(strict, unknownGithub);
+  assert.equal(resumedUnknownGithub.ok, true);
+  assert.equal(unknownGithub.state.release.assets.length, strict.githubAssets.length);
+  assert.equal(new Set(unknownGithub.state.release.assets.map(({ name }) => name)).size, strict.githubAssets.length);
 
   const exactGithub = githubAdapter(strict, built.files);
   exactGithub.state.release = completeRelease(strict, true);
@@ -363,7 +384,11 @@ async function testGuardedExecutionAdapters() {
   const rootFailure = npmAdapter(built.files, { failRoot: true });
   await assert.rejects(executeNpmPublication(strict, immutableReceipt, rootFailure), (error) => {
     assert.equal(error.receipt.ok, false);
-    assert(error.receipt.operations.every(({ role }) => role === "native"));
+    assert(error.receipt.operations.slice(0, -1).every(({ role, status }) => role === "native" && status === "completed"));
+    assert.deepEqual(
+      { role: error.receipt.operations.at(-1).role, status: error.receipt.operations.at(-1).status },
+      { role: "root", status: "failed" },
+    );
     return /injected root failure/u.test(error.message);
   });
   rootFailure.failRoot = false;
@@ -374,6 +399,21 @@ async function testGuardedExecutionAdapters() {
   assert(raceReceipt.operations.some(({ status }) => status === "skippedExactRace"));
   const mismatchedRace = npmAdapter(built.files, { raceIdentity: identity(strict.npmPackages[0]), raceBytes: "mismatch" });
   await assert.rejects(executeNpmPublication(strict, immutableReceipt, mismatchedRace), hasCode("npm_digest_mismatch"));
+
+  const unknownNpmIdentity = identity(strict.npmPackages[0]);
+  const unknownNpm = npmAdapter(built.files, { doubleFailureIdentity: unknownNpmIdentity });
+  await assert.rejects(executeNpmPublication(strict, immutableReceipt, unknownNpm), (error) => {
+    assert.equal(error.receipt.error.code, "outcome_unknown");
+    const operation = error.receipt.operations.at(-1);
+    assert.deepEqual(
+      { type: operation.type, status: operation.status, name: operation.name, version: operation.version },
+      { type: "publishPackage", status: "outcomeUnknown", name: strict.npmPackages[0].name, version: strict.version },
+    );
+    return /publish response timed out/u.test(error.message);
+  });
+  const resumedUnknownNpm = await executeNpmPublication(strict, immutableReceipt, unknownNpm);
+  assert.equal(resumedUnknownNpm.ok, true);
+  assert(!unknownNpm.published.some(({ name }) => name === strict.npmPackages[0].name));
 
   await assert.rejects(executeNpmPublication(strict, { ...immutableReceipt, immutable: false }, npmAdapter(built.files)), hasCode("npm_github_gate"));
   await assert.rejects(executeNpmPublication({
@@ -445,8 +485,16 @@ function githubAdapter(candidate, files, options = {}) {
     files,
     failAfterUpload: options.failAfterUpload,
     failBeforeUpload: options.failBeforeUpload,
+    doubleFailureAfterUpload: options.doubleFailureAfterUpload,
+    failNextRead: false,
     uploads: 0,
-    async readState() { return structuredClone(this.state); },
+    async readState() {
+      if (this.failNextRead) {
+        this.failNextRead = false;
+        throw new Error("injected GitHub reconciliation failure");
+      }
+      return structuredClone(this.state);
+    },
     async readCandidateFile(path) { return this.files.get(path); },
     async createDraft({ tag, targetSha }) {
       this.state.release = { tag, targetSha, draft: true, prerelease: false, immutable: false, assets: [] };
@@ -455,6 +503,11 @@ function githubAdapter(candidate, files, options = {}) {
       this.uploads += 1;
       if (this.uploads === this.failBeforeUpload) throw new Error("injected pre-upload interruption");
       this.state.release.assets.push({ name, sha256: sha(bytes) });
+      if (this.uploads === this.doubleFailureAfterUpload) {
+        this.doubleFailureAfterUpload = undefined;
+        this.failNextRead = true;
+        throw new Error("injected upload interruption");
+      }
       if (this.uploads === this.failAfterUpload) throw new Error("injected upload interruption");
     },
     async publishDraft() {
@@ -484,13 +537,26 @@ function npmAdapter(files, options = {}) {
     raceIdentity: options.raceIdentity,
     raceBytes: options.raceBytes,
     ambiguousFailure: options.ambiguousFailure,
+    doubleFailureIdentity: options.doubleFailureIdentity,
+    failNextInspectIdentity: undefined,
     async readCandidateFile(path) { return this.files.get(path); },
     async inspectPackage(pkg) {
-      const bytes = this.registry.get(identity(pkg));
+      const key = identity(pkg);
+      if (this.failNextInspectIdentity === key) {
+        this.failNextInspectIdentity = undefined;
+        throw new Error("injected npm reconciliation failure");
+      }
+      const bytes = this.registry.get(key);
       return bytes ? { state: "published", bytes } : { state: "vacant" };
     },
     async publishPackage(pkg) {
       const key = identity(pkg);
+      if (this.doubleFailureIdentity === key) {
+        this.doubleFailureIdentity = undefined;
+        this.registry.set(key, pkg.bytes);
+        this.failNextInspectIdentity = key;
+        throw new Error("publish response timed out");
+      }
       if (this.raceIdentity === key) {
         this.registry.set(key, this.raceBytes === "exact" ? pkg.bytes : Buffer.from("different registry bytes"));
         this.raceIdentity = undefined;
