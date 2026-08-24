@@ -40,8 +40,7 @@ check(windowsReleaseJob?.["runs-on"] === "windows-2025", "the Windows release co
 for (const command of [
   "cargo test --locked -p kasb-cli --lib",
   "cargo clippy --locked -p kasb-cli --all-targets -- -D warnings",
-  "cargo build --locked -p kasb-cli --bin kasb",
-  "node scripts/test-installers.mjs --powershell-only",
+  "node scripts/test-installers.mjs --powershell-only --build-windows-cli",
 ]) {
   check(hasRun(windowsReleaseJob, command), `the Windows release contract is missing: ${command}`);
 }
@@ -49,7 +48,7 @@ check(
   (windowsReleaseJob?.steps ?? []).some(
     (step) => step?.env?.KASB_REQUIRE_POWERSHELL_TESTS === "1"
       && typeof step?.run === "string"
-      && step.run.includes("node scripts/test-installers.mjs --powershell-only"),
+      && step.run.includes("node scripts/test-installers.mjs --powershell-only --build-windows-cli"),
   ),
   "the Windows release contract must require PowerShell behavior tests",
 );
