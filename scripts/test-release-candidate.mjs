@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
+import { archiveInvocation } from "./assemble-cli-archive.mjs";
 import { canonicalCandidateIdentity, requiredCandidateGates, validateArtifactManifest, validateCandidateVersion, validatePrebuildPublicationState, validatePublicationStateSource } from "./release-candidate-contract.mjs";
 import { scanCandidateText, validateCandidateProvenance } from "./release-candidate-inspection.mjs";
 import { checksummedReleaseAssetNames, loadReleaseContract, releaseAssetNames, repositoryRoot } from "./release-contract.mjs";
@@ -12,6 +13,15 @@ const identity = await canonicalCandidateIdentity({ mode: "rehearsal", ref: `ref
 const directory = await mkdtemp(join(repositoryRoot, ".release-candidate-test-"));
 
 try {
+  const contract = await loadReleaseContract();
+  const windowsTarget = contract.targets.find(({ rustTarget }) => rustTarget === "x86_64-pc-windows-msvc");
+  const windowsPackageDirectory = "D:\\a\\kasb\\kasb\\packages\\native\\win32-x64-msvc";
+  const windowsOutputDirectory = "D:\\a\\kasb\\kasb\\dist\\cli";
+  const windowsArchive = archiveInvocation(windowsTarget, windowsPackageDirectory, windowsOutputDirectory);
+  assert.equal(windowsArchive.args[2], windowsTarget.archiveName, "tar archive output must not expose a Windows drive path to remote-archive parsing");
+  assert.deepEqual(windowsArchive.args.slice(3, 5), ["-C", windowsPackageDirectory], "tar must read canonical entries from the native package directory");
+  assert.equal(windowsArchive.options.cwd, windowsOutputDirectory, "tar must create the archive from its output directory");
+
   for (const script of ["scripts/write-release-checksums.mjs", "scripts/validate-release-artifacts.mjs"]) {
     for (const flags of [["--candidate", "--ci"], ["--ci", "--candidate"]]) {
       const result = spawnSync(process.execPath, [script, ...flags], { cwd: repositoryRoot, encoding: "utf8" });
@@ -25,7 +35,6 @@ try {
   assert.equal(candidate.phase, "artifacts");
   assert.equal(candidate.npmPackages.length, 5);
   assert.equal(candidate.githubAssets.length, 8);
-  const contract = await loadReleaseContract();
   const rootPackageManifest = join(contract.manifest.rootPackage, "package.json");
   await mkdir(join(directory, contract.manifest.rootPackage), { recursive: true });
   await writeFile(
