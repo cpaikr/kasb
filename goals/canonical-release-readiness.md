@@ -45,8 +45,9 @@ Release, npm package, or external KASB state changed.
 
 ### Next in-scope action
 
-None. Selecting and publishing the first production version remains a separate,
-explicitly authorized task in `tasks/perform-first-rust-node-release.md`.
+None. Selecting and publishing the first production version is tracked in
+`tasks/perform-first-rust-node-release.md` and requires separate explicit
+authorization.
 
 ### Evidence and blockers
 
@@ -80,13 +81,7 @@ explicitly authorized task in `tasks/perform-first-rust-node-release.md`.
   encode and test those gates but may not configure or bypass them.
 - No production version, release tag, GitHub Release, registry publication, or
   external KASB mutation is authorized.
-- Final implementation head `a9d781a` passed exact-head CI run `32713982066`
-  and non-publishing candidate run `32713982087`. The rehearsal passed its
-  deterministic gates, root npm artifact, four native producers, 28 clean
-  consumers across Node 20.18.1 and 21–26, aggregate reconciliation, all four
-  sealed installer/receipt/upgrade lifecycles, and final output seal. The
-  sealed candidate artifact digest was
-  `sha256:cf1084c26e08c93931f1560481ff2b081ac0d54a44dfdaa6347c26a2f8467cd0`.
-- All 19 actionable CodeRabbit findings on PR #23 were resolved, subsequent
-  focused independent code reviews found no remaining issues, and no real
-  release or external publication mutation occurred.
+- Canonical completion evidence for PR #23, its final implementation head,
+  hosted CI and candidate runs, sealed artifact digest, and review closure is
+  recorded in `plans/canonical-release-pipeline.md`. No real release or external
+  publication mutation occurred.

@@ -36,10 +36,13 @@ artifact set.
   tested mutation executor, failure-injection contracts, and operator guidance,
   then merged at `8e86a86`. Exact implementation head `a9d781a` passed CI run
   `32713982066` and the full non-publishing four-target candidate run
-  `32713982087`. Public visibility, repository release immutability, protected
-  release environment configuration, and npm trusted publisher registrations
-  remain external first-release prerequisites to verify, not changes authorized
-  by this plan.
+  `32713982087`; the sealed candidate artifact digest was
+  `sha256:cf1084c26e08c93931f1560481ff2b081ac0d54a44dfdaa6347c26a2f8467cd0`.
+  All 19 actionable CodeRabbit findings were resolved, and focused independent
+  code reviews found no remaining issues. Public visibility, repository release
+  immutability, protected release environment configuration, and npm trusted
+  publisher registrations remain external first-release prerequisites to
+  verify, not changes authorized by this plan.
 
 ## Decisions
 

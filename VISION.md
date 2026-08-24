@@ -3,8 +3,8 @@
 ## Product
 
 - `name`: `kasb-standards`
-- `status`: Rust/Node cutover complete; release-readiness work in progress;
-  registry publication not performed
+- `status`: Rust/Node cutover and release readiness complete; first product
+  release not published
 - `domain`: Korean accounting standards and related interpretation material
   exposed through KASB public read surfaces
 - `users`: LLM agents, agent developers, researchers, and humans who need
