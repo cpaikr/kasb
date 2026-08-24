@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { canonicalCandidateIdentity, requiredCandidateGates, validateArtifactManifest, validateCandidateVersion, validatePrebuildPublicationState, validatePublicationStateSource } from "./release-candidate-contract.mjs";
-import { scanCandidateText, validateCandidateProvenance } from "./release-candidate-inspection.mjs";
+import { scanCandidateText, scanText, validateCandidateProvenance } from "./release-candidate-inspection.mjs";
 import { checksummedReleaseAssetNames, loadReleaseContract, releaseAssetNames, repositoryRoot } from "./release-contract.mjs";
 
 const sha = "a".repeat(40);
@@ -103,9 +103,34 @@ try {
   await assert.rejects(scanCandidateText({ githubAssets: manifest.githubAssets, npmPackages: manifest.npmPackages }), /forbidden secret/u);
   await standaloneFixture(identity.targets[0], "fixture README\n", resolve(repositoryRoot, archiveAsset.file));
 
+  const temporaryAwsKey = `ASIA${"A".repeat(16)}`;
+  await standaloneFixture(
+    identity.targets[0],
+    "fixture README\n",
+    resolve(repositoryRoot, archiveAsset.file),
+    Buffer.concat([Buffer.from([0, 1, 2, 3]), Buffer.from(temporaryAwsKey)]),
+  );
+  await assert.rejects(scanCandidateText({ githubAssets: manifest.githubAssets, npmPackages: manifest.npmPackages }), /forbidden secret/u);
+  await standaloneFixture(identity.targets[0], "fixture README\n", resolve(repositoryRoot, archiveAsset.file));
+
   const packageFile = resolve(repositoryRoot, manifest.npmPackages[0].file);
+  const nativeTarget = identity.targets[0];
+  const contractTarget = (await loadReleaseContract()).targets.find(({ packageName }) => packageName === nativeTarget.packageName);
+  const fineGrainedGithubToken = `github_pat_${"A".repeat(22)}_${"b".repeat(59)}`;
+  await npmFixture(manifest.npmPackages[0].name, "native", undefined, packageFile, {
+    [contractTarget.addonFile]: Buffer.concat([Buffer.from([0, 255, 0]), Buffer.from(fineGrainedGithubToken)]),
+  });
+  await assert.rejects(scanCandidateText({ githubAssets: manifest.githubAssets, npmPackages: manifest.npmPackages }), /forbidden secret/u);
+
+  await npmFixture(manifest.npmPackages[0].name, "native", undefined, packageFile, {
+    [contractTarget.cliFile]: Buffer.concat([Buffer.from([127, 69, 76, 70, 0]), Buffer.from(`AKIA${"B".repeat(16)}`)]),
+  });
+  await assert.rejects(scanCandidateText({ githubAssets: manifest.githubAssets, npmPackages: manifest.npmPackages }), /forbidden secret/u);
+
   await npmFixture(manifest.npmPackages[0].name, "native", "npm_abcdefghijklmnopqrstuvwxyz", packageFile);
   await assert.rejects(scanCandidateText({ githubAssets: manifest.githubAssets, npmPackages: manifest.npmPackages }), /forbidden secret/u);
+
+  assert.doesNotThrow(() => scanText("github_pat_short ASIA1234 prefixASIAAAAAAAAAAAAAAAAA ASIAAAAAAAAAAAAAAAAAA", "documented placeholders"));
 } finally {
   await rm(directory, { recursive: true, force: true });
 }
@@ -171,24 +196,30 @@ async function fixtureFile(name, fields, contents = `fixture:${name}\n`) {
   return fileDescriptor(path, fields, bytes);
 }
 
-async function npmFixture(name, role, marker = undefined, destination = undefined) {
+async function npmFixture(name, role, marker = undefined, destination = undefined, entries = {}) {
   const slug = name.replace(/[^a-z0-9]+/giu, "-");
   const source = join(directory, `${slug}-source`);
+  await rm(source, { recursive: true, force: true });
   await mkdir(join(source, "package"), { recursive: true });
   await writeFile(join(source, "package", "package.json"), `${JSON.stringify({ name, version: identity.version })}\n`);
   if (marker) await writeFile(join(source, "package", "README.md"), marker);
+  for (const [entry, contents] of Object.entries(entries)) {
+    const path = join(source, "package", entry);
+    await mkdir(join(path, ".."), { recursive: true });
+    await writeFile(path, contents);
+  }
   const path = destination ?? join(directory, `${slug}.tgz`);
   const packed = spawnSync("tar", ["-czf", path, "-C", source, "package"], { encoding: "utf8" });
   assert.equal(packed.status, 0, packed.stderr);
   return fileDescriptor(path, { name, version: identity.version, role }, await readFile(path));
 }
 
-async function standaloneFixture(target, readme, path) {
+async function standaloneFixture(target, readme, path, executableBytes = Buffer.from([0, 1, 2, 3])) {
   const source = join(directory, `${target.releaseTarget}-archive`);
   await rm(source, { recursive: true, force: true });
   await mkdir(source, { recursive: true });
   const executable = target.rustTarget.includes("windows") ? "kasb.exe" : "kasb";
-  await writeFile(join(source, executable), Buffer.from([0, 1, 2, 3]));
+  await writeFile(join(source, executable), executableBytes);
   await writeFile(join(source, "LICENSE.md"), "fixture license\n");
   await writeFile(join(source, "README.md"), readme);
   await writeFile(join(source, "THIRD_PARTY_LICENSES.html"), "fixture notices\n");
