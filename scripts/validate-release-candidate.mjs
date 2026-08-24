@@ -32,8 +32,11 @@ console.log(`${identity.mode} ${candidate.phase} candidate metadata is valid at 
 
 function parseArgs(args) {
   const parsed = { output: "dist/release/candidate.json", skipCheckoutValidation: false };
+  const seen = new Set();
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index];
+    if (seen.has(flag)) throw new Error(`duplicate candidate metadata option ${flag}`);
+    seen.add(flag);
     if (flag === "--skip-checkout-validation") {
       parsed.skipCheckoutValidation = true;
       continue;

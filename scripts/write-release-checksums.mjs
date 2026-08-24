@@ -9,6 +9,7 @@ const ciOnly = removeFlag(inputs, "--ci");
 const candidate = removeFlag(inputs, "--candidate");
 if (ciOnly && candidate) throw new Error("--ci and --candidate are mutually exclusive");
 if (inputs.some((input) => input.startsWith("--")) || inputs.length > 1) throw new Error("unknown checksum writer option");
+if (candidate && inputs.length !== 0) throw new Error("--candidate does not accept a positional output directory");
 const directory = resolve(repositoryRoot, inputs[0] ?? "dist/cli");
 const targets = ciOnly
   ? contract.targets.filter(({ continuousIntegration }) => continuousIntegration === true)

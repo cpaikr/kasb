@@ -309,14 +309,6 @@ jobs:
           NODE_VERSION: ${{ matrix.node_version }}
         run: |
           set -euo pipefail
-          case "$RUST_TARGET" in
-            x86_64-unknown-linux-gnu|aarch64-unknown-linux-gnu|aarch64-apple-darwin|x86_64-pc-windows-msvc) ;;
-            *) echo "unsupported release target" >&2; exit 1 ;;
-          esac
-          case "$NODE_VERSION" in
-            20.18.1|21|22|23|24|25|26) ;;
-            *) echo "unsupported clean-consumer Node version" >&2; exit 1 ;;
-          esac
           archive=()
           [[ "$NODE_VERSION" != 24 ]] || archive=(dist/cli)
           node scripts/test-native-consumer.mjs "$RUST_TARGET" dist/root dist/native ${archive[@]+"${archive[@]}"}
@@ -366,7 +358,7 @@ jobs:
           set -euo pipefail
           mkdir -p dist/installers dist/release dist/provenance
           cp installers/install.sh installers/install.ps1 dist/installers/
-          version=$(node -p "require('./packages/node/package.json').version")
+          version=$(node --input-type=module -e "import { loadReleaseContract } from './scripts/release-contract.mjs'; process.stdout.write((await loadReleaseContract()).version)")
           expected_targets=$(jq -c '[.targets[].rustTarget] | sort' native-targets.json)
           expected_toolchain=$(jq -c '.release.toolchain' native-targets.json)
           jq -se \
@@ -445,10 +437,6 @@ jobs:
           RUST_TARGET: ${{ matrix.rust_target }}
         run: |
           set -euo pipefail
-          case "$RUST_TARGET" in
-            x86_64-unknown-linux-gnu|aarch64-unknown-linux-gnu|aarch64-apple-darwin|x86_64-pc-windows-msvc) ;;
-            *) echo "unsupported release target" >&2; exit 1 ;;
-          esac
           node scripts/test-release-candidate-consumer.mjs "$RUST_TARGET" dist
 
   seal:

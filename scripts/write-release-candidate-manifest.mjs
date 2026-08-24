@@ -95,7 +95,8 @@ async function fileIdentity(file, fields) {
 
 function packageJson(tarball) {
   const result = spawnSync("tar", ["-xOf", tarball, "package/package.json"], { encoding: "utf8" });
-  if (result.status !== 0) throw new Error(`could not read package.json from ${tarball}: ${result.stderr.trim()}`);
+  if (result.error) throw new Error(`could not launch tar for ${tarball}: ${result.error.message}`);
+  if (result.status !== 0) throw new Error(`could not read package.json from ${tarball}: ${(result.stderr ?? "").trim()}`);
   try {
     return JSON.parse(result.stdout);
   } catch (error) {

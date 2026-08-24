@@ -9,6 +9,7 @@ const ciOnly = removeFlag(inputs, "--ci");
 const candidate = removeFlag(inputs, "--candidate");
 if (ciOnly && candidate) throw new Error("--ci and --candidate are mutually exclusive.");
 if (inputs.some((input) => input.startsWith("--")) || inputs.length > 3) throw new Error("Unknown release artifact validation option.");
+if (candidate && inputs.length !== 0) throw new Error("--candidate does not accept positional artifact directories.");
 const nativeDirectory = resolve(repositoryRoot, inputs[0] ?? "dist/native");
 const rootDirectory = resolve(repositoryRoot, inputs[1] ?? "dist/root");
 const cliDirectory = resolve(repositoryRoot, inputs[2] ?? "dist/cli");

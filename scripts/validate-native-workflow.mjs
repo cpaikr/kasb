@@ -181,6 +181,11 @@ for (const [jobName, job] of Object.entries(jobs)) {
 for (const line of workflowText.split(/\r?\n/u).filter((candidate) => /\buses:/u.test(candidate))) {
   check(/#\s*v\d+\b/u.test(line), `action pin is missing its reviewed major annotation: ${line.trim()}`);
 }
+for (const job of Object.values(jobs)) for (const step of job?.steps ?? []) {
+  if (String(step?.uses).startsWith("actions/checkout@")) {
+    check(step.with?.["persist-credentials"] === false, "every CI checkout must disable credential persistence");
+  }
+}
 
 if (missing.length > 0) {
   throw new Error(`Native CI workflow validation failed:\n${missing.map((message) => `- ${message}`).join("\n")}`);
