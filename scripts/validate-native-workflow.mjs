@@ -42,6 +42,13 @@ check(
 );
 check(
   (windowsReleaseJob?.steps ?? []).some(
+    (step) => String(step?.uses).startsWith("KyleMayes/install-llvm-action@")
+      && step?.with?.version === "18.1.8",
+  ),
+  "the Windows release contract must install the exact LLVM toolchain used by Rust bindgen",
+);
+check(
+  (windowsReleaseJob?.steps ?? []).some(
     (step) => step?.shell === "pwsh"
       && typeof step?.run === "string"
       && step.run.includes("libclang.dll")

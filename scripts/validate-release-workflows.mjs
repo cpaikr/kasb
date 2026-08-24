@@ -87,6 +87,14 @@ const actionSteps = action.runs?.steps ?? [];
 check(
   actionSteps.some(
     (step) => step?.if === "runner.os == 'Windows'"
+      && String(step?.uses).startsWith("KyleMayes/install-llvm-action@")
+      && step?.with?.version === "18.1.8",
+  ),
+  "target builder must install the exact Windows LLVM toolchain used by Rust bindgen",
+);
+check(
+  actionSteps.some(
+    (step) => step?.if === "runner.os == 'Windows'"
       && step?.shell === "pwsh"
       && typeof step?.run === "string"
       && step.run.includes("libclang.dll")
