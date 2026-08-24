@@ -33,7 +33,7 @@ where
         Err(output) => return output,
     };
     if invocation.operation == OperationName::Upgrade {
-        return upgrade::run(invocation.upgrade_check).await;
+        return upgrade::run(invocation.upgrade_check, cancellation).await;
     }
     run_invocation(client, &invocation, cancellation).await
 }
@@ -58,7 +58,7 @@ where
         Err(output) => return output,
     };
     if invocation.operation == OperationName::Upgrade {
-        return upgrade::run(invocation.upgrade_check).await;
+        return upgrade::run(invocation.upgrade_check, cancellation).await;
     }
     let client = match client_factory() {
         Ok(client) => client,
@@ -230,5 +230,24 @@ mod tests {
                 .as_deref()
                 .is_some_and(|stdout| stdout.contains("unmanaged_installation"))
         );
+    }
+
+    #[tokio::test]
+    async fn cancelled_upgrade_uses_the_process_interruption_contract() {
+        upgrade::reset_release_transport_constructions();
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+
+        let output = run_with_client_factory(
+            ["kasb", "upgrade"],
+            &cancellation,
+            || -> Result<KasbClient<PersonaClient, SystemClock>, ()> {
+                panic!("upgrade must not construct the KASB transport")
+            },
+        )
+        .await;
+
+        assert_eq!(output, ProcessOutput::interrupted(130));
+        assert_eq!(upgrade::release_transport_constructions(), 0);
     }
 }

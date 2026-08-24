@@ -1,4 +1,5 @@
 use std::fs::{self, File};
+use std::future::Future;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -9,6 +10,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use flate2::read::GzDecoder;
 use futures_util::StreamExt;
+use kasb::http::CancellationToken;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -20,6 +22,7 @@ use crate::render::ProcessOutput;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const MANIFEST_JSON: &str = include_str!("../../../native-targets.json");
 const ARCHIVE_EXPANSION_OVERHEAD: u64 = 8 * 1024 * 1024;
+const UPGRADE_CANCELLED: &str = "upgrade_cancelled";
 
 #[cfg(test)]
 static RELEASE_TRANSPORT_CONSTRUCTIONS: AtomicUsize = AtomicUsize::new(0);
@@ -44,6 +47,7 @@ struct ReleasePolicy {
     metadata_limit_bytes: usize,
     archive_limit_bytes: usize,
     request_timeout_seconds: u64,
+    archive_request_timeout_seconds: u64,
     connect_timeout_seconds: u64,
     redirect_limit: usize,
 }
@@ -128,23 +132,62 @@ impl UpgradeError {
     }
 }
 
-pub(crate) async fn run(check_only: bool) -> ProcessOutput {
-    match run_inner(check_only).await {
+pub(crate) async fn run(check_only: bool, cancellation: &CancellationToken) -> ProcessOutput {
+    match run_inner(check_only, cancellation).await {
         Ok(value) => ProcessOutput::success(value.to_string()),
+        Err(error) if error.code == UPGRADE_CANCELLED => ProcessOutput::interrupted(130),
         Err(error) => failure(error),
     }
 }
 
-async fn run_inner(check_only: bool) -> Result<serde_json::Value, UpgradeError> {
+async fn run_inner(
+    check_only: bool,
+    cancellation: &CancellationToken,
+) -> Result<serde_json::Value, UpgradeError> {
+    check_cancellation(cancellation)?;
     let manifest = release_manifest()?;
     let target = current_target(&manifest)?;
     let completed_replacements = reconcile_deferred_status(&manifest.release)?;
+    check_cancellation(cancellation)?;
     let installation = managed_installation(&manifest, &target)?;
     if should_clear_completed_replacements(check_only) {
+        check_cancellation(cancellation)?;
         clear_completed_replacements(completed_replacements)?;
     }
+    check_cancellation(cancellation)?;
     let source = GithubReleaseSource::new(&manifest.release)?;
-    execute_upgrade(check_only, &manifest, target, &installation, &source).await
+    execute_upgrade_cancellable(
+        check_only,
+        &manifest,
+        target,
+        &installation,
+        &source,
+        cancellation,
+    )
+    .await
+}
+
+fn check_cancellation(cancellation: &CancellationToken) -> Result<(), UpgradeError> {
+    if cancellation.is_cancelled() {
+        Err(cancelled())
+    } else {
+        Ok(())
+    }
+}
+
+fn cancelled() -> UpgradeError {
+    UpgradeError::new(UPGRADE_CANCELLED, "The upgrade was cancelled.")
+}
+
+async fn cancellable<T>(
+    cancellation: &CancellationToken,
+    future: impl Future<Output = Result<T, UpgradeError>>,
+) -> Result<T, UpgradeError> {
+    tokio::select! {
+        biased;
+        _ = cancellation.cancelled() => Err(cancelled()),
+        result = future => result,
+    }
 }
 
 fn should_clear_completed_replacements(check_only: bool) -> bool {
@@ -153,22 +196,36 @@ fn should_clear_completed_replacements(check_only: bool) -> bool {
 
 trait ReleaseSource {
     async fn latest(&self) -> Result<Release, UpgradeError>;
-    async fn download(&self, asset: &ReleaseAsset, limit: usize) -> Result<Vec<u8>, UpgradeError>;
+    async fn download(
+        &self,
+        asset: &ReleaseAsset,
+        limit: usize,
+        kind: DownloadKind,
+    ) -> Result<Vec<u8>, UpgradeError>;
 }
 
-async fn execute_upgrade<S: ReleaseSource>(
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DownloadKind {
+    Metadata,
+    Archive,
+}
+
+async fn execute_upgrade_cancellable<S: ReleaseSource>(
     check_only: bool,
     manifest: &ReleaseManifest,
     target: TargetIdentity,
     installation: &ManagedInstallation,
     source: &S,
+    cancellation: &CancellationToken,
 ) -> Result<serde_json::Value, UpgradeError> {
     let operation = if check_only {
         "upgrade-check"
     } else {
         "upgrade"
     };
-    let release = source.latest().await?;
+    check_cancellation(cancellation)?;
+    let release = cancellable(cancellation, source.latest()).await?;
+    check_cancellation(cancellation)?;
     validate_release(&release, &manifest.release)?;
     let latest = release_version(&release.tag_name, &manifest.release.tag_prefix)?;
     let current = Version::parse(VERSION).map_err(|_| {
@@ -178,6 +235,7 @@ async fn execute_upgrade<S: ReleaseSource>(
         )
     })?;
     let available = latest > current;
+    check_cancellation(cancellation)?;
     if !available {
         return Ok(success(json!({
             "operation": operation,
@@ -210,6 +268,7 @@ async fn execute_upgrade<S: ReleaseSource>(
             "The release checksum manifest exceeds the download limit.",
         ));
     }
+    check_cancellation(cancellation)?;
     if check_only {
         return Ok(success(json!({
             "operation": operation,
@@ -222,9 +281,17 @@ async fn execute_upgrade<S: ReleaseSource>(
             "target": target.release_target,
         })));
     }
-    let checksums = source
-        .download(checksum_asset, manifest.release.metadata_limit_bytes)
-        .await?;
+    check_cancellation(cancellation)?;
+    let checksums = cancellable(
+        cancellation,
+        source.download(
+            checksum_asset,
+            manifest.release.metadata_limit_bytes,
+            DownloadKind::Metadata,
+        ),
+    )
+    .await?;
+    check_cancellation(cancellation)?;
     if checksums.len() != checksum_asset.size as usize {
         return Err(UpgradeError::new(
             "upgrade_asset_identity",
@@ -232,9 +299,16 @@ async fn execute_upgrade<S: ReleaseSource>(
         ));
     }
     let expected_archive = checksum_entry(&checksums, &archive_name)?;
-    let archive = source
-        .download(archive_asset, manifest.release.archive_limit_bytes)
-        .await?;
+    let archive = cancellable(
+        cancellation,
+        source.download(
+            archive_asset,
+            manifest.release.archive_limit_bytes,
+            DownloadKind::Archive,
+        ),
+    )
+    .await?;
+    check_cancellation(cancellation)?;
     if archive.len() != archive_asset.size as usize {
         return Err(UpgradeError::new(
             "upgrade_asset_identity",
@@ -253,6 +327,7 @@ async fn execute_upgrade<S: ReleaseSource>(
         &target.executable_name,
         manifest.release.archive_limit_bytes as u64,
     )?;
+    check_cancellation(cancellation)?;
     let receipt = Receipt {
         schema_version: manifest.release.receipt_schema_version,
         manager: "standalone".to_owned(),
@@ -264,6 +339,9 @@ async fn execute_upgrade<S: ReleaseSource>(
         asset_name: archive_name,
         sha256: hex_digest(&executable),
     };
+    check_cancellation(cancellation)?;
+    // Cancellation stops at this commit boundary. Once replacement begins it
+    // must run through publication or rollback to keep the installation valid.
     let replacement = install_replacement(installation, &executable, &receipt)?;
     Ok(success(json!({
         "operation": operation,
@@ -276,6 +354,25 @@ async fn execute_upgrade<S: ReleaseSource>(
         "releaseTag": release.tag_name,
         "target": target.release_target,
     })))
+}
+
+#[cfg(test)]
+async fn execute_upgrade<S: ReleaseSource>(
+    check_only: bool,
+    manifest: &ReleaseManifest,
+    target: TargetIdentity,
+    installation: &ManagedInstallation,
+    source: &S,
+) -> Result<serde_json::Value, UpgradeError> {
+    execute_upgrade_cancellable(
+        check_only,
+        manifest,
+        target,
+        installation,
+        source,
+        &CancellationToken::new(),
+    )
+    .await
 }
 
 fn release_manifest() -> Result<ReleaseManifest, UpgradeError> {
@@ -541,6 +638,8 @@ struct GithubReleaseSource {
     client: wreq::Client,
     repository: String,
     metadata_limit: usize,
+    metadata_timeout: Duration,
+    archive_timeout: Duration,
 }
 
 impl GithubReleaseSource {
@@ -561,15 +660,23 @@ impl GithubReleaseSource {
             client,
             repository: policy.repository.clone(),
             metadata_limit: policy.metadata_limit_bytes,
+            metadata_timeout: Duration::from_secs(policy.request_timeout_seconds),
+            archive_timeout: Duration::from_secs(policy.archive_request_timeout_seconds),
         })
     }
 
-    async fn get(&self, url: &str, limit: usize) -> Result<Vec<u8>, UpgradeError> {
+    async fn get(
+        &self,
+        url: &str,
+        limit: usize,
+        timeout: Duration,
+    ) -> Result<Vec<u8>, UpgradeError> {
         let response = self
             .client
             .get(url)
             .header(ACCEPT, "application/vnd.github+json")
             .header(USER_AGENT, format!("kasb/{VERSION}"))
+            .timeout(timeout)
             .send()
             .await
             .map_err(|error| {
@@ -643,7 +750,9 @@ impl ReleaseSource for GithubReleaseSource {
             "https://api.github.com/repos/{}/releases/latest",
             self.repository
         );
-        let bytes = self.get(&url, self.metadata_limit).await?;
+        let bytes = self
+            .get(&url, self.metadata_limit, self.metadata_timeout)
+            .await?;
         serde_json::from_slice(&bytes).map_err(|_| {
             UpgradeError::new(
                 "upgrade_release_invalid",
@@ -652,8 +761,17 @@ impl ReleaseSource for GithubReleaseSource {
         })
     }
 
-    async fn download(&self, asset: &ReleaseAsset, limit: usize) -> Result<Vec<u8>, UpgradeError> {
-        self.get(&asset.browser_download_url, limit).await
+    async fn download(
+        &self,
+        asset: &ReleaseAsset,
+        limit: usize,
+        kind: DownloadKind,
+    ) -> Result<Vec<u8>, UpgradeError> {
+        let timeout = match kind {
+            DownloadKind::Metadata => self.metadata_timeout,
+            DownloadKind::Archive => self.archive_timeout,
+        };
+        self.get(&asset.browser_download_url, limit, timeout).await
     }
 }
 
@@ -1149,7 +1267,10 @@ fn replace_now(
     staged: &Path,
     staged_receipt: &Path,
 ) -> Result<(), UpgradeError> {
-    let result = replace_now_with_rollback_fault(installation, staged, staged_receipt, false);
+    #[cfg(test)]
+    let result = replace_now_impl(installation, staged, staged_receipt, false);
+    #[cfg(not(test))]
+    let result = replace_now_impl(installation, staged, staged_receipt);
     if result.is_err() {
         let _ = fs::remove_file(staged);
         let _ = fs::remove_file(staged_receipt);
@@ -1157,12 +1278,27 @@ fn replace_now(
     result
 }
 
-#[cfg(not(windows))]
+#[cfg(all(not(windows), test))]
 fn replace_now_with_rollback_fault(
     installation: &ManagedInstallation,
     staged: &Path,
     staged_receipt: &Path,
     simulate_rollback_failure: bool,
+) -> Result<(), UpgradeError> {
+    replace_now_impl(
+        installation,
+        staged,
+        staged_receipt,
+        simulate_rollback_failure,
+    )
+}
+
+#[cfg(not(windows))]
+fn replace_now_impl(
+    installation: &ManagedInstallation,
+    staged: &Path,
+    staged_receipt: &Path,
+    #[cfg(test)] simulate_rollback_failure: bool,
 ) -> Result<(), UpgradeError> {
     let parent = installation.executable.parent().unwrap_or(Path::new("."));
     let nonce = std::process::id();
@@ -1179,53 +1315,95 @@ fn replace_now_with_rollback_fault(
             receipt_backup.display()
         )));
     }
-    fs::rename(&installation.executable, &backup).map_err(|_| {
+    // Hard-link backups preserve the currently installed path until each
+    // staged file is atomically renamed over it on the same filesystem.
+    fs::hard_link(&installation.executable, &backup).map_err(|_| {
         UpgradeError::new(
             "upgrade_replacement_failure",
             "Could not preserve the installed executable before replacement.",
         )
     })?;
-    if fs::rename(&installation.receipt_path, &receipt_backup).is_err() {
-        let restored = fs::rename(&backup, &installation.executable).is_ok()
-            && sync_committed_installation(installation).is_ok();
-        let _ = fs::remove_file(staged);
-        let _ = fs::remove_file(staged_receipt);
-        if restored {
+    if fs::hard_link(&installation.receipt_path, &receipt_backup).is_err() {
+        if clear_posix_backups(parent, &backup, &receipt_backup) {
             return Err(UpgradeError::new(
                 "upgrade_replacement_failure",
-                "Could not preserve the installed receipt; the executable was restored.",
+                "Could not preserve the installed receipt; the installation was not changed.",
             ));
         }
         return Err(UpgradeError::new(
             "upgrade_recovery_required",
-            "Could not preserve the installed receipt or restore the executable.",
+            "Could not preserve the installed receipt or clear the executable backup.",
         )
         .recovery(format!(
-            "The executable backup remains at {}.",
+            "The installed files are unchanged; inspect the backup at {}.",
             backup.display()
         )));
     }
-    let mut replacement = fs::rename(staged, &installation.executable)
-        .and_then(|()| fs::rename(staged_receipt, &installation.receipt_path));
-    if replacement.is_ok() {
-        replacement = sync_committed_installation(installation)
-            .map_err(|error| std::io::Error::other(error.message));
-    }
-    if replacement.is_ok() {
-        let _ = fs::remove_file(&backup);
-        let _ = fs::remove_file(&receipt_backup);
-        return Ok(());
+    if sync_installation_directory(parent).is_err() {
+        if clear_posix_backups(parent, &backup, &receipt_backup) {
+            return Err(UpgradeError::new(
+                "upgrade_replacement_failure",
+                "Could not make the replacement backups durable; the installation was not changed.",
+            ));
+        }
+        return Err(UpgradeError::new(
+            "upgrade_recovery_required",
+            "Could not make the replacement backups durable or clear them.",
+        )
+        .recovery(format!(
+            "The installed files are unchanged; inspect {} and {}.",
+            backup.display(),
+            receipt_backup.display()
+        )));
     }
 
-    let _ = fs::remove_file(&installation.executable);
+    if fs::rename(staged, &installation.executable).is_err() {
+        if clear_posix_backups(parent, &backup, &receipt_backup) {
+            return Err(UpgradeError::new(
+                "upgrade_replacement_failure",
+                "Could not publish the replacement executable; the installation was not changed.",
+            ));
+        }
+        return Err(UpgradeError::new(
+            "upgrade_recovery_required",
+            "Could not publish the replacement executable or clear its backups.",
+        )
+        .recovery(format!(
+            "The installed files are unchanged; inspect {} and {}.",
+            backup.display(),
+            receipt_backup.display()
+        )));
+    }
+
+    let receipt_published = fs::rename(staged_receipt, &installation.receipt_path).is_ok();
+    let replacement = receipt_published && sync_committed_installation(installation).is_ok();
+    if replacement {
+        return if clear_posix_backups(parent, &backup, &receipt_backup) {
+            Ok(())
+        } else {
+            Err(UpgradeError::new(
+                "upgrade_recovery_required",
+                "The replacement was installed, but its backups could not be cleared.",
+            )
+            .recovery(format!(
+                "The installed executable and receipt are current; inspect {} and {}.",
+                backup.display(),
+                receipt_backup.display()
+            )))
+        };
+    }
+
+    #[cfg(test)]
     if simulate_rollback_failure {
+        let _ = fs::remove_file(&installation.executable);
         let _ = fs::create_dir(&installation.executable);
     }
     let executable_rollback = fs::rename(&backup, &installation.executable);
-    let _ = fs::remove_file(&installation.receipt_path);
-    let receipt_rollback = fs::rename(&receipt_backup, &installation.receipt_path);
-    let _ = fs::remove_file(staged);
-    let _ = fs::remove_file(staged_receipt);
+    let receipt_rollback = if receipt_published {
+        fs::rename(&receipt_backup, &installation.receipt_path)
+    } else {
+        fs::remove_file(&receipt_backup)
+    };
     let rollback_durable = executable_rollback.is_ok()
         && receipt_rollback.is_ok()
         && sync_committed_installation(installation).is_ok();
@@ -1239,8 +1417,10 @@ fn replace_now_with_rollback_fault(
     let state = json!({
         "executable": installation.executable,
         "executableBackup": backup,
+        "executableRestored": executable_rollback.is_ok(),
         "receipt": installation.receipt_path,
         "receiptBackup": receipt_backup,
+        "receiptRestored": receipt_rollback.is_ok(),
     });
     let recovery_recorded = File::options()
         .create_new(true)
@@ -1265,6 +1445,21 @@ fn replace_now_with_rollback_fault(
         "The upgrade and automatic rollback both failed.",
     )
     .recovery(recovery_hint))
+}
+
+#[cfg(not(windows))]
+fn clear_posix_backups(parent: &Path, backup: &Path, receipt_backup: &Path) -> bool {
+    fn remove_if_present(path: &Path) -> bool {
+        match fs::remove_file(path) {
+            Ok(()) => true,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => true,
+            Err(_) => false,
+        }
+    }
+
+    let executable_removed = remove_if_present(backup);
+    let receipt_removed = remove_if_present(receipt_backup);
+    executable_removed && receipt_removed && sync_installation_directory(parent).is_ok()
 }
 
 #[cfg(windows)]
@@ -1299,6 +1494,7 @@ fn schedule_windows_replacement(
             installation.executable.display()
         )));
     }
+    #[cfg(test)]
     let script = windows_replacement_script(
         std::process::id(),
         &installation.executable,
@@ -1308,9 +1504,18 @@ fn schedule_windows_replacement(
         staged_receipt,
         &receipt_backup,
         &status,
-        false,
-        false,
-        None,
+        WindowsReplacementFaults::default(),
+    );
+    #[cfg(not(test))]
+    let script = windows_replacement_script(
+        std::process::id(),
+        &installation.executable,
+        staged,
+        &backup,
+        &installation.receipt_path,
+        staged_receipt,
+        &receipt_backup,
+        &status,
     );
     write_windows_status(
         &status,
@@ -1400,8 +1605,16 @@ fn write_windows_status(path: &Path, value: &impl Serialize) -> Result<(), Upgra
     persisted
 }
 
-#[allow(clippy::too_many_arguments)]
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Default)]
+struct WindowsReplacementFaults {
+    simulate_rollback_failure: bool,
+    fail_after_receipt_publish: bool,
+    stop_after_phase: Option<&'static str>,
+}
+
 #[cfg(any(windows, test))]
+#[allow(clippy::too_many_arguments)]
 fn windows_replacement_script(
     parent_pid: u32,
     executable: &Path,
@@ -1411,13 +1624,51 @@ fn windows_replacement_script(
     staged_receipt: &Path,
     receipt_backup: &Path,
     status: &Path,
-    simulate_rollback_failure: bool,
-    fail_after_receipt_publish: bool,
-    stop_after_phase: Option<&str>,
+    #[cfg(test)] faults: WindowsReplacementFaults,
 ) -> String {
     fn literal(path: &Path) -> String {
         format!("'{}'", path.to_string_lossy().replace('\'', "''"))
     }
+    #[cfg(test)]
+    let stop_after_backing_up = if faults.stop_after_phase == Some("backingUp") {
+        "exit 86"
+    } else {
+        ""
+    };
+    #[cfg(not(test))]
+    let stop_after_backing_up = "";
+    #[cfg(test)]
+    let stop_after_replacing = if faults.stop_after_phase == Some("replacing") {
+        "exit 86"
+    } else {
+        ""
+    };
+    #[cfg(not(test))]
+    let stop_after_replacing = "";
+    #[cfg(test)]
+    let fail_after_receipt_publish = if faults.fail_after_receipt_publish {
+        "throw 'simulated failure after receipt publication'"
+    } else {
+        ""
+    };
+    #[cfg(not(test))]
+    let fail_after_receipt_publish = "";
+    #[cfg(test)]
+    let corrupt_rollback_destination = if faults.simulate_rollback_failure {
+        "Remove-ExactFile $exe\n  New-Item -ItemType Directory -Path $exe -Force | Out-Null"
+    } else {
+        ""
+    };
+    #[cfg(not(test))]
+    let corrupt_rollback_destination = "";
+    #[cfg(test)]
+    let remove_replacement_before_restore = if faults.simulate_rollback_failure {
+        ""
+    } else {
+        "Remove-ExactFile $exe"
+    };
+    #[cfg(not(test))]
+    let remove_replacement_before_restore = "Remove-ExactFile $exe";
     format!(
         r#"$ErrorActionPreference = 'Stop'
 $exe = {}
@@ -1428,9 +1679,6 @@ $stagedReceipt = {}
 $receiptBackup = {}
 $status = {}
 $helper = $MyInvocation.MyCommand.Path
-$simulateRollbackFailure = {}
-$failAfterReceiptPublish = {}
-$stopAfterPhase = {}
 $hadReceipt = Test-Path -LiteralPath $receipt
 function Flush-DurableFile([string]$path) {{
   $stream = [System.IO.File]::Open($path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
@@ -1486,32 +1734,29 @@ function Write-TerminalStatus([hashtable]$value) {{
     try {{ [System.IO.File]::Delete($statusNext) }} catch {{}}
   }}
 }}
-Wait-Process -Id {} -ErrorAction SilentlyContinue
+Wait-Process -Id {parent_pid} -ErrorAction SilentlyContinue
 try {{
   Write-TerminalStatus @{{ status = 'pending'; phase = 'backingUp' }}
-  if ($stopAfterPhase -eq 'backingUp') {{ exit 86 }}
+  {stop_after_backing_up}
   if ($hadReceipt) {{ Move-ExactFile $receipt $receiptBackup }}
   Move-ExactFile $exe $backup
   Write-TerminalStatus @{{ status = 'pending'; phase = 'replacing' }}
-  if ($stopAfterPhase -eq 'replacing') {{ exit 86 }}
+  {stop_after_replacing}
   Move-ExactFile $staged $exe
   Move-ExactFile $stagedReceipt $receipt
   Flush-DurableFile $exe
   Flush-DurableFile $receipt
-  if ($failAfterReceiptPublish) {{ throw 'simulated failure after receipt publication' }}
+  {fail_after_receipt_publish}
   Write-TerminalStatus @{{ status = 'applied'; phase = 'complete' }}
   Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $backup, $receiptBackup
 }} catch {{
   $replacementError = $_.Exception.Message
   $rollbackOk = $true
   $rollbackErrors = [System.Collections.Generic.List[string]]::new()
-  if ($simulateRollbackFailure -and [System.IO.File]::Exists($backup)) {{
-    Remove-ExactFile $exe
-    New-Item -ItemType Directory -Path $exe -Force | Out-Null
-  }}
+  {corrupt_rollback_destination}
   if ([System.IO.File]::Exists($backup)) {{
     try {{
-      if (-not $simulateRollbackFailure) {{ Remove-ExactFile $exe }}
+      {remove_replacement_before_restore}
       Move-ExactFile $backup $exe
     }} catch {{
       $rollbackOk = $false
@@ -1565,21 +1810,26 @@ try {{
         literal(staged_receipt),
         literal(receipt_backup),
         literal(status),
-        if simulate_rollback_failure {
-            "$true"
-        } else {
-            "$false"
-        },
-        if fail_after_receipt_publish {
-            "$true"
-        } else {
-            "$false"
-        },
-        stop_after_phase
-            .map(|phase| format!("'{}'", phase.replace('\'', "''")))
-            .unwrap_or_else(|| "$null".to_owned()),
-        parent_pid,
+        parent_pid = parent_pid,
+        stop_after_backing_up = stop_after_backing_up,
+        stop_after_replacing = stop_after_replacing,
+        fail_after_receipt_publish = fail_after_receipt_publish,
+        corrupt_rollback_destination = corrupt_rollback_destination,
+        remove_replacement_before_restore = remove_replacement_before_restore,
     )
+}
+
+#[cfg(not(windows))]
+fn sync_installation_directory(path: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        File::open(path)?.sync_all()
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        Ok(())
+    }
 }
 
 #[cfg(not(windows))]
@@ -1593,9 +1843,7 @@ fn sync_committed_installation(installation: &ManagedInstallation) -> Result<(),
                 "The replacement was published but could not be made durable.",
             )
         })?;
-    #[cfg(unix)]
-    File::open(installation.executable.parent().unwrap_or(Path::new(".")))
-        .and_then(|directory| directory.sync_all())
+    sync_installation_directory(installation.executable.parent().unwrap_or(Path::new(".")))
         .map_err(|_| {
             UpgradeError::new(
                 "upgrade_replacement_failure",
@@ -1647,6 +1895,7 @@ mod tests {
         archive: Vec<u8>,
         fail_latest: bool,
         downloads: Cell<usize>,
+        cancel_after: Option<(CancellationToken, DownloadKind)>,
     }
 
     impl ReleaseSource for FakeSource {
@@ -1662,14 +1911,23 @@ mod tests {
             &self,
             asset: &ReleaseAsset,
             _limit: usize,
+            kind: DownloadKind,
         ) -> Result<Vec<u8>, UpgradeError> {
             self.downloads.set(self.downloads.get() + 1);
             let checksum_name = &manifest().release.checksum_asset;
-            if &asset.name == checksum_name {
+            let result = if &asset.name == checksum_name {
                 Ok(self.checksums.clone())
             } else {
                 Ok(self.archive.clone())
+            };
+            if self
+                .cancel_after
+                .as_ref()
+                .is_some_and(|(_, cancel_kind)| *cancel_kind == kind)
+            {
+                self.cancel_after.as_ref().unwrap().0.cancel();
             }
+            result
         }
     }
 
@@ -1756,6 +2014,7 @@ mod tests {
             archive,
             fail_latest: false,
             downloads: Cell::new(0),
+            cancel_after: None,
         }
     }
 
@@ -1903,6 +2162,22 @@ mod tests {
     }
 
     #[test]
+    fn release_transport_keeps_metadata_and_archive_timeouts_distinct() {
+        let manifest = manifest();
+        let source = GithubReleaseSource::new(&manifest.release).unwrap();
+
+        assert_eq!(
+            source.metadata_timeout,
+            Duration::from_secs(manifest.release.request_timeout_seconds)
+        );
+        assert_eq!(
+            source.archive_timeout,
+            Duration::from_secs(manifest.release.archive_request_timeout_seconds)
+        );
+        assert!(source.archive_timeout > source.metadata_timeout);
+    }
+
+    #[test]
     fn check_mode_preserves_completed_replacement_status() {
         assert!(!should_clear_completed_replacements(true));
         assert!(should_clear_completed_replacements(false));
@@ -1952,6 +2227,43 @@ mod tests {
         assert_eq!(error.code, "upgrade_replacement_failure");
         assert_eq!(fs::read(executable).unwrap(), b"old");
         assert_eq!(fs::read(receipt_path).unwrap(), b"old receipt");
+        assert!(
+            !directory
+                .path()
+                .join(format!(".kasb.backup.{}", std::process::id()))
+                .exists()
+        );
+        assert!(
+            !directory
+                .path()
+                .join(format!(".kasb.receipt.backup.{}", std::process::id()))
+                .exists()
+        );
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn failed_executable_publish_never_removes_the_installed_paths() {
+        let manifest = manifest();
+        let directory = tempfile::tempdir().unwrap();
+        let executable = directory.path().join("kasb");
+        let receipt_path = directory.path().join(&manifest.release.receipt_file);
+        fs::write(&executable, b"old").unwrap();
+        fs::write(&receipt_path, b"old receipt").unwrap();
+        let missing_staged = directory.path().join("missing-staged");
+        let staged_receipt = directory.path().join("staged-receipt");
+        fs::write(&staged_receipt, b"new receipt").unwrap();
+        let installation = ManagedInstallation {
+            executable: executable.clone(),
+            receipt_path: receipt_path.clone(),
+        };
+
+        let error = replace_now(&installation, &missing_staged, &staged_receipt).unwrap_err();
+
+        assert_eq!(error.code, "upgrade_replacement_failure");
+        assert_eq!(fs::read(executable).unwrap(), b"old");
+        assert_eq!(fs::read(receipt_path).unwrap(), b"old receipt");
+        assert!(!staged_receipt.exists());
     }
 
     #[cfg(not(windows))]
@@ -2174,6 +2486,38 @@ mod tests {
         assert_eq!(source.downloads.get(), 0);
     }
 
+    #[tokio::test]
+    async fn cancellation_between_downloads_preserves_the_installation() {
+        let manifest = manifest();
+        let directory = tempfile::tempdir().unwrap();
+        let installation = test_installation(&directory);
+        let cancellation = CancellationToken::new();
+        let mut source = fake_source("0.1.1");
+        source.cancel_after = Some((cancellation.clone(), DownloadKind::Metadata));
+
+        let error = execute_upgrade_cancellable(
+            false,
+            &manifest,
+            test_target(),
+            &installation,
+            &source,
+            &cancellation,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(error.code, UPGRADE_CANCELLED);
+        assert_eq!(source.downloads.get(), 1);
+        assert_eq!(
+            fs::read(&installation.executable).unwrap(),
+            executable_script(VERSION)
+        );
+        assert_eq!(
+            fs::read(&installation.receipt_path).unwrap(),
+            b"old receipt\n"
+        );
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn available_upgrade_replaces_binary_and_receipt() {
@@ -2355,7 +2699,15 @@ mod tests {
     fn windows_helper_quotes_paths_without_interpolation() {
         let path = Path::new(r"C:\Program Files\$cash\O'Brien\kasb.exe");
         let script = windows_replacement_script(
-            42, path, path, path, path, path, path, path, false, false, None,
+            42,
+            path,
+            path,
+            path,
+            path,
+            path,
+            path,
+            path,
+            WindowsReplacementFaults::default(),
         );
         assert!(script.contains(r"'C:\Program Files\$cash\O''Brien\kasb.exe'"));
         assert!(script.contains("Wait-Process -Id 42"));
@@ -2370,6 +2722,8 @@ mod tests {
         );
         assert!(script.contains("Flush-DurableFile $status"));
         assert!(script.contains("$status.$statusNonce.previous"));
+        assert!(!script.contains("simulated failure"));
+        assert!(!script.contains("exit 86"));
         assert!(
             script
                 .contains("Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $helper")
@@ -2441,7 +2795,7 @@ mod tests {
         staged_receipt_exists: bool,
         simulate_rollback_failure: bool,
         fail_after_receipt_publish: bool,
-        stop_after_phase: Option<&str>,
+        stop_after_phase: Option<&'static str>,
     ) -> WindowsHelperResult {
         let directory = tempfile::tempdir().unwrap();
         let executable = directory.path().join("kasb.exe");
@@ -2478,9 +2832,11 @@ mod tests {
                 &staged_receipt,
                 &receipt_backup,
                 &status,
-                simulate_rollback_failure,
-                fail_after_receipt_publish,
-                stop_after_phase,
+                WindowsReplacementFaults {
+                    simulate_rollback_failure,
+                    fail_after_receipt_publish,
+                    stop_after_phase,
+                },
             ),
         )
         .unwrap();
