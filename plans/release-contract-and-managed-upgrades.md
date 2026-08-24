@@ -131,6 +131,6 @@ binary without runtime addon downloads.
 
 ## Next action
 
-Finish the implementation PR's CI and review, merge it into the goal integration
-branch, record the evidence, and then promote the four-target release-pipeline
-plan to Current.
+Finish PR #22's CI and review, merge it into the goal integration branch,
+record the evidence, and then promote the four-target release-pipeline plan to
+Current.

@@ -37,8 +37,8 @@ build and validate the resulting versioned artifacts and upgrade behavior.
 
 ### Next in-scope action
 
-Create and finish the implementation PR against the goal integration branch,
-record its merged validation evidence, then start the four-target candidate and
+Finish implementation PR #22 against the goal integration branch, record its
+merged validation evidence, then start the four-target candidate and
 publication-pipeline slice.
 
 ### Evidence and blockers
@@ -49,6 +49,10 @@ publication-pipeline slice.
 - PR #21 merged the two release plans, active goal record, and truthful
   rewrite-completion documentation into commit `80eea30` on the goal integration
   branch.
+- PR #22 carries the reviewed release, installation, and managed-upgrade
+  implementation. Its local contract, test, conformance, build, formatting,
+  clippy, license, native-workflow, and diff checks pass; required CI and
+  hosted review are in progress.
 - The implementation branch makes Cargo workspace version `0.1.0` the current
   development identity; npm packages, four target-derived standalone archives,
   generated installers, checksums, CLI identity, and receipts derive from it.
