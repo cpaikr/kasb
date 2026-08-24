@@ -1,11 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { loadReleaseContract, releaseDownloadUrl, releaseTag, repositoryRoot } from "./release-contract.mjs";
+import { loadReleaseContract, releaseAssetNames, releaseDownloadUrl, releaseTag, repositoryRoot } from "./release-contract.mjs";
 
 const failures = [];
 const check = (condition, message) => { if (!condition) failures.push(message); };
 const contract = await loadReleaseContract();
+validateCanonicalReleaseMatrix(contract);
+if (process.argv.includes("--release-matrix-only")) {
+  finish(`release matrix is canonical for ${contract.targets.length} targets`);
+  process.exit(0);
+}
 const metadata = command("cargo", ["metadata", "--locked", "--no-deps", "--format-version", "1"]);
 if (metadata.status === 0) {
   const packages = JSON.parse(metadata.stdout).packages.filter(({ source }) => source === null);
@@ -43,8 +48,21 @@ for (const target of contract.targets) {
 }
 check(contract.targets.length === 4, "release identity must cover all four supported targets exactly");
 check(contract.release.repository === "cpaikr/kasb", "release repository identity must remain cpaikr/kasb");
+check(contract.release.shellInstallerAsset === "install.sh", "shell installer release identity must remain install.sh");
+check(contract.release.powershellInstallerAsset === "install.ps1", "PowerShell installer release identity must remain install.ps1");
+check(contract.release.provenanceAsset === "provenance.json", "release provenance identity must remain provenance.json");
 check(contract.release.receiptSchemaVersion === 1, "receipt schema version must remain explicit");
 check(contract.release.receiptFile === ".kasb-receipt.json", "receipt filename must remain stable");
+check(contract.release.candidateReceiptFile === "candidate.json", "candidate receipt filename must remain stable");
+const expectedToolchain = { rust: "1.88.0", node: "24", npm: "11.6.2" };
+const toolchain = contract.release.toolchain ?? {};
+check(JSON.stringify(Object.keys(toolchain).sort()) === JSON.stringify(Object.keys(expectedToolchain).sort()), "release toolchain must contain exactly rust, node, and npm pins");
+for (const [name, version] of Object.entries(expectedToolchain)) {
+  check(toolchain[name] === version, `release ${name} toolchain pin must remain ${version}`);
+}
+for (const target of contract.targets) {
+  check(typeof target.releaseRunner === "string" && target.releaseRunner.length > 0, `${target.rustTarget} is missing a release runner`);
+}
 check(
   JSON.stringify(contract.release.archiveEntries) === JSON.stringify(["{executable}", "LICENSE.md", "README.md", "THIRD_PARTY_LICENSES.html"]),
   "standalone archive entries must remain one exact shared release contract",
@@ -81,7 +99,7 @@ if (process.env.KASB_RELEASE_METADATA) {
   failures.push(...releaseMetadataFailures(release, contract));
 }
 
-const expectedMetadataAssets = [...contract.targets.map(({ archiveName }) => archiveName), contract.release.checksumAsset];
+const expectedMetadataAssets = releaseAssetNames(contract);
 const validMetadataFixture = {
   immutable: true,
   draft: false,
@@ -99,11 +117,7 @@ if (!releaseMetadataFailures({ ...validMetadataFixture, assets: [...validMetadat
   failures.push("release metadata validator accepted an unexpected-asset self-test fixture");
 }
 
-if (failures.length) {
-  console.error(failures.map((failure) => `- ${failure}`).join("\n"));
-  process.exit(1);
-}
-console.log(`release contract is current for kasb ${contract.version} and ${contract.targets.length} targets`);
+finish(`release contract is current for kasb ${contract.version} and ${contract.targets.length} targets`);
 
 function command(executable, args) {
   return spawnSync(executable, args, { cwd: repositoryRoot, encoding: "utf8" });
@@ -113,13 +127,61 @@ function sameEntries(left, right) {
   return JSON.stringify(Object.entries(left ?? {}).sort()) === JSON.stringify(Object.entries(right).sort());
 }
 
+function validateCanonicalReleaseMatrix(releaseContract) {
+  const expected = [
+    {
+      rustTarget: "x86_64-unknown-linux-gnu",
+      packageDirectory: "linux-x64-gnu",
+      releaseRunner: "blacksmith-2vcpu-ubuntu-2404",
+      buildContainer: "quay.io/pypa/manylinux_2_28_x86_64:2026.08.15-1@sha256:0c87ccb5996dab6c3b7612ee4fda7b80c4ab3c44a86c2541e4a872afdf4f131b",
+    },
+    {
+      rustTarget: "aarch64-unknown-linux-gnu",
+      packageDirectory: "linux-arm64-gnu",
+      releaseRunner: "blacksmith-2vcpu-ubuntu-2404-arm",
+      buildContainer: "quay.io/pypa/manylinux_2_28_aarch64:2026.08.15-1@sha256:561427136aabf3787bffb294b3515748241e0962d1527ae28bea1e076bfb9d99",
+    },
+    {
+      rustTarget: "aarch64-apple-darwin",
+      packageDirectory: "darwin-arm64",
+      releaseRunner: "blacksmith-6vcpu-macos-15",
+      buildContainer: null,
+    },
+    {
+      rustTarget: "x86_64-pc-windows-msvc",
+      packageDirectory: "win32-x64-msvc",
+      releaseRunner: "blacksmith-2vcpu-windows-2025",
+      buildContainer: null,
+    },
+  ];
+  const actual = releaseContract.targets.map(({ rustTarget, packageDirectory, releaseRunner, buildContainer = null }) => ({
+    rustTarget,
+    packageDirectory,
+    releaseRunner,
+    buildContainer,
+  }));
+  check(JSON.stringify(actual) === JSON.stringify(expected), "release targets, package directories, runners, and build containers must match the exact canonical matrix");
+  check(
+    JSON.stringify(releaseContract.manifest.validationNodeVersions) === JSON.stringify(["20.18.1", "21", "22", "23", "24", "25", "26"]),
+    "clean-consumer Node coverage must remain exactly 20.18.1 and majors 21 through 26",
+  );
+}
+
+function finish(message) {
+  if (failures.length) {
+    console.error(failures.map((failure) => `- ${failure}`).join("\n"));
+    process.exit(1);
+  }
+  console.log(message);
+}
+
 function releaseMetadataFailures(release, releaseContract) {
   const metadataFailures = [];
   const requireMetadata = (condition, message) => { if (!condition) metadataFailures.push(message); };
   requireMetadata(release.immutable === true, "release metadata must be immutable");
   requireMetadata(release.draft === false && release.prerelease === false, "release metadata must describe a production release");
   requireMetadata(release.tag_name === releaseTag(releaseContract.release, releaseContract.version), "release metadata tag differs from canonical version");
-  const expectedAssets = [...releaseContract.targets.map(({ archiveName }) => archiveName), releaseContract.release.checksumAsset];
+  const expectedAssets = releaseAssetNames(releaseContract);
   const actualAssets = (release.assets ?? []).map(({ name }) => name);
   requireMetadata(
     JSON.stringify([...actualAssets].sort()) === JSON.stringify([...expectedAssets].sort()),
@@ -130,7 +192,9 @@ function releaseMetadataFailures(release, releaseContract) {
     requireMetadata(matches.length === 1, `release metadata must contain exactly one ${expected}`);
     const [asset] = matches;
     if (!asset) continue;
-    const limit = expected === releaseContract.release.checksumAsset ? releaseContract.release.metadataLimitBytes : releaseContract.release.archiveLimitBytes;
+    const limit = releaseContract.targets.some(({ archiveName }) => archiveName === expected)
+      ? releaseContract.release.archiveLimitBytes
+      : releaseContract.release.metadataLimitBytes;
     requireMetadata(Number.isSafeInteger(asset.size) && asset.size > 0 && asset.size <= limit, `${expected} metadata has an invalid bounded size`);
     requireMetadata(asset.browser_download_url === releaseDownloadUrl(releaseContract.release, release.tag_name, expected), `${expected} metadata has a noncanonical download URL`);
   }

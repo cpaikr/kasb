@@ -43,3 +43,27 @@ export function releaseApiUrl(release, tag) {
 export function releaseDownloadUrl(release, tag, asset) {
   return `https://github.com/${release.repository}/releases/download/${tag}/${asset}`;
 }
+
+export function releaseAssetNames(contract) {
+  return [
+    ...contract.targets.map(({ archiveName }) => archiveName),
+    contract.release.checksumAsset,
+    contract.release.shellInstallerAsset,
+    contract.release.powershellInstallerAsset,
+    contract.release.provenanceAsset,
+  ];
+}
+
+export function internalCandidateAssetNames(contract) {
+  return [contract.release.candidateReceiptFile];
+}
+
+export function checksummedReleaseAssetNames(contract) {
+  return releaseAssetNames(contract).filter((name) => name !== contract.release.checksumAsset);
+}
+
+export function candidateAssetDirectory(contract, name) {
+  if (name === contract.release.shellInstallerAsset || name === contract.release.powershellInstallerAsset) return "dist/installers";
+  if (name === contract.release.provenanceAsset) return "dist/provenance";
+  return "dist/cli";
+}

@@ -640,7 +640,7 @@ fn clear_completed_replacements(statuses: Vec<PathBuf>) -> Result<(), UpgradeErr
 
 struct GithubReleaseSource {
     client: wreq::Client,
-    repository: String,
+    latest_url: String,
     metadata_limit: usize,
     metadata_timeout: Duration,
     archive_timeout: Duration,
@@ -651,8 +651,14 @@ impl GithubReleaseSource {
     fn new(policy: &ReleasePolicy) -> Result<Self, UpgradeError> {
         #[cfg(test)]
         RELEASE_TRANSPORT_CONSTRUCTIONS.fetch_add(1, Ordering::SeqCst);
+        let latest_url = test_latest_url(&policy.repository)?.unwrap_or_else(|| {
+            format!(
+                "https://api.github.com/repos/{}/releases/latest",
+                policy.repository
+            )
+        });
         let client = wreq::Client::builder()
-            .https_only(true)
+            .https_only(latest_url.starts_with("https://"))
             .timeout(Duration::from_secs(policy.request_timeout_seconds))
             .connect_timeout(Duration::from_secs(policy.connect_timeout_seconds))
             .redirect(wreq::redirect::Policy::limited(policy.redirect_limit))
@@ -663,7 +669,7 @@ impl GithubReleaseSource {
             })?;
         Ok(Self {
             client,
-            repository: policy.repository.clone(),
+            latest_url,
             metadata_limit: policy.metadata_limit_bytes,
             metadata_timeout: Duration::from_secs(policy.request_timeout_seconds),
             archive_timeout: Duration::from_secs(policy.archive_request_timeout_seconds),
@@ -723,6 +729,38 @@ impl GithubReleaseSource {
     }
 }
 
+fn test_latest_url(repository: &str) -> Result<Option<String>, UpgradeError> {
+    let allow = std::env::var("KASB_UPGRADE_TEST_ALLOW_NONCANONICAL_URLS").ok();
+    let latest = std::env::var("KASB_UPGRADE_TEST_LATEST_URL").ok();
+    if allow.is_none() && latest.is_none() {
+        return Ok(None);
+    }
+    if allow.as_deref() != Some("1")
+        || latest
+            .as_deref()
+            .is_none_or(|url| !is_loopback_test_url(url, repository))
+    {
+        return Err(UpgradeError::new(
+            "upgrade_test_contract_invalid",
+            "The test-only release URL must be the canonical loopback latest-release route.",
+        ));
+    }
+    Ok(latest)
+}
+
+fn is_loopback_test_url(value: &str, repository: &str) -> bool {
+    let Some(authority_and_path) = value.strip_prefix("http://127.0.0.1:") else {
+        return false;
+    };
+    let Some((port, path)) = authority_and_path.split_once('/') else {
+        return false;
+    };
+    !port.is_empty()
+        && port.bytes().all(|byte| byte.is_ascii_digit())
+        && port.parse::<u16>().is_ok_and(|port| port > 0)
+        && path == format!("repos/{repository}/releases/latest")
+}
+
 fn http_status_error(status: u16) -> Option<UpgradeError> {
     if (200..300).contains(&status) {
         return None;
@@ -753,12 +791,8 @@ pub(crate) fn release_transport_constructions() -> usize {
 
 impl ReleaseSource for GithubReleaseSource {
     async fn latest(&self) -> Result<Release, UpgradeError> {
-        let url = format!(
-            "https://api.github.com/repos/{}/releases/latest",
-            self.repository
-        );
         let bytes = self
-            .get(&url, self.metadata_limit, self.metadata_timeout)
+            .get(&self.latest_url, self.metadata_limit, self.metadata_timeout)
             .await?;
         serde_json::from_slice(&bytes).map_err(|_| {
             UpgradeError::new(
@@ -1991,6 +2025,31 @@ mod tests {
             "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 'kasb {version}'; exit 0; fi\nexit 1\n"
         )
         .into_bytes()
+    }
+
+    #[test]
+    fn upgrade_test_url_is_restricted_to_the_canonical_loopback_route() {
+        assert!(is_loopback_test_url(
+            "http://127.0.0.1:49152/repos/cpaikr/kasb/releases/latest",
+            "cpaikr/kasb",
+        ));
+        for rejected in [
+            "https://127.0.0.1:49152/repos/cpaikr/kasb/releases/latest",
+            "http://localhost:49152/repos/cpaikr/kasb/releases/latest",
+            "http://127.0.0.1:0/repos/cpaikr/kasb/releases/latest",
+            "http://127.0.0.1:49152/repos/other/kasb/releases/latest",
+            "http://127.0.0.1:49152/repos/cpaikr/kasb/releases/latest/extra",
+            "http://127.0.0.1:49152@evil.example/repos/cpaikr/kasb/releases/latest",
+        ] {
+            assert!(
+                !is_loopback_test_url(rejected, "cpaikr/kasb"),
+                "accepted {rejected}"
+            );
+        }
+        assert!(is_loopback_test_url(
+            "http://127.0.0.1:49152/repos/other/kasb/releases/latest",
+            "other/kasb",
+        ));
     }
 
     #[cfg(unix)]

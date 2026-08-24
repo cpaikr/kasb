@@ -2,15 +2,13 @@
 
 ## Current
 
-[Establish the release, installation, and managed-upgrade contract](plans/release-contract-and-managed-upgrades.md)
+[Automate canonical GitHub and npm releases](plans/canonical-release-pipeline.md)
 
 ## Completed
 
+[Establish the release, installation, and managed-upgrade contract](plans/release-contract-and-managed-upgrades.md)
+
 [Rewrite KASB around a public Rust SDK, Node SDK, and Rust CLI](plans/rust-node-rewrite.md)
-
-## Plans
-
-1. [Automate canonical GitHub and npm releases](plans/canonical-release-pipeline.md)
 
 ## Tasks
 

@@ -9,9 +9,12 @@ artifact set.
 
 ## Current state
 
-- `.github/workflows/ci.yml` is merge validation and release rehearsal, not a
-  release workflow. It has no tag trigger, release environment, publication
-  permission, or registry publishing job.
+- The prerequisite release, installation, and managed-upgrade contract merged
+  in PR #22 at `e9c707d`; `ROADMAP.md` now tracks this plan as Current.
+- `.github/workflows/ci.yml` remains economical merge validation, while the new
+  reusable candidate workflow owns the exhaustive release rehearsal. Continuous
+  CI has no tag trigger, release environment, publication permission, or
+  registry publishing job.
 - Continuous CI builds the root npm tarball and Linux GNU x64/ARM64 native npm
   packages and direct CLI archives. It validates the complete continuously
   tested subset after clean-consumer checks across Node 20.18.1 and majors
@@ -20,14 +23,23 @@ artifact set.
   continuous CI. `docs/release.md` correctly requires fresh evidence for every
   included target before future publication, and the default aggregate
   artifact validator already expects all four targets.
-- Native artifact jobs currently do not depend on deterministic validation.
-  GitHub Actions artifacts are temporary and are not canonical release assets.
+- Candidate native artifact jobs depend on deterministic validation. GitHub
+  Actions artifacts are temporary evidence and are not canonical release
+  assets.
 - Historical tags, GitHub Releases, and npm versions through `0.2.1` describe
   the retired TypeScript/Pi product. The latest GitHub Release has no standalone
   binary assets.
 - The source and canonical release repository is private, so unauthenticated
   installation and upgrades require the separately authorized visibility
   change before the first real release.
+- No pipeline implementation has yet satisfied this plan's full four-target
+  rehearsal and review criteria. The current implementation branch contains
+  the reusable candidate workflow, guarded publication jobs, tested mutation
+  executor, and failure-injection contracts; hosted four-target evidence and
+  repository review remain outstanding. Public visibility, repository release
+  immutability, protected release environment configuration, and npm trusted
+  publisher registrations are external first-release prerequisites to verify,
+  not changes authorized by this plan.
 
 ## Decisions
 
@@ -45,6 +57,10 @@ artifact set.
   binds the canonical source version to an unmistakable synthetic candidate
   ref and deterministic publication-state fixtures, while exercising the same
   artifact generators and validators without claiming or reserving a version.
+- Rehearsal is structurally non-publishing: it receives no release-write or npm
+  provenance authority, cannot enter the protected release environment, and
+  uses deterministic publication-state fixtures instead of live publication
+  mutation. It must still build and consume the exact four-target candidate.
 - GitHub Release assets include every supported standalone archive, the
   checksum manifest, generated shell and PowerShell installers, and bounded
   source/revision/toolchain provenance.
@@ -63,6 +79,19 @@ artifact set.
 - Implementing the workflow does not authorize choosing a release version,
   creating or moving a tag, publishing a GitHub Release, or publishing any
   registry package.
+- Strict publication jobs require separate `github-release` and `npm-release`
+  protected environments whose reviewer and deployment rules constrain
+  authorized release refs. Environment-only sentinel secrets fail closed before
+  mutation; the GitHub environment also supplies a repository-scoped
+  Contents-read and Administration-read credential for the immutable-release
+  settings preflight. npm trusted-publisher registrations must bind each native
+  package and the root package to the canonical repository, the exact final
+  top-level workflow
+  filename, and the exact `npm-release` environment name. Each registration
+  must select whether it allows
+  `npm publish`, staged publish, or both. Publication runs on GitHub-hosted
+  runners with `id-token: write` scoped to the npm job; retained npm publication
+  tokens are outside the contract.
 
 ## Scope
 
@@ -86,9 +115,12 @@ artifact set.
   on every supported target.
 - Publish the staged GitHub Release and then the validated npm tarballs through
   protected release jobs with least-privilege permissions and explicit failure
-  reporting. After publishing the GitHub Release and before npm publication,
-  verify `release.immutable` is true, `tag_name` is the canonical tag, and the
-  tag resolves to the validated candidate commit.
+  reporting. Require repository release immutability to already be enabled and
+  verify it with a short-lived, environment-protected GitHub App token holding
+  only Administration read and Contents read. Publish the draft only after
+  every asset has been uploaded and verified, then, before npm
+  publication, verify `release.immutable` is true, `tag_name` is the canonical
+  tag, and the tag resolves to the validated candidate commit.
 - Update release operator documentation with trusted-publisher setup,
   environment protection, recovery boundaries, and the separately authorized
   first-release procedure.
@@ -110,10 +142,15 @@ artifact set.
   failure, and safe rerun behavior without moving a published tag or replacing
   an immutable asset.
 - The release workflow carries only the permissions needed by each job and uses
-  trusted publishing rather than retained npm tokens.
+  trusted publishing rather than retained npm tokens. Provenance validation
+  requires public repository and npm package visibility, a GitHub-hosted runner,
+  and `id-token: write` only on the publishing job.
 - The existing deterministic and continuous Linux validation remains green and
   the full candidate workflow can be exercised without performing external
   publication.
+- Non-publishing verification proves that rehearsal has no write permission,
+  protected-environment access, OIDC publication authority, live GitHub Release
+  mutation, npm mutation, tag mutation, or repository-visibility mutation.
 
 ## Completion criteria
 
@@ -144,7 +181,8 @@ artifact set.
 
 ## Next action
 
-After the release and managed-upgrade contract satisfies its completion
-criteria and merges, factor its build and validation commands into a
-non-publishing full-target candidate workflow before adding guarded GitHub or
-npm mutation jobs.
+Open the implementation PR against the release-readiness integration branch,
+run its non-publishing full-target candidate workflow, resolve repository
+review, and record the exact hosted evidence before merge. The plan remains
+active until the full four-target rehearsal, repository review, and
+implementation PR merge are recorded.

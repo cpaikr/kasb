@@ -1,0 +1,463 @@
+name: Canonical release candidate
+
+on:
+  pull_request:
+    paths:
+      - ".github/actions/build-release-target/**"
+      - ".github/workflows/candidate.yml"
+      - ".github/workflows/release.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
+      - "packages/**"
+      - "scripts/**"
+      - "installers/**"
+      - "fixtures/release/**"
+      - "fixtures/release-publication/**"
+      - "conformance/**"
+      - "evals/**"
+      - "native-targets.json"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig.json"
+      - "README.md"
+      - "LICENSE.md"
+      - "THIRD_PARTY_LICENSES.html"
+      - "about.toml"
+      - "docs/release.md"
+      - "plans/canonical-release-pipeline.md"
+  workflow_call:
+    inputs:
+      mode:
+        required: true
+        type: string
+      candidate_ref:
+        required: true
+        type: string
+      candidate_sha:
+        required: true
+        type: string
+      publication_state_artifact:
+        required: false
+        type: string
+        default: ""
+    outputs:
+      candidate_artifact_id:
+        value: ${{ jobs.seal.outputs.artifact_id }}
+      candidate_artifact_digest:
+        value: ${{ jobs.seal.outputs.artifact_digest }}
+      candidate_artifact_name:
+        value: release-candidate
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-candidate-${{ inputs.candidate_sha || github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  metadata:
+    name: Bind candidate identity
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 10
+    outputs:
+      mode: ${{ steps.identity.outputs.mode }}
+      ref: ${{ steps.identity.outputs.ref }}
+      sha: ${{ steps.identity.outputs.sha }}
+      linux_matrix: ${{ steps.authority.outputs.linux_matrix }}
+      portable_matrix: ${{ steps.authority.outputs.portable_matrix }}
+      consumer_matrix: ${{ steps.authority.outputs.consumer_matrix }}
+      e2e_matrix: ${{ steps.authority.outputs.e2e_matrix }}
+    steps:
+      - name: Resolve immutable candidate identity
+        id: identity
+        shell: bash
+        env:
+          REQUESTED_MODE: ${{ inputs.mode }}
+          REQUESTED_REF: ${{ inputs.candidate_ref }}
+          REQUESTED_SHA: ${{ inputs.candidate_sha }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mode="${REQUESTED_MODE:-rehearsal}"
+          sha="${REQUESTED_SHA:-${PR_SHA:-$GITHUB_SHA}}"
+          ref="${REQUESTED_REF:-refs/kasb-rehearsal/$sha}"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "candidate SHA must be a full lowercase commit identity" >&2; exit 1; }
+          [[ "$mode" == rehearsal || "$mode" == strict ]] || { echo "invalid candidate mode" >&2; exit 1; }
+          if [[ ("$GITHUB_EVENT_NAME" == pull_request || "$GITHUB_EVENT_NAME" == workflow_dispatch) && "$mode" != rehearsal ]]; then
+            echo "pull-request and manual candidates are rehearsal-only" >&2
+            exit 1
+          fi
+          [[ "$mode" != rehearsal || "$ref" == "refs/kasb-rehearsal/$sha" ]] || { echo "invalid rehearsal ref" >&2; exit 1; }
+          [[ "$mode" != strict || "$ref" == refs/tags/v* ]] || { echo "strict candidates require a version tag" >&2; exit 1; }
+          {
+            echo "mode=$mode"
+            echo "ref=$ref"
+            echo "sha=$sha"
+          } >> "$GITHUB_OUTPUT"
+      - name: Check out exact candidate commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ steps.identity.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - name: Derive release matrices from native-targets.json
+        id: authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/validate-release-contract.mjs --release-matrix-only
+          jq -c '{include:[.targets[] | select(.buildContainer != null) | {rust_target:.rustTarget,runner:.releaseRunner,package_directory:.packageDirectory,build_container:.buildContainer}]}' native-targets.json | sed 's/^/linux_matrix=/' >> "$GITHUB_OUTPUT"
+          jq -c '{include:[.targets[] | select(.buildContainer == null) | {rust_target:.rustTarget,runner:.releaseRunner,package_directory:.packageDirectory}]}' native-targets.json | sed 's/^/portable_matrix=/' >> "$GITHUB_OUTPUT"
+          jq -c '. as $manifest | {include:[$manifest.targets[] as $target | $manifest.validationNodeVersions[] as $node | {rust_target:$target.rustTarget,runner:$target.releaseRunner,node_version:$node}]}' native-targets.json | sed 's/^/consumer_matrix=/' >> "$GITHUB_OUTPUT"
+          jq -c '{include:[.targets[] | {rust_target:.rustTarget,runner:.releaseRunner}]}' native-targets.json | sed 's/^/e2e_matrix=/' >> "$GITHUB_OUTPUT"
+      - name: Download strict publication snapshot
+        if: steps.identity.outputs.mode == 'strict'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ inputs.publication_state_artifact }}
+          path: dist/release/state
+      - name: Validate candidate before expensive work
+        shell: bash
+        env:
+          MODE: ${{ steps.identity.outputs.mode }}
+          CANDIDATE_REF: ${{ steps.identity.outputs.ref }}
+          CANDIDATE_SHA: ${{ steps.identity.outputs.sha }}
+        run: |
+          set -euo pipefail
+          state=fixtures/release/publication-vacant.json
+          [[ "$MODE" == rehearsal ]] || state=dist/release/state/publication-state.json
+          node scripts/validate-release-candidate.mjs --mode "$MODE" --ref "$CANDIDATE_REF" --sha "$CANDIDATE_SHA" --publication-state "$state" --output dist/release/candidate-metadata.json
+
+  deterministic:
+    name: Deterministic release gates
+    needs: metadata
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact candidate commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.metadata.outputs.sha }}
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.13
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - name: Set up Rust 1.88
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal --component rustfmt --component clippy
+          rustup default 1.88.0
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Validate contracts and generated state
+        run: bun run contracts:check && bun run native:check && node scripts/validate-release-workflows.mjs
+      - name: Install cargo-about
+        run: cargo install cargo-about --version 0.9.2 --locked --features cli
+      - name: Validate licenses
+        run: bun run licenses:check
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Test products and installer contracts
+        env:
+          KASB_REQUIRE_POWERSHELL_TESTS: "1"
+        run: bun run test && bun run test:release-pipeline
+      - name: Run adversarial conformance
+        run: bun run conformance:judge
+      - name: Build all products
+        run: bun run build
+      - name: Check Rust formatting
+        run: cargo fmt --all --check
+      - name: Check Rust lints
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+
+  root-package:
+    name: Build immutable root npm tarball
+    needs: [metadata, deterministic]
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact candidate commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.metadata.outputs.sha }}
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.13
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - name: Pin packaging npm 11.6.2
+        run: npm install --global npm@11.6.2
+      - name: Build and pack once
+        run: |
+          bun install --frozen-lockfile
+          bun run build:node
+          mkdir -p dist/root
+          npm pack ./packages/node --ignore-scripts --pack-destination dist/root
+      - name: Upload root tarball
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: candidate-root-package
+          path: dist/root/*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  native-linux:
+    name: Candidate ${{ matrix.rust_target }} at glibc 2.28
+    needs: [metadata, deterministic]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.metadata.outputs.linux_matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    container:
+      image: ${{ matrix.build_container }}
+    steps:
+      - name: Install Linux build prerequisites
+        run: dnf install -y clang-devel cmake curl git ninja-build perl-core pkgconf-pkg-config
+      - name: Check out exact candidate commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.metadata.outputs.sha }}
+          persist-credentials: false
+      - name: Build and validate target
+        uses: ./.github/actions/build-release-target
+        with:
+          candidate_sha: ${{ needs.metadata.outputs.sha }}
+          candidate_ref: ${{ needs.metadata.outputs.ref }}
+          rust_target: ${{ matrix.rust_target }}
+          package_directory: ${{ matrix.package_directory }}
+          enforce_glibc: "true"
+          declared_runner: ${{ matrix.runner }}
+          build_image: ${{ matrix.build_container }}
+
+  native-portable:
+    name: Candidate ${{ matrix.rust_target }}
+    needs: [metadata, deterministic]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.metadata.outputs.portable_matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact candidate commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.metadata.outputs.sha }}
+          persist-credentials: false
+      - name: Build and validate target
+        uses: ./.github/actions/build-release-target
+        with:
+          candidate_sha: ${{ needs.metadata.outputs.sha }}
+          candidate_ref: ${{ needs.metadata.outputs.ref }}
+          rust_target: ${{ matrix.rust_target }}
+          package_directory: ${{ matrix.package_directory }}
+          enforce_glibc: "false"
+          declared_runner: ${{ matrix.runner }}
+
+  native-consumers:
+    name: Clean consumer ${{ matrix.rust_target }} on Node ${{ matrix.node_version }}
+    needs: [metadata, root-package, native-linux, native-portable]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.metadata.outputs.consumer_matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact candidate commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.metadata.outputs.sha }}
+          persist-credentials: false
+      - name: Set up isolated consumer Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: ${{ matrix.node_version }}
+      - name: Download immutable root package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: candidate-root-package
+          path: dist/root
+      - name: Download immutable target package and archive
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: candidate-target-${{ matrix.rust_target }}
+          path: dist
+      - name: Download immutable process probe
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: candidate-consumer-probe-${{ matrix.rust_target }}
+          path: target/${{ matrix.rust_target }}/release
+      - name: Exercise clean installed consumer
+        shell: bash
+        env:
+          RUST_TARGET: ${{ matrix.rust_target }}
+          NODE_VERSION: ${{ matrix.node_version }}
+        run: |
+          set -euo pipefail
+          case "$RUST_TARGET" in
+            x86_64-unknown-linux-gnu|aarch64-unknown-linux-gnu|aarch64-apple-darwin|x86_64-pc-windows-msvc) ;;
+            *) echo "unsupported release target" >&2; exit 1 ;;
+          esac
+          case "$NODE_VERSION" in
+            20.18.1|21|22|23|24|25|26) ;;
+            *) echo "unsupported clean-consumer Node version" >&2; exit 1 ;;
+          esac
+          archive=()
+          [[ "$NODE_VERSION" != 24 ]] || archive=(dist/cli)
+          node scripts/test-native-consumer.mjs "$RUST_TARGET" dist/root dist/native ${archive[@]+"${archive[@]}"}
+
+  aggregate:
+    name: Validate complete four-target candidate
+    needs: [metadata, deterministic, root-package, native-linux, native-portable, native-consumers]
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 15
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
+    steps:
+      - name: Check out exact candidate commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.metadata.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - name: Download root tarball
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: candidate-root-package
+          path: dist/root
+      - name: Download all target artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: candidate-target-*
+          merge-multiple: true
+          path: dist
+      - name: Download strict publication snapshot
+        if: needs.metadata.outputs.mode == 'strict'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: ${{ inputs.publication_state_artifact }}
+          path: dist/release/state
+      - name: Validate aggregate and create manifest
+        shell: bash
+        env:
+          CANDIDATE_SHA: ${{ needs.metadata.outputs.sha }}
+          CANDIDATE_REF: ${{ needs.metadata.outputs.ref }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist/installers dist/release dist/provenance
+          cp installers/install.sh installers/install.ps1 dist/installers/
+          version=$(node -p "require('./packages/node/package.json').version")
+          expected_targets=$(jq -c '[.targets[].rustTarget] | sort' native-targets.json)
+          expected_toolchain=$(jq -c '.release.toolchain' native-targets.json)
+          jq -se \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg version "$version" \
+            --arg sourceRef "$CANDIDATE_REF" \
+            --arg commit "$CANDIDATE_SHA" \
+            --argjson expectedTargets "$expected_targets" \
+            --argjson expectedToolchain "$expected_toolchain" \
+            'length == ($expectedTargets | length) and ([.[].target.rustTarget] | unique | sort) == $expectedTargets and all(.[]; .schemaVersion == 1 and .repository == $repository and .version == $version and .sourceRef == $sourceRef and .commit == $commit and .toolchain == $expectedToolchain and (.target.runner.label | length > 0) and (.target.runner.os | length > 0) and (.target.runner.arch | length > 0))' \
+            dist/provenance/fragments/*.json >/dev/null
+          jq -s --arg repository "$GITHUB_REPOSITORY" --arg commit "$CANDIDATE_SHA" \
+            --arg version "$version" --arg sourceRef "$CANDIDATE_REF" \
+            --slurpfile manifest native-targets.json \
+            '{schemaVersion:1,repository:$repository,version:$version,sourceRef:$sourceRef,commit:$commit,toolchain:.[0].toolchain,targets:([$manifest[0].targets[].rustTarget as $target | .[] | .target | select(.rustTarget == $target)])}' \
+            dist/provenance/fragments/*.json > dist/provenance/provenance.json
+          node scripts/write-release-checksums.mjs --candidate
+          node scripts/validate-release-artifacts.mjs --candidate
+          node scripts/write-release-candidate-manifest.mjs --sha "$CANDIDATE_SHA" --output dist/release/artifact-manifest.json
+      - name: Reconcile post-build candidate metadata
+        shell: bash
+        env:
+          MODE: ${{ needs.metadata.outputs.mode }}
+          CANDIDATE_REF: ${{ needs.metadata.outputs.ref }}
+          CANDIDATE_SHA: ${{ needs.metadata.outputs.sha }}
+        run: |
+          set -euo pipefail
+          state=fixtures/release/publication-vacant.json
+          [[ "$MODE" == rehearsal ]] || state=dist/release/state/publication-state.json
+          node scripts/validate-release-candidate.mjs --mode "$MODE" --ref "$CANDIDATE_REF" --sha "$CANDIDATE_SHA" --publication-state "$state" --artifact-manifest dist/release/artifact-manifest.json --output dist/release/candidate.json
+      - name: Upload validated candidate
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-candidate
+          path: |
+            dist/root/*.tgz
+            dist/native/*.tgz
+            dist/cli/*.tar.gz
+            dist/cli/SHA256SUMS
+            dist/installers/install.sh
+            dist/installers/install.ps1
+            dist/provenance/provenance.json
+            dist/release/artifact-manifest.json
+            dist/release/candidate.json
+          if-no-files-found: error
+          retention-days: 7
+
+  sealed-candidate-e2e:
+    name: Sealed candidate ${{ matrix.rust_target }} installer and upgrade
+    needs: [metadata, aggregate]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.metadata.outputs.e2e_matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact candidate commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.metadata.outputs.sha }}
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 24
+      - name: Download exact sealed candidate by artifact ID
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          artifact-ids: ${{ needs.aggregate.outputs.artifact_id }}
+          path: dist
+      - name: Exercise exact installer, receipt, and same-version upgrade check
+        shell: bash
+        env:
+          KASB_CANDIDATE_SHA: ${{ needs.metadata.outputs.sha }}
+          RUST_TARGET: ${{ matrix.rust_target }}
+        run: |
+          set -euo pipefail
+          case "$RUST_TARGET" in
+            x86_64-unknown-linux-gnu|aarch64-unknown-linux-gnu|aarch64-apple-darwin|x86_64-pc-windows-msvc) ;;
+            *) echo "unsupported release target" >&2; exit 1 ;;
+          esac
+          node scripts/test-release-candidate-consumer.mjs "$RUST_TARGET" dist
+
+  seal:
+    name: Expose only the fully consumed candidate
+    needs: [aggregate, sealed-candidate-e2e]
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 5
+    outputs:
+      artifact_id: ${{ needs.aggregate.outputs.artifact_id }}
+      artifact_digest: ${{ needs.aggregate.outputs.artifact_digest }}
+    steps:
+      - run: echo "All four native runners consumed the exact sealed candidate." >> "$GITHUB_STEP_SUMMARY"

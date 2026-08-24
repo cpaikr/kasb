@@ -36,7 +36,27 @@ check(
   workflowText.includes("omitted from continuous CI to reduce compute cost"),
   "the CI workflow must document why macOS and Windows are omitted",
 );
-check(windowsReleaseJob?.["runs-on"] === "windows-2025", "the Windows release contract must run on windows-2025");
+check(
+  windowsReleaseJob?.["runs-on"] === "blacksmith-2vcpu-windows-2025",
+  "the Windows release contract must run on blacksmith-2vcpu-windows-2025",
+);
+check(
+  (windowsReleaseJob?.steps ?? []).some(
+    (step) => String(step?.uses).startsWith("KyleMayes/install-llvm-action@")
+      && step?.with?.version === "18.1.8",
+  ),
+  "the Windows release contract must install the exact LLVM toolchain used by Rust bindgen",
+);
+check(
+  (windowsReleaseJob?.steps ?? []).some(
+    (step) => step?.shell === "pwsh"
+      && typeof step?.run === "string"
+      && step.run.includes("libclang.dll")
+      && step.run.includes("LIBCLANG_PATH=$llvmBin")
+      && step.run.includes("$env:GITHUB_ENV"),
+  ),
+  "the Windows release contract must expose its verified libclang directory to Rust bindgen",
+);
 for (const command of [
   "cargo test --locked -p kasb-cli --lib",
   "cargo clippy --locked -p kasb-cli --all-targets -- -D warnings",

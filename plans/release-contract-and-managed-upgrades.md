@@ -10,7 +10,8 @@ binary without runtime addon downloads.
 
 ## Current state
 
-- The implementation branch makes Cargo workspace version `0.1.0` the current
+- PR #22 merged this contract into the goal integration branch at `e9c707d`.
+  Cargo workspace version `0.1.0` is the current
   development identity and derives the npm root, four native packages, archive
   names, CLI identity, installers, checksums, and receipts from it. The first
   production version remains deliberately unselected and must be newer than
@@ -21,9 +22,10 @@ binary without runtime addon downloads.
 - Generated POSIX and PowerShell installers and receipt-managed CLI upgrade
   behavior are implemented with bounded discovery, checksum and executable
   verification, recoverable replacement, and ordinary-command isolation.
-- Local deterministic, installer, Rust, Node, formatting, clippy, license, and
-  freshness validation passes. PowerShell behavioral execution is required in
-  CI because the local macOS host does not provide `pwsh`.
+- Deterministic, installer, Rust, Node, formatting, clippy, license, freshness,
+  and continuous native validation passed before merge. The final hosted run
+  also executed the generated PowerShell installer and compiled the Windows
+  replacement protocol, closing the local macOS host's `pwsh` coverage gap.
 - `cpaikr/kasb` is currently private. Its release assets cannot be the
   unauthenticated canonical installation source until the separately
   authorized visibility change makes that repository public.
@@ -129,8 +131,22 @@ binary without runtime addon downloads.
   merged, and this plan leaves `ROADMAP.md` Current only after those gates are
   recorded truthfully.
 
+## Completion evidence
+
+- PR #22 merged at `e9c707d` after CodeRabbit feedback was resolved.
+- Its final hosted CI run `32690717196` passed deterministic validation,
+  PowerShell installer behavior on hosted Linux and Windows, Windows upgrade
+  compilation, immutable root npm validation, Linux GNU x64/ARM64 native and
+  clean-consumer validation, and aggregate artifact validation.
+- The repository contract derives identities for all four supported targets.
+  Fresh macOS ARM64 and Windows x64 native artifacts remain release-candidate
+  evidence owned by the now-current pipeline plan, not by continuous CI.
+- `ROADMAP.md` now records this plan as completed and promotes
+  `plans/canonical-release-pipeline.md` to Current.
+
 ## Next action
 
-Finish PR #22's CI and review, merge it into the goal integration branch,
-record the evidence, and then promote the four-target release-pipeline plan to
-Current.
+Use the merged contract as the input to the non-publishing four-target
+candidate workflow. Do not select a production version, create or move a tag,
+publish a GitHub Release or npm package, or change repository visibility while
+doing so.

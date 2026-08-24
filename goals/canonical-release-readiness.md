@@ -26,20 +26,25 @@ _None._
 
 ### Completed included results
 
-_None._
+- The canonical release, installation, and managed-upgrade contract merged in
+  PR #22 at `e9c707d`. Cargo workspace metadata now owns the development
+  version, `native-targets.json` derives all four supported artifact identities,
+  generated installers enforce checksummed immutable-release installation, and
+  receipt-owned CLI upgrades are bounded and recoverable.
 
 ### Current in-scope result
 
-Finish review and delivery of the canonical release, installation, and
-managed-upgrade implementation on `codex/release-contract-upgrades`. The
-release-pipeline plan remains sequenced after this contract because it must
-build and validate the resulting versioned artifacts and upgrade behavior.
+Implement, review, and deliver the canonical four-target candidate and guarded
+GitHub/npm publication pipeline described by
+`plans/canonical-release-pipeline.md`. The required completion evidence is a
+non-publishing rehearsal of the exact candidate path; publication mutations
+remain excluded.
 
 ### Next in-scope action
 
-Finish implementation PR #22 against the goal integration branch, record its
-merged validation evidence, then start the four-target candidate and
-publication-pipeline slice.
+Open the guarded pipeline implementation PR, run the full four-target
+non-publishing rehearsal, resolve repository review, and record the hosted
+evidence before merging the final implementation PR.
 
 ### Evidence and blockers
 
@@ -49,20 +54,33 @@ publication-pipeline slice.
 - PR #21 merged the two release plans, active goal record, and truthful
   rewrite-completion documentation into commit `80eea30` on the goal integration
   branch.
-- PR #22 carries the reviewed release, installation, and managed-upgrade
-  implementation. Its local contract, test, conformance, build, formatting,
-  clippy, license, native-workflow, and diff checks pass; required CI and
-  hosted review are in progress.
-- The implementation branch makes Cargo workspace version `0.1.0` the current
+- PR #22 merged the reviewed release, installation, and managed-upgrade
+  implementation at `e9c707d`. Final hosted CI run `32690717196` passed
+  deterministic validation, generated PowerShell installer execution on hosted
+  Linux and Windows, Windows upgrade compilation, root npm immutability, both
+  continuously tested Linux native targets, and aggregate artifact validation.
+  CodeRabbit's actionable review findings were resolved before merge.
+- The merged contract makes Cargo workspace version `0.1.0` the current
   development identity; npm packages, four target-derived standalone archives,
   generated installers, checksums, CLI identity, and receipts derive from it.
   It does not select the first production version.
-- Local contract, installer, Node, Rust, formatting, clippy, license, and
-  generated-file checks pass. PowerShell behavioral execution remains pending
-  in required CI because `pwsh` is not installed on the local macOS host.
+- The four-target identity contract covers Linux GNU x64/ARM64, macOS ARM64,
+  and Windows x64. Continuous native CI remains intentionally Linux-only;
+  fresh native and clean-consumer evidence for all four targets is a completion
+  gate for the non-publishing candidate slice.
 - `cpaikr/kasb` remains the single canonical source and release repository.
   This goal implements and validates that binding without changing its current
   private visibility; making it public is an external prerequisite for the
   separately authorized first release.
+- Before any separately authorized publication, operators must verify public
+  repository visibility, repository release immutability, protected release
+  environment rules, and npm trusted-publisher registrations. This goal may
+  encode and test those gates but may not configure or bypass them.
 - No production version, release tag, GitHub Release, registry publication, or
   external KASB mutation is authorized.
+- The implementation branch now contains the target-derived candidate path,
+  protected publication orchestration, tested live executor, exact candidate
+  installer/receipt/upgrade consumers, and deterministic failure injection.
+  Local product, contract, workflow, formatting, lint, build, and adversarial
+  conformance validation pass; hosted four-target rehearsal and repository
+  review remain the completion gates.
