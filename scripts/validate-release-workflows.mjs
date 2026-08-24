@@ -157,7 +157,12 @@ for (const evidence of ["candidateReceiptFile", "candidateRoot", "installers", "
 check(!/\b(?:cargo build|npm pack|bun run build)\b/u.test(consumerText), "sealed candidate consumer must never rebuild");
 
 check(equal(Object.keys(release.on ?? {}), ["push"]) && equal(release.on?.push?.tags, ["v*"]), "publication must be canonical-tag-only");
-check(release.permissions?.contents === "read" && release.concurrency?.["cancel-in-progress"] === false, "publication defaults must be read-only and non-cancelling");
+check(
+  release.permissions?.contents === "read"
+    && release.concurrency?.group === "canonical-release"
+    && release.concurrency?.["cancel-in-progress"] === false,
+  "publication defaults must be read-only, non-cancelling, and serialized across versions",
+);
 const releaseJobs = release.jobs ?? {};
 const preflight = releaseJobs["publication-state"];
 check(preflight?.environment === "github-release" && equal(preflight.permissions, { contents: "read" }), "immutability preflight must run read-only inside github-release");

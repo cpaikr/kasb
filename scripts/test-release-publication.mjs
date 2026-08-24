@@ -14,10 +14,15 @@ import {
 } from "./release-publication-contract.mjs";
 import { executeGitHubPublication, executeNpmPublication } from "./release-publication.mjs";
 import { requiredCandidateGates } from "./release-candidate-contract.mjs";
+import { compareStableVersions, highestStableVersion } from "./release-contract.mjs";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const fixture = JSON.parse(await readFile(resolve(repositoryRoot, "fixtures/release-publication/scenarios.json"), "utf8"));
 const { candidate, vacant } = fixture;
+
+assert.equal(compareStableVersions("9007199254740992.0.0", "9007199254740993.0.0"), -1);
+assert.equal(compareStableVersions("9007199254740993.0.0", "9007199254740992.0.0"), 1);
+assert.equal(highestStableVersion(["9007199254740992.0.0", "9007199254740993.0.0"]), "9007199254740993.0.0");
 
 const initial = validatePublicationStateSnapshot(candidate, vacant);
 assert.equal(initial.source, "fixture");
@@ -151,6 +156,22 @@ expectCode(() => planGitHubPublication(strictCandidate, {
 expectCode(() => planNpmPublication(strictCandidate, {
   ...vacant.npm,
   highestPublishedVersion: "2.0.0",
+}), "candidate_version_regression");
+const largeVersionCandidate = strictCandidateFixture("9007199254740992.0.0").candidate;
+expectCode(() => planGitHubPublication(largeVersionCandidate, {
+  schemaVersion: 1,
+  repository: largeVersionCandidate.repository,
+  repositoryPrivate: false,
+  immutableReleases: true,
+  highestPublishedVersion: "9007199254740993.0.0",
+  tag: largeVersionCandidate.canonicalTag,
+  tagSha: largeVersionCandidate.commit,
+  release: null,
+}, "stage"), "candidate_version_regression");
+expectCode(() => planNpmPublication(largeVersionCandidate, {
+  schemaVersion: 1,
+  highestPublishedVersion: "9007199254740993.0.0",
+  packages: largeVersionCandidate.npmPackages.map(({ name, version }) => ({ name, version, state: "vacant" })),
 }), "candidate_version_regression");
 expectCode(() => planGitHubPublication(candidate, githubState({
   draft: true,
@@ -368,6 +389,7 @@ async function testGuardedExecutionAdapters() {
   assert.equal(new Set(unknownGithub.state.release.assets.map(({ name }) => name)).size, strict.githubAssets.length);
 
   const exactGithub = githubAdapter(strict, built.files);
+  exactGithub.state.highestPublishedVersion = strict.version;
   exactGithub.state.release = completeRelease(strict, true);
   const skippedGithub = await executeGitHubPublication(strict, exactGithub);
   assert.deepEqual(skippedGithub.operations, []);
@@ -383,7 +405,7 @@ async function testGuardedExecutionAdapters() {
   assert.equal(npmReceipt.ok, true);
   assert.deepEqual(allVacant.published.map(({ role }) => role), ["native", "native", "native", "native", "root"]);
 
-  const partial = npmAdapter(built.files);
+  const partial = npmAdapter(built.files, { highestPublishedVersion: strict.version });
   partial.registry.set(identity(strict.npmPackages[0]), built.files.get(strict.npmPackages[0].file));
   const partialReceipt = await executeNpmPublication(strict, immutableReceipt, partial);
   assert.equal(partialReceipt.ok, true);
@@ -438,9 +460,8 @@ async function testGuardedExecutionAdapters() {
   }, immutableReceipt, npmAdapter(built.files)), hasCode("publication_rehearsal"));
 }
 
-function strictCandidateFixture() {
+function strictCandidateFixture(version = "1.0.0") {
   const commit = "1".repeat(40);
-  const version = "1.0.0";
   const files = new Map();
   const targets = [
     ["linux-x64-gnu", "@sjunepark/kasb-linux-x64-gnu"],

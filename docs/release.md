@@ -158,8 +158,9 @@ resumable registry state.
 
 Strict publication, when separately authorized, consumes the already validated
 candidate without rebuilding it. Repository release immutability must already
-be enabled. The workflow stages a draft, uploads and verifies the complete
-GitHub asset set, and only then publishes it. It next re-verifies the immutable
+be enabled. One non-cancelling concurrency group serializes every release
+version. The workflow stages a draft, uploads and verifies the complete GitHub
+asset set, and only then publishes it. It next re-verifies the immutable
 state, tag, commit, and asset set before publishing native npm packages followed
 by the exact-version root package. Any partial publication is reported
 truthfully and resumed only after byte-for-byte identity checks. These operator

@@ -106,10 +106,10 @@ export function candidateAssetDirectory(contract, name) {
 }
 
 export function compareStableVersions(left, right) {
-  const a = left.split(".").map(Number);
-  const b = right.split(".").map(Number);
+  const a = left.split(".").map(BigInt);
+  const b = right.split(".").map(BigInt);
   for (let index = 0; index < 3; index += 1) {
-    if (a[index] !== b[index]) return Math.sign(a[index] - b[index]);
+    if (a[index] !== b[index]) return a[index] < b[index] ? -1 : 1;
   }
   return 0;
 }

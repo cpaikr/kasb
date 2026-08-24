@@ -945,6 +945,12 @@ fn executable_from_archive(
                 "The release archive contains an invalid entry.",
             )
         })?;
+        if entry.size() > executable_limit {
+            return Err(UpgradeError::new(
+                "upgrade_archive_invalid",
+                "A release archive entry exceeds its size limit.",
+            ));
+        }
         expanded_bytes = expanded_bytes.saturating_add(entry.size());
         if expanded_bytes > aggregate_limit {
             return Err(UpgradeError::new(
@@ -967,11 +973,7 @@ fn executable_from_archive(
         if path != Path::new(executable_name) {
             continue;
         }
-        if found.is_some()
-            || !entry.header().entry_type().is_file()
-            || entry.size() == 0
-            || entry.size() > executable_limit
-        {
+        if found.is_some() || !entry.header().entry_type().is_file() || entry.size() == 0 {
             return Err(UpgradeError::new(
                 "upgrade_archive_invalid",
                 "The release archive executable identity is invalid.",
@@ -2205,6 +2207,29 @@ mod tests {
             executable_from_archive(&encoded, "kasb", &expected_entries, 1024).unwrap(),
             b"binary"
         );
+
+        let mut encoded = Vec::new();
+        {
+            let encoder =
+                flate2::write::GzEncoder::new(&mut encoded, flate2::Compression::default());
+            let mut builder = tar::Builder::new(encoder);
+            for (name, bytes) in [
+                ("kasb", vec![b'x']),
+                ("LICENSE.md", vec![b'x'; 1025]),
+                ("README.md", vec![b'x']),
+                ("THIRD_PARTY_LICENSES.html", vec![b'x']),
+            ] {
+                let mut header = tar::Header::new_gnu();
+                header.set_size(bytes.len() as u64);
+                header.set_mode(if name == "kasb" { 0o755 } else { 0o644 });
+                header.set_cksum();
+                builder
+                    .append_data(&mut header, name, Cursor::new(bytes))
+                    .unwrap();
+            }
+            builder.finish().unwrap();
+        }
+        assert!(executable_from_archive(&encoded, "kasb", &expected_entries, 1024).is_err());
 
         let mut encoded = Vec::new();
         {
