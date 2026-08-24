@@ -35,7 +35,9 @@ async function githubSnapshot(contract, tag, expectedCommit, directory) {
   const repositoryResponse = await command("gh", ["api", `repos/${repository}`], limits);
   const repositoryMetadata = JSON.parse(repositoryResponse.stdout);
   if (repositoryMetadata.private !== false) throw new Error("canonical release repository must be public before strict publication");
-  if (repositoryMetadata.immutable_releases_enabled !== true) throw new Error("canonical repository must enable immutable releases before strict publication");
+  const immutableResponse = await command("gh", ["api", `repos/${repository}/immutable-releases`], limits);
+  const immutableSettings = JSON.parse(immutableResponse.stdout);
+  if (immutableSettings.enabled !== true) throw new Error("canonical repository must enable immutable releases before strict publication");
   const tagSha = await resolveRemoteTag(repository, tag, limits);
   if (tagSha !== expectedCommit) throw new Error("remote release tag does not peel to the requested candidate commit");
   const response = await command("gh", ["api", `repos/${repository}/releases/tags/${tag}`], { ...limits, allowNotFound: true });
