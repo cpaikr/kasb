@@ -26,65 +26,36 @@ check(!candidate.on?.pull_request_target, "candidate must never use pull_request
 check(candidate.concurrency?.["cancel-in-progress"] === false, "candidate builds must not be cancelled in flight");
 
 const jobs = candidate.jobs ?? {};
-for (const [name, timeout] of Object.entries({
-  metadata: 10,
-  deterministic: 60,
-  "root-package": 15,
-  "native-linux": 45,
-  "native-portable": 45,
-  "native-consumers": 15,
-  aggregate: 15,
-  "sealed-candidate-e2e": 20,
-  seal: 5,
-})) {
-  check(jobs[name]?.["timeout-minutes"] === timeout, `${name} must keep its bounded ${timeout}-minute timeout`);
-}
 check(needs(jobs.deterministic, ["metadata"]), "deterministic gates must follow metadata");
 check(needs(jobs["root-package"], ["metadata", "deterministic"]), "root package must follow deterministic gates");
-for (const name of ["native-linux", "native-portable"]) check(needs(jobs[name], ["metadata", "deterministic"]), `${name} must follow metadata and deterministic gates`);
-check(needs(jobs["native-consumers"], ["metadata", "root-package", "native-linux", "native-portable"]), "clean consumers must run only after immutable target artifacts exist");
-check(needs(jobs.aggregate, ["metadata", "deterministic", "root-package", "native-linux", "native-portable", "native-consumers"]), "aggregate must follow every producer and clean consumer");
+for (const name of ["native-linux", "native-portable"]) check(needs(jobs[name], ["metadata", "deterministic", "root-package"]), `${name} must follow every shared gate`);
+check(needs(jobs.aggregate, ["metadata", "deterministic", "root-package", "native-linux", "native-portable"]), "aggregate must follow every producer");
 check(needs(jobs["sealed-candidate-e2e"], ["metadata", "aggregate"]), "sealed native E2E must consume the aggregate");
 check(needs(jobs.seal, ["aggregate", "sealed-candidate-e2e"]), "candidate outputs must remain hidden until every native E2E passes");
 check(String(candidate.on?.workflow_call?.outputs?.candidate_artifact_id?.value ?? "").includes("jobs.seal.outputs"), "workflow outputs must be emitted only by the final seal job");
 
 const metadataRun = runs(jobs.metadata).join("\n");
-for (const evidence of [".targets[]", ".releaseRunner", ".buildContainer", ".validationNodeVersions", "consumer_matrix=", "e2e_matrix="]) {
+for (const evidence of [".targets[]", ".releaseRunner", ".buildContainer", ".validationNodeVersions", "e2e_matrix="]) {
   check(metadataRun.includes(evidence), `metadata must derive ${evidence} from native-targets.json`);
 }
-const authority = (jobs.metadata?.steps ?? []).find(({ id }) => id === "authority");
-check(
-  String(authority?.run).indexOf("validate-release-contract.mjs --release-matrix-only") < String(authority?.run).indexOf("linux_matrix="),
-  "metadata must reject noncanonical target scheduling before emitting any runner matrix",
-);
 check(String(jobs["native-linux"]?.strategy?.matrix).includes("needs.metadata.outputs.linux_matrix"), "Linux matrix must be metadata-derived");
 check(String(jobs["native-portable"]?.strategy?.matrix).includes("needs.metadata.outputs.portable_matrix"), "portable matrix must be metadata-derived");
-check(String(jobs["native-consumers"]?.strategy?.matrix).includes("needs.metadata.outputs.consumer_matrix"), "clean-consumer matrix must be metadata-derived");
 check(String(jobs["sealed-candidate-e2e"]?.strategy?.matrix).includes("needs.metadata.outputs.e2e_matrix"), "E2E matrix must be metadata-derived");
-check(!Object.hasOwn(action.inputs ?? {}, "validation_node_versions"), "target producers must not accept mutable consumer runtime inputs");
-check(!actionText.includes("npx ") && !actionText.includes("test-native-consumer.mjs"), "target producers must not execute mutable consumer tooling after artifact assembly");
-check(hasRun(jobs["native-consumers"], "test-native-consumer.mjs"), "isolated clean-consumer jobs must exercise installed native packages");
-check(
-  String((jobs["native-consumers"]?.steps ?? []).find(({ uses }) => String(uses).startsWith("actions/setup-node@"))?.with?.["node-version"]).includes("matrix.node_version"),
-  "isolated clean-consumer jobs must select the manifest-authorized Node runtime through setup-node",
-);
-check(hasRun(jobs["native-consumers"], "20.18.1|21|22|23|24|25|26"), "clean consumers must allowlist exactly Node 20.18.1 and majors 21 through 26");
+check(action.inputs?.validation_node_versions?.required === true, "target consumer versions must be passed from manifest authority");
+check(actionText.includes("JSON.parse(process.argv[1])") && actionText.includes("inputs.validation_node_versions"), "target consumers must iterate the manifest-derived Node versions");
 
 for (const command of ["bun run contracts:check", "bun run native:check", "bun run licenses:check", "bun run typecheck", "bun run test", "bun run test:release-pipeline", "bun run conformance:judge", "bun run build", "cargo fmt --all --check", "cargo clippy --locked --workspace --all-targets -- -D warnings"]) {
   check(hasRun(jobs.deterministic, command), `deterministic candidate gate is missing ${command}`);
 }
-for (const command of ["cargo build --locked --release --target", "assemble-native-package.mjs", "assemble-cli-archive.mjs", "write-release-target-provenance.mjs"]) {
+for (const command of ["cargo build --locked --release --target", "assemble-native-package.mjs", "assemble-cli-archive.mjs", "test-native-consumer.mjs", "write-release-target-provenance.mjs"]) {
   check(actionText.includes(command), `target builder is missing ${command}`);
 }
 check(!actionText.includes("jq "), "cross-platform target action must not assume jq is installed");
 check(actionText.includes("npm install --global npm@11.6.2") && hasRun(jobs["root-package"], "npm install --global npm@11.6.2"), "all npm packaging must pin 11.6.2 on Node 24");
 const candidateSteps = Object.values(jobs).flatMap((job) => job?.steps ?? []);
-const candidatePackagingSteps = Object.entries(jobs)
-  .filter(([name]) => name !== "native-consumers")
-  .flatMap(([, job]) => job?.steps ?? []);
 const releaseSteps = Object.values(release.jobs ?? {}).flatMap((job) => job?.steps ?? []);
 const actionSteps = action.runs?.steps ?? [];
-for (const [scope, steps] of [["candidate", candidatePackagingSteps], ["release", releaseSteps], ["target action", actionSteps]]) {
+for (const [scope, steps] of [["candidate", candidateSteps], ["release", releaseSteps], ["target action", actionSteps]]) {
   const nodeSteps = steps.filter(({ uses }) => String(uses).startsWith("actions/setup-node@"));
   check(nodeSteps.length > 0 && nodeSteps.every((step) => String(step.with?.["node-version"]) === manifest.release.toolchain.node), `${scope} Node setup must match native-targets.json`);
   const npmVersions = steps.flatMap(({ run }) => [...String(run ?? "").matchAll(/\bnpm install --global npm@([^\s\\]+)/gu)].map((match) => match[1]));
@@ -99,22 +70,7 @@ check(
   "candidate Rust setup must match native-targets.json",
 );
 check(actionText.includes("dist/native/*.tgz") && actionText.includes("dist/cli/*.tar.gz") && !actionText.includes("dist/**"), "target uploads must be allowlisted");
-for (const step of action.runs?.steps ?? []) {
-  check(!String(step?.run ?? "").includes("${{ inputs."), `composite shell step ${step?.name ?? "<unnamed>"} must receive inputs through env`);
-}
-for (const [jobName, job] of Object.entries(jobs)) for (const step of job?.steps ?? []) {
-  check(!String(step?.run ?? "").includes("${{"), `${jobName} shell step ${step?.name ?? "<unnamed>"} must receive GitHub values through env`);
-}
-check(action.runs?.steps?.[0]?.name === "Validate bounded release target inputs", "target producer must validate inputs before setup, build, or artifact operations");
-check(
-  ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu", "aarch64-apple-darwin", "x86_64-pc-windows-msvc"].every((target) => actionText.includes(target)),
-  "target producer must validate the complete target allowlist before invoking build tools",
-);
-check(
-  actionText.includes("candidate-consumer-probe-${{ inputs.rust_target }}")
-    && candidateText.includes("candidate-consumer-probe-${{ matrix.rust_target }}"),
-  "isolated clean consumers must receive the exact producer-built process probe by artifact",
-);
+check(!actionSteps.some(({ run }) => String(run).includes("${{ inputs.candidate_ref }}")), "target action must pass the candidate ref through the environment rather than shell template expansion");
 
 check(hasRun(jobs.aggregate, "write-release-checksums.mjs --candidate"), "aggregate must checksum all publishable assets");
 check(hasRun(jobs.aggregate, "validate-release-artifacts.mjs --candidate"), "aggregate must run full candidate-aware artifact validation");

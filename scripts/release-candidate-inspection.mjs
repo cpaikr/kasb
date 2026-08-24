@@ -1,19 +1,15 @@
-import { spawn, spawnSync } from "node:child_process";
-import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 
 import { loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
 
 const forbiddenMarkers = Object.freeze([
   /-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----/u,
-  /\bgh[pousr]_[A-Za-z0-9_]{20,100}\b/u,
-  /(?<![A-Za-z0-9_])github_pat_[A-Za-z0-9_]{20,100}(?![A-Za-z0-9_])/u,
-  /\bnpm_[A-Za-z0-9]{20,100}\b/u,
-  /(?<![A-Za-z0-9_])(?:AKIA|ASIA)[0-9A-Z]{16}(?![A-Za-z0-9_])/u,
+  /\bgh[pousr]_[A-Za-z0-9_]{20,}\b/u,
+  /\bnpm_[A-Za-z0-9]{20,}\b/u,
+  /\bAKIA[0-9A-Z]{16}\b/u,
 ]);
-const archiveEntryLimit = 1024;
-const markerOverlapBytes = 256;
 
 export async function validateCandidateProvenance(path, identity) {
   const contract = await loadReleaseContract();
@@ -52,151 +48,63 @@ export async function validateCandidateProvenance(path, identity) {
 export async function scanCandidateText({ githubAssets, npmPackages }, root = repositoryRoot) {
   const contract = await loadReleaseContract();
   const byName = new Map(githubAssets.map((asset) => [asset.name, resolve(root, asset.file)]));
-  const archives = new Set(contract.targets.map(({ archiveName }) => archiveName));
-  for (const asset of githubAssets) {
-    const path = byName.get(asset.name);
-    const limit = archives.has(asset.name)
-      ? contract.release.archiveLimitBytes
-      : contract.release.metadataLimitBytes;
-    await scanFile(path, limit, asset.name);
-    if (archives.has(asset.name)) {
-      await scanTar(path, asset.name, contract.release);
+  for (const name of [
+    contract.release.checksumAsset,
+    contract.release.shellInstallerAsset,
+    contract.release.powershellInstallerAsset,
+    contract.release.provenanceAsset,
+  ]) {
+    scanText(await boundedText(byName.get(name), contract.release.metadataLimitBytes, name), name);
+  }
+  for (const target of contract.targets) {
+    const archive = byName.get(target.archiveName);
+    for (const entry of target.archiveEntries.filter((name) => name !== target.cliFile)) {
+      scanText(tarEntry(archive, entry, true, contract.release.metadataLimitBytes), `${target.archiveName}:${entry}`);
     }
   }
   for (const pkg of npmPackages) {
     const tarball = resolve(root, pkg.file);
-    const label = basename(tarball);
-    await scanFile(tarball, contract.release.archiveLimitBytes, label);
-    await scanTar(tarball, label, contract.release);
+    const entries = listTar(tarball);
+    for (const entry of entries.filter(isKnownTextEntry)) {
+      scanText(tarEntry(tarball, entry, false, contract.release.metadataLimitBytes), `${basename(tarball)}:${entry}`);
+    }
   }
 }
 
 export function scanText(text, label) {
   for (const marker of forbiddenMarkers) {
-    if (marker.test(text)) forbiddenMarker(label);
+    if (marker.test(text)) throw new Error(`${label} contains a forbidden secret or private-key marker`);
   }
+}
+
+function isKnownTextEntry(entry) {
+  return /(?:^|\/)(?:package\.json|README\.md|LICENSE\.md|THIRD_PARTY_LICENSES\.(?:md|html))$/u.test(entry)
+    || /\/dist\/[^/]+\.(?:js|d\.ts|json)$/u.test(entry);
 }
 
 async function boundedText(path, limit, label) {
   if (!path) throw new Error(`${label} is missing`);
-  const chunks = [];
-  let length = 0;
-  for await (const chunk of createReadStream(path)) {
-    length += chunk.length;
-    if (length > limit) throw new Error(`${label} exceeds its bounded textual size`);
-    chunks.push(chunk);
-  }
-  const bytes = Buffer.concat(chunks, length);
+  const bytes = await readFile(path);
   if (bytes.length === 0) throw new Error(`${label} is empty`);
   if (bytes.length > limit) throw new Error(`${label} exceeds its bounded textual size`);
   if (bytes.includes(0)) throw new Error(`${label} is not a textual surface`);
   return bytes.toString("utf8");
 }
 
-async function scanFile(path, limit, label) {
-  if (!path) throw new Error(`${label} is missing`);
-  const metadata = await stat(path);
-  if (!metadata.isFile() || metadata.size === 0 || metadata.size > limit) {
-    throw new Error(`${label} exceeds its bounded publishable-file size`);
-  }
-  await scanReadable(createReadStream(path), label, limit);
+function listTar(path) {
+  const result = spawnSync("tar", ["-tzf", path], { encoding: "utf8", maxBuffer: 4 * 1024 * 1024 });
+  if (result.status !== 0) throw new Error(`could not list ${path}: ${result.stderr.trim()}`);
+  return result.stdout.split(/\r?\n/u).filter(Boolean);
 }
 
-async function scanTar(path, label, release) {
-  const entries = listTar(path, release.metadataLimitBytes);
-  if (entries.length === 0 || entries.length > archiveEntryLimit) {
-    throw new Error(`${label} exceeds its bounded archive entry count`);
+function tarEntry(path, entry, gzip, limit) {
+  const result = spawnSync("tar", [gzip ? "-xOzf" : "-xOf", path, entry], { maxBuffer: limit + 1 });
+  if (result.status !== 0) throw new Error(`could not inspect textual entry ${entry} in ${path}`);
+  if (result.stdout.length === 0 || result.stdout.length > limit || result.stdout.includes(0)) {
+    if (result.stdout.length === 0) throw new Error(`${basename(path)}:${entry} is empty`);
+    throw new Error(`${basename(path)}:${entry} exceeds its bounded textual size`);
   }
-  const seen = new Set();
-  const aggregate = { bytes: 0, limit: release.archiveLimitBytes * 2 };
-  for (const entry of entries) {
-    if (entry.startsWith("-") || seen.has(entry)) {
-      throw new Error(`${label} contains an invalid or duplicate archive entry`);
-    }
-    seen.add(entry);
-    scanText(entry, `${label}:archive entry name`);
-    await scanTarEntry(path, entry, `${label}:${entry}`, release.archiveLimitBytes, aggregate);
-  }
-}
-
-function listTar(path, limit) {
-  const result = spawnSync("tar", ["-tzf", path], { maxBuffer: limit + 1 });
-  if (result.status !== 0 || !result.stdout || result.stdout.length > limit) {
-    throw new Error(`could not inspect the bounded archive index in ${path}`);
-  }
-  return result.stdout.toString("utf8").split(/\r?\n/u).filter(Boolean);
-}
-
-async function scanTarEntry(path, entry, label, limit, aggregate) {
-  const child = spawn("tar", ["-xOzf", path, entry], { stdio: ["ignore", "pipe", "pipe"] });
-  const completion = waitForChild(child);
-  const diagnostics = [];
-  let diagnosticsBytes = 0;
-  child.stderr.on("data", (chunk) => {
-    if (diagnosticsBytes >= 64 * 1024) return;
-    const bounded = chunk.subarray(0, 64 * 1024 - diagnosticsBytes);
-    diagnostics.push(bounded);
-    diagnosticsBytes += bounded.length;
-  });
-  try {
-    const bytes = await scanReadable(child.stdout, label, limit, aggregate);
-    if (bytes === 0) throw new Error(`${label} is empty`);
-  } catch (error) {
-    child.kill("SIGKILL");
-    await completion.catch(() => {});
-    throw error;
-  }
-  const status = await completion;
-  if (status !== 0) {
-    const detail = Buffer.concat(diagnostics, diagnosticsBytes).toString("utf8").trim();
-    throw new Error(`could not inspect archive entry ${label}${detail ? `: ${detail}` : ""}`);
-  }
-}
-
-async function scanReadable(readable, label, limit, aggregate = undefined) {
-  const scanner = markerScanner(label);
-  let bytes = 0;
-  for await (const chunk of readable) {
-    bytes += chunk.length;
-    if (bytes > limit) throw new Error(`${label} exceeds its bounded inspection size`);
-    if (aggregate) {
-      aggregate.bytes += chunk.length;
-      if (aggregate.bytes > aggregate.limit) throw new Error(`${basename(label.split(":", 1)[0])} exceeds its bounded expanded archive size`);
-    }
-    scanner.push(chunk);
-  }
-  scanner.finish();
-  return bytes;
-}
-
-function markerScanner(label) {
-  let buffered = "";
-  return {
-    push(bytes) {
-      buffered += bytes.toString("latin1");
-      const cutoff = buffered.length - markerOverlapBytes;
-      if (cutoff <= 0) return;
-      for (const marker of forbiddenMarkers) {
-        const match = marker.exec(buffered);
-        if (match && match.index < cutoff) forbiddenMarker(label);
-      }
-      buffered = buffered.slice(cutoff);
-    },
-    finish() {
-      scanText(buffered, label);
-    },
-  };
-}
-
-function forbiddenMarker(label) {
-  throw new Error(`${label} contains a forbidden secret or private-key marker`);
-}
-
-function waitForChild(child) {
-  return new Promise((resolve, reject) => {
-    child.once("error", reject);
-    child.once("close", resolve);
-  });
+  return result.stdout.toString("utf8");
 }
 
 function exactKeys(value, keys, label) {

@@ -23,89 +23,38 @@ export async function executeGitHubPublication(candidateInput, adapter) {
       if (plan.actions.length === 0) break;
       const [action] = plan.actions;
       if (action.type === "createDraft") {
-        const operation = pendingOperation(receipt, { type: "createDraft", tag: action.tag });
         try {
           await adapter.createDraft({ tag: action.tag, targetSha: action.targetSha });
-          operation.status = "completed";
+          receipt.operations.push({ type: "createDraft", status: "completed", tag: action.tag });
         } catch (error) {
-          let state;
-          try {
-            state = await adapter.readState();
-          } catch {
-            operation.status = "outcomeUnknown";
-            throw error;
-          }
-          let raced;
-          try {
-            raced = planGitHubPublication(candidate, state, "stage");
-          } catch (reconciliationError) {
-            operation.status = "failed";
-            throw reconciliationError;
-          }
-          if (raced.actions.some(({ type }) => type === "createDraft")) {
-            operation.status = "failed";
-            throw error;
-          }
-          operation.status = "skippedExactRace";
+          const raced = planGitHubPublication(candidate, await adapter.readState(), "stage");
+          if (raced.actions.some(({ type }) => type === "createDraft")) throw error;
+          receipt.operations.push({ type: "createDraft", status: "skippedExactRace", tag: action.tag });
         }
         continue;
       }
       if (action.type !== "uploadAsset") fail("github_unexpected_action", `unexpected GitHub action ${action.type}`);
       const artifact = candidate.githubAssets.find(({ name }) => name === action.name);
       const bytes = await verifiedCandidateBytes(adapter, artifact);
-      const operation = pendingOperation(receipt, { type: "uploadAsset", name: artifact.name, sha256: artifact.sha256 });
       try {
         await adapter.uploadAsset({ ...artifact, bytes });
-        operation.status = "completed";
+        receipt.operations.push({ type: "uploadAsset", status: "completed", name: artifact.name, sha256: artifact.sha256 });
       } catch (error) {
-        let state;
-        try {
-          state = await adapter.readState();
-        } catch {
-          operation.status = "outcomeUnknown";
-          throw error;
-        }
-        let raced;
-        try {
-          raced = planGitHubPublication(candidate, state, "stage");
-        } catch (reconciliationError) {
-          operation.status = "failed";
-          throw reconciliationError;
-        }
-        if (raced.actions.some(({ type, name }) => type === "uploadAsset" && name === artifact.name)) {
-          operation.status = "failed";
-          throw error;
-        }
-        operation.status = "skippedExactRace";
+        const raced = planGitHubPublication(candidate, await adapter.readState(), "stage");
+        if (raced.actions.some(({ type, name }) => type === "uploadAsset" && name === artifact.name)) throw error;
+        receipt.operations.push({ type: "uploadAsset", status: "skippedExactRace", name: artifact.name, sha256: artifact.sha256 });
       }
     }
 
     const finalization = planGitHubPublication(candidate, await adapter.readState(), "finalize");
     if (finalization.actions.length === 1) {
-      const operation = pendingOperation(receipt, { type: "publishDraft", tag: candidate.canonicalTag });
       try {
         await adapter.publishDraft({ tag: candidate.canonicalTag });
-        operation.status = "completed";
+        receipt.operations.push({ type: "publishDraft", status: "completed", tag: candidate.canonicalTag });
       } catch (error) {
-        let state;
-        try {
-          state = await adapter.readState();
-        } catch {
-          operation.status = "outcomeUnknown";
-          throw error;
-        }
-        let raced;
-        try {
-          raced = planGitHubPublication(candidate, state, "verify");
-        } catch (reconciliationError) {
-          operation.status = "failed";
-          throw reconciliationError;
-        }
-        if (raced.status !== "published") {
-          operation.status = "failed";
-          throw error;
-        }
-        operation.status = "skippedExactRace";
+        const raced = planGitHubPublication(candidate, await adapter.readState(), "verify");
+        if (raced.status !== "published") throw error;
+        receipt.operations.push({ type: "publishDraft", status: "skippedExactRace", tag: candidate.canonicalTag });
       }
     } else if (finalization.actions.length !== 0) {
       fail("github_finalize_actions", "GitHub finalization produced an invalid action set");
@@ -141,32 +90,19 @@ export async function executeNpmPublication(candidateInput, githubReceipt, adapt
         continue;
       }
       const bytes = await verifiedCandidateBytes(adapter, pkg);
-      const operation = pendingOperation(receipt, {
-        type: "publishPackage",
-        name: pkg.name,
-        version: pkg.version,
-        role: pkg.role,
-      });
       try {
         await adapter.publishPackage({ ...pkg, bytes }, { access: "public", provenance: true });
-        operation.status = "completed";
+        receipt.operations.push({ type: "publishPackage", status: "completed", name: pkg.name, version: pkg.version, role: pkg.role });
       } catch (error) {
         let raced;
         try {
           raced = await inspectOne(pkg, adapter, maxRegistryTarballBytes);
         } catch {
-          operation.status = "outcomeUnknown";
           throw error;
         }
-        if (raced.state === "vacant") {
-          operation.status = "failed";
-          throw error;
-        }
-        if (raced.state !== "published" || raced.sha256 !== pkg.sha256) {
-          operation.status = "failed";
-          npmMismatch(pkg, raced.sha256);
-        }
-        operation.status = "skippedExactRace";
+        if (raced.state === "vacant") throw error;
+        if (raced.state !== "published" || raced.sha256 !== pkg.sha256) npmMismatch(pkg, raced.sha256);
+        receipt.operations.push({ type: "publishPackage", status: "skippedExactRace", name: pkg.name, version: pkg.version });
       }
     }
     const verified = planNpmPublication(candidate, await npmSnapshot(candidate, adapter, maxRegistryTarballBytes));
@@ -243,12 +179,6 @@ function strictCandidate(value) {
 
 function baseReceipt(channel, candidate) {
   return { schemaVersion: 1, ok: false, channel, repository: candidate.repository, version: candidate.version, tag: candidate.canonicalTag, commit: candidate.commit, operations: [] };
-}
-
-function pendingOperation(receipt, operation) {
-  const pending = { ...operation, status: "pending" };
-  receipt.operations.push(pending);
-  return pending;
 }
 
 function npmMismatch(pkg, registrySha256) {

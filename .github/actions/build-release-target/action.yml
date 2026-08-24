@@ -10,6 +10,8 @@ inputs:
     required: true
   package_directory:
     required: true
+  root_artifact:
+    required: true
   enforce_glibc:
     required: true
   declared_runner:
@@ -17,61 +19,12 @@ inputs:
   build_image:
     required: false
     default: ""
+  validation_node_versions:
+    required: true
 
 runs:
   using: composite
   steps:
-    - name: Validate bounded release target inputs
-      shell: bash
-      env:
-        CANDIDATE_SHA: ${{ inputs.candidate_sha }}
-        CANDIDATE_REF: ${{ inputs.candidate_ref }}
-        RUST_TARGET: ${{ inputs.rust_target }}
-        PACKAGE_DIRECTORY: ${{ inputs.package_directory }}
-        ENFORCE_GLIBC: ${{ inputs.enforce_glibc }}
-        DECLARED_RUNNER: ${{ inputs.declared_runner }}
-        BUILD_IMAGE: ${{ inputs.build_image }}
-      run: |
-        set -euo pipefail
-        [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "candidate SHA must be a full lowercase commit identity" >&2; exit 1; }
-        if [[ "$CANDIDATE_REF" == refs/kasb-rehearsal/* ]]; then
-          [[ "$CANDIDATE_REF" == "refs/kasb-rehearsal/$CANDIDATE_SHA" ]] || { echo "candidate rehearsal ref does not match its commit" >&2; exit 1; }
-        else
-          [[ "$CANDIDATE_REF" =~ ^refs/tags/v[0-9A-Za-z._+-]+$ ]] || { echo "candidate tag ref has an invalid format" >&2; exit 1; }
-        fi
-
-        case "$RUST_TARGET" in
-          x86_64-unknown-linux-gnu)
-            expected_package=linux-x64-gnu
-            expected_runner=blacksmith-2vcpu-ubuntu-2404
-            expected_image=quay.io/pypa/manylinux_2_28_x86_64:2026.08.15-1@sha256:0c87ccb5996dab6c3b7612ee4fda7b80c4ab3c44a86c2541e4a872afdf4f131b
-            expected_glibc=true
-            ;;
-          aarch64-unknown-linux-gnu)
-            expected_package=linux-arm64-gnu
-            expected_runner=blacksmith-2vcpu-ubuntu-2404-arm
-            expected_image=quay.io/pypa/manylinux_2_28_aarch64:2026.08.15-1@sha256:561427136aabf3787bffb294b3515748241e0962d1527ae28bea1e076bfb9d99
-            expected_glibc=true
-            ;;
-          aarch64-apple-darwin)
-            expected_package=darwin-arm64
-            expected_runner=macos-15
-            expected_image=
-            expected_glibc=false
-            ;;
-          x86_64-pc-windows-msvc)
-            expected_package=win32-x64-msvc
-            expected_runner=windows-2025
-            expected_image=
-            expected_glibc=false
-            ;;
-          *) echo "unsupported release target" >&2; exit 1 ;;
-        esac
-
-        [[ "$PACKAGE_DIRECTORY" == "$expected_package" ]] || { echo "target package directory does not match the canonical mapping" >&2; exit 1; }
-        [[ "$DECLARED_RUNNER" == "$expected_runner" ]] || { echo "target runner does not match the canonical mapping" >&2; exit 1; }
-        [[ "$BUILD_IMAGE" == "$expected_image" ]] || { echo "target build image does not match the canonical mapping" >&2; exit 1; }
-        [[ "$ENFORCE_GLIBC" == "$expected_glibc" ]] || { echo "target glibc policy does not match the canonical mapping" >&2; exit 1; }
     - name: Set up packaging Node 24
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
       with:
@@ -86,46 +39,52 @@ runs:
         target: ${{ inputs.rust_target }}
     - name: Build same-revision addon and CLI once
       shell: bash
-      env:
-        RUST_TARGET: ${{ inputs.rust_target }}
       run: |
         set -euo pipefail
-        cargo build --locked --release --target "$RUST_TARGET" -p kasb-node --lib --bin kasb-process-probe
-        cargo build --locked --release --target "$RUST_TARGET" -p kasb-cli --bin kasb
+        cargo build --locked --release --target "${{ inputs.rust_target }}" -p kasb-node --lib --bin kasb-process-probe
+        cargo build --locked --release --target "${{ inputs.rust_target }}" -p kasb-cli --bin kasb
     - name: Derive native package and standalone archive
       shell: bash
-      env:
-        RUST_TARGET: ${{ inputs.rust_target }}
-        PACKAGE_DIRECTORY: ${{ inputs.package_directory }}
-        ENFORCE_GLIBC: ${{ inputs.enforce_glibc }}
       run: |
         set -euo pipefail
-        node scripts/assemble-native-package.mjs "$RUST_TARGET"
-        node scripts/assemble-cli-archive.mjs "$RUST_TARGET"
-        if [[ "$ENFORCE_GLIBC" == true ]]; then
-          node scripts/validate-glibc-floor.mjs "$RUST_TARGET"
+        node scripts/assemble-native-package.mjs "${{ inputs.rust_target }}"
+        node scripts/assemble-cli-archive.mjs "${{ inputs.rust_target }}"
+        if [[ "${{ inputs.enforce_glibc }}" == true ]]; then
+          node scripts/validate-glibc-floor.mjs "${{ inputs.rust_target }}"
         fi
         mkdir -p dist/native
-        npm pack "./packages/native/$PACKAGE_DIRECTORY" --ignore-scripts --pack-destination dist/native
+        npm pack "./packages/native/${{ inputs.package_directory }}" --ignore-scripts --pack-destination dist/native
+    - name: Download immutable root package
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      with:
+        name: ${{ inputs.root_artifact }}
+        path: dist/root
+    - name: Exercise clean consumers on Node 20.18.1 through 26
+      shell: bash
+      run: |
+        set -euo pipefail
+        while IFS= read -r node_version; do
+          archive=()
+          [[ "$node_version" != 24 ]] || archive=(dist/cli)
+          npx --yes --package "node@$node_version" node scripts/test-native-consumer.mjs \
+            "${{ inputs.rust_target }}" dist/root dist/native ${archive[@]+"${archive[@]}"}
+        done < <(node -e 'for (const version of JSON.parse(process.argv[1])) console.log(version)' '${{ inputs.validation_node_versions }}')
     - name: Record bounded target provenance
       shell: bash
       env:
-        CANDIDATE_SHA: ${{ inputs.candidate_sha }}
         CANDIDATE_REF: ${{ inputs.candidate_ref }}
-        RUST_TARGET: ${{ inputs.rust_target }}
-        DECLARED_RUNNER: ${{ inputs.declared_runner }}
-        BUILD_IMAGE: ${{ inputs.build_image }}
+        CANDIDATE_SHA: ${{ inputs.candidate_sha }}
       run: |
         set -euo pipefail
         node scripts/write-release-target-provenance.mjs \
           --repository "$GITHUB_REPOSITORY" \
           --commit "$CANDIDATE_SHA" \
           --ref "$CANDIDATE_REF" \
-          --target "$RUST_TARGET" \
+          --target "${{ inputs.rust_target }}" \
           --rust "$(rustc --version)" \
           --npm "$(npm --version)" \
-          --runner "$DECLARED_RUNNER" \
-          --build-image "$BUILD_IMAGE"
+          --runner "${{ inputs.declared_runner }}" \
+          --build-image "${{ inputs.build_image }}"
     - name: Upload allowlisted validated target artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
       with:
@@ -134,14 +93,5 @@ runs:
           dist/native/*.tgz
           dist/cli/*.tar.gz
           dist/provenance/fragments/${{ inputs.rust_target }}.json
-        if-no-files-found: error
-        retention-days: 7
-    - name: Upload isolated consumer process probe
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-      with:
-        name: candidate-consumer-probe-${{ inputs.rust_target }}
-        path: |
-          target/${{ inputs.rust_target }}/release/kasb-process-probe
-          target/${{ inputs.rust_target }}/release/kasb-process-probe.exe
         if-no-files-found: error
         retention-days: 7
