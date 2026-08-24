@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { canonicalCandidateIdentity, requiredCandidateGates, validateArtifactManifest, validateCandidateVersion, validatePrebuildPublicationState, validatePublicationStateSource } from "./release-candidate-contract.mjs";
 import { scanCandidateText, scanText, validateCandidateProvenance } from "./release-candidate-inspection.mjs";
 import { checksummedReleaseAssetNames, loadReleaseContract, releaseAssetNames, repositoryRoot } from "./release-contract.mjs";
@@ -36,6 +36,10 @@ try {
       file: relative(directory, resolve(repositoryRoot, pkg.file)),
     })),
   };
+  const contract = await loadReleaseContract();
+  const rootedPackageJson = join(directory, contract.manifest.rootPackage, "package.json");
+  await mkdir(dirname(rootedPackageJson), { recursive: true });
+  await writeFile(rootedPackageJson, await readFile(resolve(repositoryRoot, contract.manifest.rootPackage, "package.json")));
   assert.equal((await validateArtifactManifest(identity, rootedManifest, directory)).phase, "artifacts");
   const alternateRoot = join(directory, "alternate-root");
   await mkdir(join(alternateRoot, "assets"), { recursive: true });
