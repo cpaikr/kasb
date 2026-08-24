@@ -139,14 +139,15 @@ binary without runtime addon downloads.
   compilation, immutable root npm validation, Linux GNU x64/ARM64 native and
   clean-consumer validation, and aggregate artifact validation.
 - The repository contract derives identities for all four supported targets.
-  Fresh macOS ARM64 and Windows x64 native artifacts remain release-candidate
-  evidence owned by the now-current pipeline plan, not by continuous CI.
-- `ROADMAP.md` now records this plan as completed and promotes
-  `plans/canonical-release-pipeline.md` to Current.
+  Fresh macOS ARM64 and Windows x64 native artifacts were produced and
+  validated by the completed pipeline plan, not by continuous CI.
+- `ROADMAP.md` now records this plan and
+  `plans/canonical-release-pipeline.md` as completed.
 
 ## Next action
 
-Use the merged contract as the input to the non-publishing four-target
-candidate workflow. Do not select a production version, create or move a tag,
-publish a GitHub Release or npm package, or change repository visibility while
-doing so.
+None within this plan. The completed downstream candidate evidence is recorded
+in `plans/canonical-release-pipeline.md`. The first production release is
+tracked in `tasks/perform-first-rust-node-release.md` and requires separate
+explicit authorization before any version, tag, visibility, GitHub Release, or
+npm mutation.

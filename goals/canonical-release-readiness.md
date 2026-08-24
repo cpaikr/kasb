@@ -1,6 +1,6 @@
 # Goal: Make KASB release-ready without publishing
 
-Status: active
+Status: completed
 Planning scope: ROADMAP.md
 
 ## Original contract
@@ -31,20 +31,23 @@ _None._
   version, `native-targets.json` derives all four supported artifact identities,
   generated installers enforce checksummed immutable-release installation, and
   receipt-owned CLI upgrades are bounded and recoverable.
+- The canonical candidate and guarded publication pipeline merged in PR #23 at
+  `8e86a86`.
+  One reusable workflow now builds, consumes, aggregates, and seals the exact
+  four-target candidate, while tag-only protected jobs project those validated
+  bytes to GitHub and npm without rebuilding.
 
-### Current in-scope result
+### Final delivery
 
-Implement, review, and deliver the canonical four-target candidate and guarded
-GitHub/npm publication pipeline described by
-`plans/canonical-release-pipeline.md`. The required completion evidence is a
-non-publishing rehearsal of the exact candidate path; publication mutations
-remain excluded.
+PR #23 delivered the final implementation slice to the release-readiness
+integration branch. No production version, repository visibility, tag, GitHub
+Release, npm package, or external KASB state changed.
 
 ### Next in-scope action
 
-Open the guarded pipeline implementation PR, run the full four-target
-non-publishing rehearsal, resolve repository review, and record the hosted
-evidence before merging the final implementation PR.
+None. Selecting and publishing the first production version is tracked in
+`tasks/perform-first-rust-node-release.md` and requires separate explicit
+authorization.
 
 ### Evidence and blockers
 
@@ -78,9 +81,7 @@ evidence before merging the final implementation PR.
   encode and test those gates but may not configure or bypass them.
 - No production version, release tag, GitHub Release, registry publication, or
   external KASB mutation is authorized.
-- The implementation branch now contains the target-derived candidate path,
-  protected publication orchestration, tested live executor, exact candidate
-  installer/receipt/upgrade consumers, and deterministic failure injection.
-  Local product, contract, workflow, formatting, lint, build, and adversarial
-  conformance validation pass; hosted four-target rehearsal and repository
-  review remain the completion gates.
+- Canonical completion evidence for PR #23, its final implementation head,
+  hosted CI and candidate runs, sealed artifact digest, and review closure is
+  recorded in `plans/canonical-release-pipeline.md`. No real release or external
+  publication mutation occurred.
