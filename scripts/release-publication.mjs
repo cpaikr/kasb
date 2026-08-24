@@ -261,7 +261,12 @@ function requireAdapter(adapter, methods) {
 
 function withReceipt(error, receipt) {
   const failure = error instanceof Error ? error : new Error(String(error));
-  failure.receipt = { ...receipt, error: { code: error instanceof PublicationContractError ? error.code : "operation_failed", message: failure.message } };
+  const code = receipt.operations.some(({ status }) => status === "outcomeUnknown")
+    ? "outcome_unknown"
+    : error instanceof PublicationContractError
+      ? error.code
+      : "operation_failed";
+  failure.receipt = { ...receipt, error: { code, message: failure.message } };
   return failure;
 }
 

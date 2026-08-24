@@ -346,6 +346,7 @@ async function testGuardedExecutionAdapters() {
   // bytes still make the next run safely resumable.
   const unknownGithub = githubAdapter(strict, built.files, { doubleFailureAfterUpload: 1 });
   await assert.rejects(executeGitHubPublication(strict, unknownGithub), (error) => {
+    assert.equal(error.receipt.error.code, "outcome_unknown");
     const operation = error.receipt.operations.at(-1);
     assert.deepEqual(
       { type: operation.type, status: operation.status, name: operation.name },
@@ -402,6 +403,7 @@ async function testGuardedExecutionAdapters() {
   const unknownNpmIdentity = identity(strict.npmPackages[0]);
   const unknownNpm = npmAdapter(built.files, { doubleFailureIdentity: unknownNpmIdentity });
   await assert.rejects(executeNpmPublication(strict, immutableReceipt, unknownNpm), (error) => {
+    assert.equal(error.receipt.error.code, "outcome_unknown");
     const operation = error.receipt.operations.at(-1);
     assert.deepEqual(
       { type: operation.type, status: operation.status, name: operation.name, version: operation.version },
