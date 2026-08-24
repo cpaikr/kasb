@@ -51,6 +51,34 @@ jobs:
       - name: Check Rust lints
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
 
+  windows-release-contract:
+    name: Windows release contract
+    runs-on: windows-2025
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.13
+      - name: Set up Rust 1.88
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
+        with:
+          toolchain: 1.88.0
+          components: clippy
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Compile and test the Windows upgrade protocol
+        run: cargo test --locked -p kasb-cli --lib
+      - name: Lint the Windows CLI target
+        run: cargo clippy --locked -p kasb-cli --all-targets -- -D warnings
+      - name: Build the installer identity fixture
+        run: cargo build --locked -p kasb-cli --bin kasb
+      - name: Test the PowerShell installer behavior
+        env:
+          KASB_REQUIRE_POWERSHELL_TESTS: "1"
+        run: node scripts/test-installers.mjs --powershell-only
+
   root-package:
     name: Immutable root npm package
     runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -80,9 +108,9 @@ jobs:
 
   native-linux:
     name: Native ${{ matrix.rust_target }} at glibc 2.28
-    # macOS ARM64 and Windows x64 remain supported packages but are deliberately
-    # omitted from continuous CI to reduce compute cost; their recorded native
-    # validation remains in plans/rust-node-rewrite.md.
+    # macOS ARM64 and Windows x64 native package builds remain deliberately
+    # omitted from continuous CI to reduce compute cost. The separate Windows
+    # job compiles the CLI and tests release mechanics, not packaged artifacts.
     needs: root-package
     strategy:
       fail-fast: false
@@ -220,4 +248,4 @@ jobs:
           merge-multiple: true
           path: dist/cli
       - name: Validate continuously tested artifact set
-        run: node scripts/validate-release-artifacts.mjs --ci
+        run: node scripts/write-release-checksums.mjs --ci && node scripts/validate-release-artifacts.mjs --ci

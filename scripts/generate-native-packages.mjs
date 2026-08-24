@@ -1,12 +1,14 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadReleaseContract } from "./release-contract.mjs";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const checkOnly = process.argv.includes("--check");
-const manifest = JSON.parse(await readFile(resolve(repositoryRoot, "native-targets.json"), "utf8"));
+const { manifest, version } = await loadReleaseContract();
 const rootPackagePath = resolve(repositoryRoot, manifest.rootPackage, "package.json");
 const rootPackage = JSON.parse(await readFile(rootPackagePath, "utf8"));
+rootPackage.version = version;
 const license = await readFile(resolve(repositoryRoot, "LICENSE.md"), "utf8");
 const notices = await readFile(resolve(repositoryRoot, "THIRD_PARTY_LICENSES.html"), "utf8");
 const outputs = new Map();
@@ -30,7 +32,7 @@ for (const target of manifest.targets) {
     engines: { node: `>=${manifest.minimumNodeVersion}` },
     repository: {
       type: "git",
-      url: "git+https://github.com/cpaikr/kasb.git",
+      url: `git+https://github.com/${manifest.release.repository}.git`,
       directory: `${manifest.nativePackageRoot}/${target.packageDirectory}`,
     },
     license: rootPackage.license ?? "Elastic-2.0",

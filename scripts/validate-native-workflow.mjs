@@ -15,6 +15,7 @@ const workflow = document.toJS();
 const missing = [];
 const jobs = workflow?.jobs ?? {};
 const deterministicJob = jobs.deterministic;
+const windowsReleaseJob = jobs["windows-release-contract"];
 const linuxJob = jobs["native-linux"];
 const nativeJob = jobs.native;
 const artifactJob = jobs["artifact-set"];
@@ -34,6 +35,23 @@ check(
 check(
   workflowText.includes("omitted from continuous CI to reduce compute cost"),
   "the CI workflow must document why macOS and Windows are omitted",
+);
+check(windowsReleaseJob?.["runs-on"] === "windows-2025", "the Windows release contract must run on windows-2025");
+for (const command of [
+  "cargo test --locked -p kasb-cli --lib",
+  "cargo clippy --locked -p kasb-cli --all-targets -- -D warnings",
+  "cargo build --locked -p kasb-cli --bin kasb",
+  "node scripts/test-installers.mjs --powershell-only",
+]) {
+  check(hasRun(windowsReleaseJob, command), `the Windows release contract is missing: ${command}`);
+}
+check(
+  (windowsReleaseJob?.steps ?? []).some(
+    (step) => step?.env?.KASB_REQUIRE_POWERSHELL_TESTS === "1"
+      && typeof step?.run === "string"
+      && step.run.includes("node scripts/test-installers.mjs --powershell-only"),
+  ),
+  "the Windows release contract must require PowerShell behavior tests",
 );
 check(
   hasRun(deterministicJob, "cargo install cargo-about --version 0.9.2 --locked --features cli"),
@@ -102,9 +120,11 @@ for (const expected of ["native-*", "cli-*", "root-package"]) {
 }
 check(
   (artifactJob?.steps ?? []).some(
-    (step) => typeof step?.run === "string" && step.run.trim() === "node scripts/validate-release-artifacts.mjs --ci",
+    (step) => typeof step?.run === "string"
+      && step.run.includes("node scripts/write-release-checksums.mjs --ci")
+      && step.run.includes("node scripts/validate-release-artifacts.mjs --ci"),
   ),
-  "artifact-set must run the continuous-CI artifact validator",
+  "artifact-set must generate checksums before the continuous-CI artifact validator",
 );
 for (const [name, job] of [["deterministic", deterministicJob], ["root-package", jobs["root-package"]], ["artifact-set", artifactJob]]) {
   check(

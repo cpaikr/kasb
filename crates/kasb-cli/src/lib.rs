@@ -4,6 +4,7 @@ mod args;
 #[cfg(feature = "conformance-fixtures")]
 pub mod conformance;
 mod render;
+mod upgrade;
 
 use std::ffi::OsString;
 
@@ -31,6 +32,9 @@ where
         Ok(invocation) => invocation,
         Err(output) => return output,
     };
+    if invocation.operation == OperationName::Upgrade {
+        return upgrade::run(invocation.upgrade_check).await;
+    }
     run_invocation(client, &invocation, cancellation).await
 }
 
@@ -53,6 +57,9 @@ where
         Ok(invocation) => invocation,
         Err(output) => return output,
     };
+    if invocation.operation == OperationName::Upgrade {
+        return upgrade::run(invocation.upgrade_check).await;
+    }
     let client = match client_factory() {
         Ok(client) => client,
         Err(_) => {
@@ -144,6 +151,7 @@ where
         }
         OperationName::SearchQna => serialize(client.execute_search_qna(input, cancellation).await),
         OperationName::GetQna => serialize(client.execute_get_qna(input, cancellation).await),
+        OperationName::Upgrade => unreachable!("upgrade is handled before KASB transport"),
     }
 }
 
@@ -171,8 +179,17 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn help_and_parse_failures_do_not_construct_the_transport() {
-        for argv in [vec!["kasb", "--help"], vec!["kasb", "missing-command"]] {
+    async fn ordinary_commands_never_construct_the_release_transport() {
+        upgrade::reset_release_transport_constructions();
+        for (argv, expected_kasb_transport) in [
+            (vec!["kasb", "--help"], false),
+            (vec!["kasb", "--version"], false),
+            (vec!["kasb", "missing-command"], false),
+            (
+                vec!["kasb", "search-standards", "--keyword", "leases"],
+                true,
+            ),
+        ] {
             let called = Cell::new(false);
             let output = run_with_client_factory(
                 argv,
@@ -184,8 +201,34 @@ mod tests {
             )
             .await;
 
-            assert!(!called.get());
+            assert_eq!(called.get(), expected_kasb_transport);
+            assert_eq!(upgrade::release_transport_constructions(), 0);
             assert!(output.stdout.is_some());
         }
+    }
+
+    #[tokio::test]
+    async fn unmanaged_upgrade_fails_before_constructing_any_transport() {
+        upgrade::reset_release_transport_constructions();
+        let kasb_transport_called = Cell::new(false);
+        let output = run_with_client_factory(
+            ["kasb", "upgrade", "--check"],
+            &CancellationToken::new(),
+            || -> Result<KasbClient<PersonaClient, SystemClock>, ()> {
+                kasb_transport_called.set(true);
+                Err(())
+            },
+        )
+        .await;
+
+        assert_eq!(output.exit_code, 1);
+        assert!(!kasb_transport_called.get());
+        assert_eq!(upgrade::release_transport_constructions(), 0);
+        assert!(
+            output
+                .stdout
+                .as_deref()
+                .is_some_and(|stdout| stdout.contains("unmanaged_installation"))
+        );
     }
 }

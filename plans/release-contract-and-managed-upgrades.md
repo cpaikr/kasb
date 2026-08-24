@@ -10,16 +10,20 @@ binary without runtime addon downloads.
 
 ## Current state
 
-- `native-targets.json` owns four supported native targets and drives generated
-  npm platform metadata, but it does not yet own release asset names or
-  installers.
-- The npm root and generated native packages use version `0.2.1`, which is
-  already occupied in npm by the retired TypeScript/Pi product. The Rust
-  workspace uses version `0.1.0`.
-- Existing assembly and validation prove that each npm platform package and its
-  direct CLI archive contain the same Rust CLI binary. No shipped checksum
-  manifest, installer, installation receipt, CLI product-version command, or
-  upgrade operation exists.
+- The implementation branch makes Cargo workspace version `0.1.0` the current
+  development identity and derives the npm root, four native packages, archive
+  names, CLI identity, installers, checksums, and receipts from it. The first
+  production version remains deliberately unselected and must be newer than
+  the occupied retired-product version `0.2.1`.
+- `native-targets.json` owns the four supported targets plus release repository,
+  archive, bound, installer-selection, and receipt policy. Repository checks
+  reject derived identity or generated-file skew.
+- Generated POSIX and PowerShell installers and receipt-managed CLI upgrade
+  behavior are implemented with bounded discovery, checksum and executable
+  verification, recoverable replacement, and ordinary-command isolation.
+- Local deterministic, installer, Rust, Node, formatting, clippy, license, and
+  freshness validation passes. PowerShell behavioral execution is required in
+  CI because the local macOS host does not provide `pwsh`.
 - `cpaikr/kasb` is currently private. Its release assets cannot be the
   unauthenticated canonical installation source until the separately
   authorized visibility change makes that repository public.
@@ -127,6 +131,6 @@ binary without runtime addon downloads.
 
 ## Next action
 
-Make Cargo workspace metadata the canonical product-version source and add a
-repository-owned validator that rejects the current Cargo/npm/version-tag skew
-before extending artifact or upgrade behavior.
+Finish the implementation PR's CI and review, merge it into the goal integration
+branch, record the evidence, and then promote the four-target release-pipeline
+plan to Current.

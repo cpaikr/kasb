@@ -65,6 +65,13 @@ The npm runtime floor is Node.js 20.18.1 and the validated Rust minimum is
 1.88. Registry publication, version selection, and release tags require
 separate authorization.
 
+Cargo workspace package metadata is the product-version authority. The npm
+root, native packages, standalone archive names, generated installers, and CLI
+identity are derived from it and checked with `bun run release:check`.
+Standalone installs will use immutable, checksummed releases from `cpaikr/kasb`
+and carry an adjacent ownership receipt. That path is not publicly usable while
+the repository remains private and no production release has been authorized.
+
 ## License
 
 Elastic License 2.0. See [LICENSE.md](LICENSE.md).

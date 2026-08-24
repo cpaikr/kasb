@@ -20,7 +20,16 @@ conformance-fixtures = []
 
 [dependencies]
 clap = { version = "4.6.6", features = ["derive"] }
+flate2 = "1.1.9"
+futures-util.workspace = true
 kasb = { path = "../kasb", version = "0.1.0" }
+semver = "1.0.28"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.145", features = ["preserve_order"] }
+sha2 = "0.10.9"
+tar = "0.4.44"
 tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread"] }
+wreq = { version = "=6.0.0-rc.29", features = ["stream"] }
+
+[dev-dependencies]
+tempfile = "3.23.0"

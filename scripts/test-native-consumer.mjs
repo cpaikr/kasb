@@ -3,16 +3,17 @@ import { execFileSync, spawn as spawnChild, spawnSync } from "node:child_process
 import { access, chmod, constants, copyFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
+import { loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
 
-const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const rustTarget = process.argv[2];
 if (!rustTarget) {
   throw new Error("Usage: node scripts/test-native-consumer.mjs <rust-target> [root-tarball-or-directory] [native-tarball-or-directory] [direct-cli-archive-or-directory]");
 }
 
-const manifest = JSON.parse(await readFile(resolve(repositoryRoot, "native-targets.json"), "utf8"));
-const target = manifest.targets.find((candidate) => candidate.rustTarget === rustTarget);
+const contract = await loadReleaseContract();
+const { manifest } = contract;
+const target = contract.targets.find((candidate) => candidate.rustTarget === rustTarget);
 if (!target) throw new Error(`Unknown native target: ${rustTarget}`);
 if (process.platform !== target.npmPlatform || process.arch !== target.npmArch) {
   throw new Error(`Consumer runner is ${process.platform}-${process.arch}, expected ${target.npmPlatform}-${target.npmArch}.`);
@@ -66,11 +67,15 @@ try {
     process.platform === "win32" ? "kasb.cmd" : "kasb",
   );
   await verifyResolverMetadataFailures(installedRoot, launcher, temporary);
-  for (const args of [["--help"], ["get-paragraph", "--std-num", "1116"]]) {
+  for (const args of [["--version"], ["--help"], ["get-paragraph", "--std-num", "1116"]]) {
     const direct = spawn(directCli, args, temporary);
     const launched = spawn(launcher, args, temporary);
     for (const field of ["status", "signal", "stdout", "stderr"]) {
       assert.deepEqual(launched[field], direct[field], `npm launcher must preserve ${field} for ${args.join(" ")}`);
+    }
+    if (args[0] === "--version") {
+      assert.equal(direct.status, 0, "direct CLI version identity must succeed");
+      assert.equal(direct.stdout.trim(), `kasb ${contract.version}`, "direct CLI version must match Cargo identity");
     }
   }
   await verifyLauncherProcessContract(installedRoot, installedCli, directCli, launcher, temporary);
@@ -326,7 +331,7 @@ async function suppliedTarball(input) {
 
 async function suppliedArchive(input) {
   const path = resolve(repositoryRoot, input);
-  const expectedName = `kasb-${rootPackage.version}-${target.packageDirectory}.tar.gz`;
+  const expectedName = target.archiveName;
   const metadata = await stat(path);
   if (metadata.isFile()) {
     if (path.split(/[\\/]/u).at(-1) !== expectedName) {
