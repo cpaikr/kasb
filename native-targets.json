@@ -70,7 +70,7 @@
       "addonFile": "kasb.darwin-arm64.node",
       "cliFile": "kasb",
       "continuousIntegration": false,
-      "releaseRunner": "macos-15"
+      "releaseRunner": "blacksmith-6vcpu-macos-15"
     },
     {
       "rustTarget": "x86_64-pc-windows-msvc",
@@ -81,7 +81,7 @@
       "addonFile": "kasb.win32-x64-msvc.node",
       "cliFile": "kasb.exe",
       "continuousIntegration": false,
-      "releaseRunner": "windows-2025"
+      "releaseRunner": "blacksmith-2vcpu-windows-2025"
     }
   ],
   "notClaimed": [

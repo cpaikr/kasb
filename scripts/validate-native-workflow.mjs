@@ -36,7 +36,10 @@ check(
   workflowText.includes("omitted from continuous CI to reduce compute cost"),
   "the CI workflow must document why macOS and Windows are omitted",
 );
-check(windowsReleaseJob?.["runs-on"] === "windows-2025", "the Windows release contract must run on windows-2025");
+check(
+  windowsReleaseJob?.["runs-on"] === "blacksmith-2vcpu-windows-2025",
+  "the Windows release contract must run on blacksmith-2vcpu-windows-2025",
+);
 for (const command of [
   "cargo test --locked -p kasb-cli --lib",
   "cargo clippy --locked -p kasb-cli --all-targets -- -D warnings",

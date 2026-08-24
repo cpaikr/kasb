@@ -44,8 +44,8 @@ version, target, executable path, canonical repository and tag, asset name, and
 installed executable digest. The PowerShell path streams and extracts the
 archive through .NET and does not depend on an external `tar` executable.
 CI compiles the Windows-only upgrade path and executes the generated
-PowerShell installer on `windows-2025`; this is protocol evidence, not a native
-package support claim.
+PowerShell installer on `blacksmith-2vcpu-windows-2025`; this is protocol
+evidence, not a native package support claim.
 
 `kasb upgrade --check` performs bounded discovery only. `kasb upgrade` proceeds
 only when the current executable and receipt agree, then verifies immutable

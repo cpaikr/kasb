@@ -144,13 +144,13 @@ function validateCanonicalReleaseMatrix(releaseContract) {
     {
       rustTarget: "aarch64-apple-darwin",
       packageDirectory: "darwin-arm64",
-      releaseRunner: "macos-15",
+      releaseRunner: "blacksmith-6vcpu-macos-15",
       buildContainer: null,
     },
     {
       rustTarget: "x86_64-pc-windows-msvc",
       packageDirectory: "win32-x64-msvc",
-      releaseRunner: "windows-2025",
+      releaseRunner: "blacksmith-2vcpu-windows-2025",
       buildContainer: null,
     },
   ];
