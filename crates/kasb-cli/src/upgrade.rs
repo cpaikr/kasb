@@ -1436,6 +1436,20 @@ function Flush-DurableFile([string]$path) {{
   $stream = [System.IO.File]::Open($path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
   try {{ $stream.Flush($true) }} finally {{ $stream.Dispose() }}
 }}
+function Get-Sha256([string]$path) {{
+  $stream = [System.IO.File]::Open($path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+  try {{
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {{
+      $digest = $sha256.ComputeHash($stream)
+      return ([System.BitConverter]::ToString($digest)).Replace('-', '').ToLowerInvariant()
+    }} finally {{
+      $sha256.Dispose()
+    }}
+  }} finally {{
+    $stream.Dispose()
+  }}
+}}
 function Test-AnyPath([string]$path) {{
   return [System.IO.File]::Exists($path) -or [System.IO.Directory]::Exists($path)
 }}
@@ -1524,7 +1538,7 @@ try {{
   if ($rollbackOk) {{
     try {{
       $oldReceipt = Get-Content -Raw -LiteralPath $receipt | ConvertFrom-Json
-      $oldDigest = (Get-FileHash -Algorithm SHA256 -LiteralPath $exe).Hash.ToLowerInvariant()
+      $oldDigest = Get-Sha256 $exe
       if ($oldReceipt.manager -ne 'standalone' -or $oldReceipt.sha256 -ne $oldDigest) {{ throw 'restored receipt identity mismatch' }}
       Flush-DurableFile $exe
       Flush-DurableFile $receipt
@@ -2346,6 +2360,9 @@ mod tests {
         assert!(script.contains(r"'C:\Program Files\$cash\O''Brien\kasb.exe'"));
         assert!(script.contains("Wait-Process -Id 42"));
         assert!(script.contains("Flush-DurableFile $exe"));
+        assert!(script.contains("[System.Security.Cryptography.SHA256]::Create()"));
+        assert!(script.contains("$oldDigest = Get-Sha256 $exe"));
+        assert!(!script.contains("Get-FileHash"));
         assert!(script.contains("status = 'rolledBack'"));
         assert!(script.contains("Move-ExactFile $backup $exe"));
         assert!(
