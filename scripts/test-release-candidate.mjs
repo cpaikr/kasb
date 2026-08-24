@@ -36,6 +36,11 @@ try {
       file: relative(directory, resolve(repositoryRoot, pkg.file)),
     })),
   };
+  await mkdir(join(directory, "packages", "node"), { recursive: true });
+  await writeFile(
+    join(directory, "packages", "node", "package.json"),
+    await readFile(resolve(repositoryRoot, "packages", "node", "package.json")),
+  );
   assert.equal((await validateArtifactManifest(identity, rootedManifest, directory)).phase, "artifacts");
   const alternateRoot = join(directory, "alternate-root");
   await mkdir(join(alternateRoot, "assets"), { recursive: true });
