@@ -376,6 +376,10 @@ enum BoundedFileError {
 }
 
 fn read_bounded_regular(path: &Path, limit: usize) -> Result<Vec<u8>, BoundedFileError> {
+    let path_metadata = fs::symlink_metadata(path).map_err(|_| BoundedFileError::Open)?;
+    if !path_metadata.file_type().is_file() {
+        return Err(BoundedFileError::NotRegular);
+    }
     let file = File::open(path).map_err(|_| BoundedFileError::Open)?;
     let metadata = file.metadata().map_err(|_| BoundedFileError::Read)?;
     if !metadata.is_file() {
@@ -1454,9 +1458,12 @@ function Write-TerminalStatus([hashtable]$value) {{
   $value.hadReceipt = $hadReceipt
   $statusJson = $value | ConvertTo-Json -Compress
   $statusNext = "$status.next"
+  $statusPrevious = "$status.previous"
   [System.IO.File]::WriteAllText($statusNext, $statusJson, (New-Object System.Text.UTF8Encoding($false)))
   Flush-DurableFile $statusNext
-  [System.IO.File]::Replace($statusNext, $status, $null)
+  Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $statusPrevious
+  [System.IO.File]::Replace($statusNext, $status, $statusPrevious)
+  Remove-Item -Force -ErrorAction SilentlyContinue -LiteralPath $statusPrevious
 }}
 Wait-Process -Id {} -ErrorAction SilentlyContinue
 try {{
