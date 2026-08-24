@@ -1,4 +1,4 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -16,8 +16,8 @@ const packageDirectory = resolve(repositoryRoot, manifest.nativePackageRoot, tar
 const outputDirectory = resolve(repositoryRoot, process.argv[3] ?? "dist/cli");
 await mkdir(outputDirectory, { recursive: true });
 const archive = resolve(outputDirectory, target.archiveName);
-const result = spawnSync("tar", ["--format=ustar", "-czf", archive, ...target.archiveEntries], {
-  cwd: packageDirectory,
+const result = spawnSync("tar", ["--format=ustar", "-czf", target.archiveName, "-C", packageDirectory, ...target.archiveEntries], {
+  cwd: outputDirectory,
   encoding: "utf8",
 });
 if (result.error) throw result.error;

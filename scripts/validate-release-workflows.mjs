@@ -8,6 +8,7 @@ const manifest = JSON.parse(await readFile(resolve(root, "native-targets.json"),
 const candidateText = await readFile(resolve(root, ".github/workflows/candidate.yml"), "utf8");
 const releaseText = await readFile(resolve(root, ".github/workflows/release.yml"), "utf8");
 const actionText = await readFile(resolve(root, ".github/actions/build-release-target/action.yml"), "utf8");
+const archiveAssemblerText = await readFile(resolve(root, "scripts/assemble-cli-archive.mjs"), "utf8");
 const consumerText = await readFile(resolve(root, "scripts/test-release-candidate-consumer.mjs"), "utf8");
 const executorText = await readFile(resolve(root, "scripts/execute-release-publication.mjs"), "utf8");
 const candidateContractText = await readFile(resolve(root, "scripts/release-candidate-contract.mjs"), "utf8");
@@ -82,6 +83,11 @@ for (const command of ["bun run contracts:check", "bun run native:check", "bun r
 for (const command of ["cargo build --locked --release --target", "assemble-native-package.mjs", "assemble-cli-archive.mjs", "write-release-target-provenance.mjs"]) {
   check(actionText.includes(command), `target builder is missing ${command}`);
 }
+check(
+  archiveAssemblerText.includes('["--format=ustar", "-czf", target.archiveName, "-C", packageDirectory, ...target.archiveEntries]')
+    && archiveAssemblerText.includes("cwd: outputDirectory"),
+  "CLI archives must use a basename output from the destination directory so Windows drive paths are not parsed as remote tar hosts",
+);
 check(!actionText.includes("jq "), "cross-platform target action must not assume jq is installed");
 check(actionText.includes("npm install --global npm@11.6.2") && hasRun(jobs["root-package"], "npm install --global npm@11.6.2"), "all npm packaging must pin 11.6.2 on Node 24");
 const candidateSteps = Object.values(jobs).flatMap((job) => job?.steps ?? []);
