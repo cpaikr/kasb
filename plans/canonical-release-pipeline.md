@@ -11,9 +11,10 @@ artifact set.
 
 - The prerequisite release, installation, and managed-upgrade contract merged
   in PR #22 at `e9c707d`; `ROADMAP.md` now tracks this plan as Current.
-- `.github/workflows/ci.yml` is merge validation and release rehearsal, not a
-  release workflow. It has no tag trigger, release environment, publication
-  permission, or registry publishing job.
+- `.github/workflows/ci.yml` remains economical merge validation, while the new
+  reusable candidate workflow owns the exhaustive release rehearsal. Continuous
+  CI has no tag trigger, release environment, publication permission, or
+  registry publishing job.
 - Continuous CI builds the root npm tarball and Linux GNU x64/ARM64 native npm
   packages and direct CLI archives. It validates the complete continuously
   tested subset after clean-consumer checks across Node 20.18.1 and majors
@@ -22,8 +23,9 @@ artifact set.
   continuous CI. `docs/release.md` correctly requires fresh evidence for every
   included target before future publication, and the default aggregate
   artifact validator already expects all four targets.
-- Native artifact jobs currently do not depend on deterministic validation.
-  GitHub Actions artifacts are temporary and are not canonical release assets.
+- Candidate native artifact jobs depend on deterministic validation. GitHub
+  Actions artifacts are temporary evidence and are not canonical release
+  assets.
 - Historical tags, GitHub Releases, and npm versions through `0.2.1` describe
   the retired TypeScript/Pi product. The latest GitHub Release has no standalone
   binary assets.
@@ -31,7 +33,10 @@ artifact set.
   installation and upgrades require the separately authorized visibility
   change before the first real release.
 - No pipeline implementation has yet satisfied this plan's full four-target
-  rehearsal and review criteria. Public visibility, repository release
+  rehearsal and review criteria. The current implementation branch contains
+  the reusable candidate workflow, guarded publication jobs, tested mutation
+  executor, and failure-injection contracts; hosted four-target evidence and
+  repository review remain outstanding. Public visibility, repository release
   immutability, protected release environment configuration, and npm trusted
   publisher registrations are external first-release prerequisites to verify,
   not changes authorized by this plan.
@@ -82,8 +87,8 @@ artifact set.
   settings preflight. npm
   trusted-publisher registrations must bind each native package and the root
   package to the canonical repository, the exact final top-level workflow
-  filename, and, when the npm registration uses its optional environment field,
-  that exact environment name. Each registration must select whether it allows
+  filename, and the exact `npm-release` environment name. Each registration
+  must select whether it allows
   `npm publish`, staged publish, or both. Publication runs on GitHub-hosted
   runners with `id-token: write` scoped to the npm job; retained npm publication
   tokens are outside the contract.
@@ -176,9 +181,8 @@ artifact set.
 
 ## Next action
 
-Factor the merged release contract's build and validation commands into a
-non-publishing full-target candidate workflow. Then add strictly gated
-publication jobs that consume, rather than rebuild, that candidate and prove
-through deterministic validation that the rehearsal path cannot reach them.
-The plan remains active until the full four-target rehearsal, repository review,
-and implementation PR merge are recorded.
+Open the implementation PR against the release-readiness integration branch,
+run its non-publishing full-target candidate workflow, resolve repository
+review, and record the exact hosted evidence before merge. The plan remains
+active until the full four-target rehearsal, repository review, and
+implementation PR merge are recorded.

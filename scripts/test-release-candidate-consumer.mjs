@@ -129,27 +129,32 @@ try {
     }
   }
 
-  const upgrade = await run(installedExecutable, ["upgrade", "--check"], {
-    env: {
-      ...process.env,
-      KASB_UPGRADE_TEST_ALLOW_NONCANONICAL_URLS: "1",
-      KASB_UPGRADE_TEST_LATEST_URL: `${base}/repos/${contract.release.repository}/releases/latest`,
-    },
-  });
-  assertProcessSucceeded(upgrade, "managed candidate upgrade check");
-  const upgradeResult = JSON.parse(upgrade.stdout).result;
-  assert.deepEqual(upgradeResult, {
-    operation: "upgrade-check",
-    managed: true,
-    currentVersion: contract.version,
-    latestVersion: contract.version,
-    updateAvailable: false,
-    releaseTag: tag,
-    releaseRepository: contract.release.repository,
-    target: target.releaseTarget,
-  });
-  assert.deepEqual(await readFile(installedExecutable), installedExecutableBytes, "same-version upgrade check must not change the managed binary");
-  assert.deepEqual(await readFile(receiptPath), receiptBytes, "same-version upgrade check must not change the managed receipt");
+  for (const [args, operation] of [
+    [["upgrade", "--check"], "upgrade-check"],
+    [["upgrade"], "upgrade"],
+  ]) {
+    const upgrade = await run(installedExecutable, args, {
+      env: {
+        ...process.env,
+        KASB_UPGRADE_TEST_ALLOW_NONCANONICAL_URLS: "1",
+        KASB_UPGRADE_TEST_LATEST_URL: `${base}/repos/${contract.release.repository}/releases/latest`,
+      },
+    });
+    assertProcessSucceeded(upgrade, `managed candidate ${operation}`);
+    const upgradeResult = JSON.parse(upgrade.stdout).result;
+    assert.deepEqual(upgradeResult, {
+      operation,
+      managed: true,
+      currentVersion: contract.version,
+      latestVersion: contract.version,
+      updateAvailable: false,
+      releaseTag: tag,
+      releaseRepository: contract.release.repository,
+      target: target.releaseTarget,
+    });
+    assert.deepEqual(await readFile(installedExecutable), installedExecutableBytes, `same-version ${operation} must not change the managed binary`);
+    assert.deepEqual(await readFile(receiptPath), receiptBytes, `same-version ${operation} must not change the managed receipt`);
+  }
 
   for (const requiredPath of routes.keys()) {
     assert(requests.includes(requiredPath), `candidate consumer did not exercise ${requiredPath}`);

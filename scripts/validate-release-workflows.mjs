@@ -64,7 +64,7 @@ const e2e = jobs["sealed-candidate-e2e"];
 check(hasInput(e2e, "artifact-ids") && hasRun(e2e, "test-release-candidate-consumer.mjs"), "every native E2E must download the aggregate by ID and consume it");
 const e2eConsumer = (e2e?.steps ?? []).find(({ run }) => String(run).includes("test-release-candidate-consumer.mjs"));
 check(String(e2eConsumer?.env?.KASB_CANDIDATE_SHA).includes("needs.metadata.outputs.sha"), "sealed native E2E must compare the receipt with the checked-out PR head rather than GitHub's merge SHA");
-for (const evidence of ["candidateReceiptFile", "candidateRoot", "installers", "receiptBytes", '["upgrade", "--check"]', "same-version upgrade check must not change the managed binary", "same-version upgrade check must not change the managed receipt"]) {
+for (const evidence of ["candidateReceiptFile", "candidateRoot", "installers", "receiptBytes", '["upgrade", "--check"]', '["upgrade"]', "same-version ${operation} must not change the managed binary", "same-version ${operation} must not change the managed receipt"]) {
   check(consumerText.includes(evidence), `sealed candidate consumer is missing ${evidence}`);
 }
 check(!/\b(?:cargo build|npm pack|bun run build)\b/u.test(consumerText), "sealed candidate consumer must never rebuild");
@@ -92,6 +92,26 @@ validatePolicyAppStep(appSteps(releaseJobs["github-release"])[0], "GitHub execut
 check(appSteps(releaseJobs["npm-release"]).length === 0, "npm executor must not mint a release-policy App token");
 check(hasRun(releaseJobs["github-release"], "github-release:v1"), "GitHub executor must require the environment-only sentinel");
 check(hasRun(releaseJobs["npm-release"], "npm-release:v1"), "npm executor must require the environment-only sentinel");
+for (const [name, channel] of [["github-release", "github"], ["npm-release", "npm"]]) {
+  const firstStep = releaseJobs[name]?.steps?.[0];
+  const receiptPath = `\${{ runner.temp }}/${channel}-publication-receipt.json`;
+  check(
+    String(firstStep?.run ?? "").includes(`"channel":"${channel}"`)
+      && firstStep?.env?.PUBLICATION_RECEIPT === receiptPath
+      && String(firstStep?.run ?? "").includes('> "$PUBLICATION_RECEIPT"')
+      && String(firstStep?.run ?? "").includes('"code":"not_started"'),
+    `${name} must seed its truthful not-started receipt outside the checkout before any fallible setup`,
+  );
+  const executorStep = (releaseJobs[name]?.steps ?? []).find(({ run }) => String(run).includes("execute-release-publication.mjs"));
+  check(
+    executorStep?.env?.PUBLICATION_RECEIPT === receiptPath
+      && String(executorStep?.run ?? "").includes('"code":"outcome_unknown"')
+      && String(executorStep?.run ?? "").includes('--output "$PUBLICATION_RECEIPT"'),
+    `${name} must conservatively arm and finalize the same durable receipt around mutation`,
+  );
+  const uploadStep = (releaseJobs[name]?.steps ?? []).find(({ uses }) => String(uses).startsWith("actions/upload-artifact@"));
+  check(uploadStep?.with?.path === receiptPath, `${name} must upload the durable receipt from runner.temp`);
+}
 for (const name of ["github-release", "npm-release"]) {
   check(hasInput(releaseJobs[name], "artifact-ids"), `${name} must consume the exact candidate artifact by ID`);
   check(hasRun(releaseJobs[name], "--artifact-manifest dist/release/artifact-manifest.json") && hasRun(releaseJobs[name], "--output dist/release/candidate.json"), `${name} must revalidate the raw manifest into the default planner candidate path`);

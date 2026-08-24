@@ -121,7 +121,10 @@ Windows x64 candidates from one checkout and exercise the same metadata,
 artifact, installer, receipt, upgrade, provenance, and clean-consumer contracts
 used by strict publication. The validated candidate includes every native npm
 tarball, the root npm tarball, all four standalone archives, `SHA256SUMS`, both
-generated installers, and bounded provenance.
+generated installers, and bounded provenance. Its sealed Actions artifact also
+carries an internal raw artifact manifest and the validated `candidate.json`
+receipt that binds every candidate byte to the source commit. Neither internal
+file is part of the GitHub Release or npm projections.
 
 Rehearsal substitutes only an unmistakable synthetic candidate ref and
 deterministic publication-state fixtures. It must have no release-write
@@ -139,4 +142,7 @@ GitHub asset set, and only then publishes it. It next re-verifies the immutable
 state, tag, commit, and asset set before publishing native npm packages followed
 by the exact-version root package. Any partial publication is reported
 truthfully and resumed only after byte-for-byte identity checks. These operator
-contracts do not authorize running that path.
+contracts do not authorize running that path. Resume uses the original
+validated Actions artifact: rerun only the failed publication job while that
+artifact remains retained. An expired or unavailable artifact fails closed and
+must not be replaced by a rebuild for the same partially published version.

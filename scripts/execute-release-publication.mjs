@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createWriteStream } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
@@ -24,7 +24,7 @@ async function main() {
   try {
     const candidate = JSON.parse(await readFile(resolve(repositoryRoot, options.candidate ?? "dist/release/candidate.json"), "utf8"));
     if (options.channel === "github") {
-      receipt = await executeGitHubPublication(candidate, githubAdapter(candidate, options));
+      receipt = await executeGitHubPublication(candidate, githubAdapter(candidate));
     } else {
       const githubReceipt = JSON.parse(await readFile(resolve(repositoryRoot, required(options["github-receipt"], "--github-receipt is required for npm")), "utf8"));
       receipt = await executeNpmPublication(candidate, githubReceipt, npmAdapter());
@@ -33,21 +33,30 @@ async function main() {
     receipt = error?.receipt ?? { ...receipt, error: { code: error?.code ?? "operation_failed", message: error instanceof Error ? error.message : String(error) } };
     process.exitCode = 1;
   } finally {
-    await mkdir(dirname(output), { recursive: true });
-    await writeFile(output, `${JSON.stringify(receipt, null, 2)}\n`);
+    await writeReceiptAtomically(output, receipt);
     console.log(JSON.stringify(receipt));
   }
 }
 
-function githubAdapter(candidate, options) {
-  const policyToken = required(process.env.KASB_RELEASE_POLICY_TOKEN, "KASB_RELEASE_POLICY_TOKEN is required for live release-policy checks");
+async function writeReceiptAtomically(output, receipt) {
+  await mkdir(dirname(output), { recursive: true });
+  const temporary = `${output}.${process.pid}.tmp`;
+  try {
+    await writeFile(temporary, `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
+    await rename(temporary, output);
+  } finally {
+    await rm(temporary, { force: true });
+  }
+}
+
+function githubAdapter(candidate, runCommand = command, policyToken = required(process.env.KASB_RELEASE_POLICY_TOKEN, "KASB_RELEASE_POLICY_TOKEN is required for live release-policy checks")) {
   return {
     async readCandidateFile(path) { return readFile(resolve(repositoryRoot, path)); },
     async readState() {
       const directory = await mkdtemp(join(tmpdir(), "kasb-github-state-"));
       const outputPath = join(directory, "state.json");
       try {
-        await command(process.execPath, [
+        await runCommand(process.execPath, [
           resolve(repositoryRoot, "scripts/capture-release-publication-state.mjs"),
           "--commit", candidate.commit,
           "--output", outputPath,
@@ -57,28 +66,29 @@ function githubAdapter(candidate, options) {
       } finally { await rm(directory, { recursive: true, force: true }); }
     },
     async createDraft({ tag, targetSha }) {
-      await command("gh", ["release", "create", tag, "--repo", candidate.repository, "--verify-tag", "--target", targetSha, "--draft", "--title", tag, "--generate-notes"]);
+      await runCommand("gh", ["release", "create", tag, "--repo", candidate.repository, "--verify-tag", "--target", targetSha, "--draft", "--title", tag, "--generate-notes"]);
     },
     async uploadAsset({ name, bytes }) {
-      await withPrivateCandidateFile(bytes, name, (path) => command(
+      await withPrivateCandidateFile(bytes, name, (path) => runCommand(
         "gh",
         ["release", "upload", candidate.canonicalTag, path, "--repo", candidate.repository],
         metadataCommandLimits,
       ));
     },
     async publishDraft({ tag }) {
-      await command("gh", ["release", "edit", tag, "--repo", candidate.repository, "--draft=false", "--latest"]);
+      await runCommand("gh", ["release", "edit", tag, "--repo", candidate.repository, "--draft=false", "--latest"]);
     },
   };
 }
 
-function npmAdapter(runCommand = command) {
+function npmAdapter(runCommand = command, downloadFile = commandToFile) {
   return {
     async readCandidateFile(path) { return readFile(resolve(repositoryRoot, path)); },
     async inspectPackage({ name, version, maxBytes }) {
       const viewed = await runCommand("npm", ["view", `${name}@${version}`, "dist.tarball", "--json"], { ...metadataCommandLimits, allowNotFound: true });
       if (viewed.notFound) return { state: "vacant" };
       const url = JSON.parse(viewed.stdout);
+      if (typeof url !== "string") throw new Error(`npm returned a noncanonical tarball URL for ${name}@${version}`);
       const parsed = new URL(url);
       if (parsed.protocol !== "https:" || parsed.hostname !== "registry.npmjs.org" || parsed.username || parsed.password || parsed.port) {
         throw new Error(`npm returned a noncanonical tarball URL for ${name}@${version}`);
@@ -86,7 +96,7 @@ function npmAdapter(runCommand = command) {
       const directory = await mkdtemp(join(tmpdir(), "kasb-npm-state-"));
       const path = join(directory, "package.tgz");
       try {
-        await commandToFile("curl", ["--fail", "--location", "--proto", "=https", "--tlsv1.2", url], path, {
+        await downloadFile("curl", ["--fail", "--location", "--proto", "=https", "--tlsv1.2", url], path, {
           maxBytes,
           timeoutMs: contract.release.archiveRequestTimeoutSeconds * 1000,
           stallTimeoutMs: contract.release.transferStallTimeoutSeconds * 1000,
@@ -227,11 +237,76 @@ async function selfTest() {
   });
   await adapter.publishPackage({ bytes: expected });
   await assert.rejects(readFile(publishedPath), /ENOENT/u);
+  const nonStringTarball = npmAdapter(async () => ({ stdout: '["https://registry.npmjs.org/example/-/example-1.0.0.tgz"]', stderr: "", notFound: false }));
+  await assert.rejects(
+    nonStringTarball.inspectPackage({ name: "example", version: "1.0.0", maxBytes: 1024 }),
+    /noncanonical tarball URL/u,
+  );
   await assert.rejects(
     command(process.execPath, ["-e", "process.stdout.write('12345')"], { maxOutputBytes: 4, timeoutMs: 1000 }),
     /output exceeds its bound/u,
   );
-  console.log("publication executor uses bounded commands and private verified-byte files");
+
+  const liveCandidate = {
+    repository: "cpaikr/kasb",
+    canonicalTag: "v0.3.0",
+    commit: "a".repeat(40),
+  };
+  const githubCalls = [];
+  let uploadedPath;
+  const github = githubAdapter(liveCandidate, async (executable, args, options) => {
+    githubCalls.push({ executable, args });
+    if (executable === process.execPath) {
+      assert.equal(options.env.GH_TOKEN, "policy-token");
+      const outputPath = args[args.indexOf("--output") + 1];
+      await writeFile(outputPath, `${JSON.stringify({ github: { state: "vacant" } })}\n`);
+    } else if (args[1] === "upload") {
+      uploadedPath = args[3];
+      assert.equal(basename(uploadedPath), "install.sh");
+      assert.deepEqual(await readFile(uploadedPath), expected);
+    }
+    return { stdout: "", stderr: "", notFound: false };
+  }, "policy-token");
+  assert.deepEqual(await github.readState(), { state: "vacant" });
+  await github.createDraft({ tag: liveCandidate.canonicalTag, targetSha: liveCandidate.commit });
+  await github.uploadAsset({ name: "install.sh", bytes: expected });
+  await assert.rejects(readFile(uploadedPath), /ENOENT/u);
+  await github.publishDraft({ tag: liveCandidate.canonicalTag });
+  assert.deepEqual(githubCalls.slice(1).map(({ executable, args }) => [executable, args]), [
+    ["gh", ["release", "create", "v0.3.0", "--repo", "cpaikr/kasb", "--verify-tag", "--target", liveCandidate.commit, "--draft", "--title", "v0.3.0", "--generate-notes"]],
+    ["gh", ["release", "upload", "v0.3.0", uploadedPath, "--repo", "cpaikr/kasb"]],
+    ["gh", ["release", "edit", "v0.3.0", "--repo", "cpaikr/kasb", "--draft=false", "--latest"]],
+  ]);
+
+  const registryBytes = Buffer.from("exact registry tarball bytes\n");
+  const npmCalls = [];
+  let npmPublishedPath;
+  const npm = npmAdapter(async (executable, args) => {
+    npmCalls.push([executable, args]);
+    if (args[0] === "view") {
+      return { stdout: JSON.stringify("https://registry.npmjs.org/@sjunepark/kasb/-/kasb-0.3.0.tgz"), stderr: "", notFound: false };
+    }
+    npmPublishedPath = args[1];
+    assert.deepEqual(await readFile(npmPublishedPath), expected);
+    return { stdout: "", stderr: "", notFound: false };
+  }, async (executable, args, path, limits) => {
+    assert.equal(executable, "curl");
+    assert.deepEqual(args.slice(0, 5), ["--fail", "--location", "--proto", "=https", "--tlsv1.2"]);
+    assert.equal(limits.maxBytes, 1024);
+    await writeFile(path, registryBytes);
+  });
+  assert.deepEqual(await npm.inspectPackage({ name: "@sjunepark/kasb", version: "0.3.0", maxBytes: 1024 }), { state: "published", bytes: registryBytes });
+  await npm.publishPackage({ bytes: expected });
+  await assert.rejects(readFile(npmPublishedPath), /ENOENT/u);
+  assert.deepEqual(npmCalls, [
+    ["npm", ["view", "@sjunepark/kasb@0.3.0", "dist.tarball", "--json"]],
+    ["npm", ["publish", npmPublishedPath, "--access", "public", "--provenance"]],
+  ]);
+  const vacant = npmAdapter(async () => ({ stdout: "", stderr: "", notFound: true }));
+  assert.deepEqual(await vacant.inspectPackage({ name: "@sjunepark/kasb", version: "0.3.0", maxBytes: 1024 }), { state: "vacant" });
+  assert.equal(npm.isConflict(new Error("E409 previously published")), true);
+  assert.equal(npm.isConflict(new Error("network unavailable")), false);
+  console.log("publication executor uses bounded commands, private verified-byte files, and exact live adapter commands");
 }
 
 function parse(args) {

@@ -42,9 +42,9 @@ remain excluded.
 
 ### Next in-scope action
 
-Build the reusable candidate path and guarded publication path, prove through
-failure injection that rehearsal cannot publish, and run the full four-target
-non-publishing rehearsal before merging the final implementation PR.
+Open the guarded pipeline implementation PR, run the full four-target
+non-publishing rehearsal, resolve repository review, and record the hosted
+evidence before merging the final implementation PR.
 
 ### Evidence and blockers
 
@@ -78,3 +78,9 @@ non-publishing rehearsal before merging the final implementation PR.
   encode and test those gates but may not configure or bypass them.
 - No production version, release tag, GitHub Release, registry publication, or
   external KASB mutation is authorized.
+- The implementation branch now contains the target-derived candidate path,
+  protected publication orchestration, tested live executor, exact candidate
+  installer/receipt/upgrade consumers, and deterministic failure injection.
+  Local product, contract, workflow, formatting, lint, build, and adversarial
+  conformance validation pass; hosted four-target rehearsal and repository
+  review remain the completion gates.

@@ -95,6 +95,12 @@ jobs:
       receipt_artifact_id: ${{ steps.receipt.outputs.artifact-id }}
       receipt_artifact_digest: ${{ steps.receipt.outputs.artifact-digest }}
     steps:
+      - name: Seed truthful GitHub publication receipt
+        shell: bash
+        env:
+          PUBLICATION_RECEIPT: ${{ runner.temp }}/github-publication-receipt.json
+        run: |
+          printf '%s\n' '{"schemaVersion":1,"ok":false,"channel":"github","operations":[],"error":{"code":"not_started","message":"GitHub publication did not start"}}' > "$PUBLICATION_RECEIPT"
       - name: Require configured GitHub release environment
         shell: bash
         env:
@@ -157,18 +163,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           KASB_RELEASE_POLICY_TOKEN: ${{ steps.release-policy-token.outputs.token }}
+          PUBLICATION_RECEIPT: ${{ runner.temp }}/github-publication-receipt.json
         run: |
+          printf '%s\n' '{"schemaVersion":1,"ok":false,"channel":"github","operations":[],"error":{"code":"outcome_unknown","message":"GitHub publication began but did not produce a final receipt"}}' > "$PUBLICATION_RECEIPT"
           node scripts/execute-release-publication.mjs \
             --channel github \
             --candidate dist/release/candidate.json \
-            --output dist/release/github-publication-receipt.json
+            --output "$PUBLICATION_RECEIPT"
       - name: Upload truthful GitHub publication receipt
         id: receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: github-publication-receipt-${{ github.run_attempt }}
-          path: dist/release/github-publication-receipt.json
+          path: ${{ runner.temp }}/github-publication-receipt.json
           if-no-files-found: error
           retention-days: 30
 
@@ -182,6 +190,12 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Seed truthful npm publication receipt
+        shell: bash
+        env:
+          PUBLICATION_RECEIPT: ${{ runner.temp }}/npm-publication-receipt.json
+        run: |
+          printf '%s\n' '{"schemaVersion":1,"ok":false,"channel":"npm","operations":[],"error":{"code":"not_started","message":"npm publication did not start"}}' > "$PUBLICATION_RECEIPT"
       - name: Require configured npm release environment
         shell: bash
         env:
@@ -232,26 +246,26 @@ jobs:
           CANDIDATE_DIGEST: ${{ needs.candidate.outputs.candidate_artifact_digest }}
           PREFLIGHT_DIGEST: ${{ needs.publication-state.outputs.artifact_digest }}
           GITHUB_RECEIPT_DIGEST: ${{ needs.github-release.outputs.receipt_artifact_digest }}
+          PUBLICATION_RECEIPT: ${{ runner.temp }}/npm-publication-receipt.json
         run: |
           set -euo pipefail
           [[ "$CANDIDATE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ || "$CANDIDATE_DIGEST" =~ ^[0-9a-f]{64}$ ]]
           [[ "$PREFLIGHT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ || "$PREFLIGHT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
           [[ "$GITHUB_RECEIPT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ || "$GITHUB_RECEIPT_DIGEST" =~ ^[0-9a-f]{64}$ ]]
-          mkdir -p dist/release
-          printf '%s\n' '{"schemaVersion":1,"ok":false,"channel":"npm","operations":[],"error":{"code":"not_started","message":"npm publication did not start"}}' > dist/release/npm-publication-receipt.json
           node scripts/capture-release-publication-state.mjs --commit "$GITHUB_SHA" --verify-immutable-release-only true
           node scripts/plan-github-publication.mjs --state dist/release/publication-state.json --phase verify
           jq -e '.ok and .status == "published" and (.actions | length == 0)' dist/release/github-publication-plan.json >/dev/null
+          printf '%s\n' '{"schemaVersion":1,"ok":false,"channel":"npm","operations":[],"error":{"code":"outcome_unknown","message":"npm publication began but did not produce a final receipt"}}' > "$PUBLICATION_RECEIPT"
           node scripts/execute-release-publication.mjs \
             --channel npm \
             --candidate dist/release/candidate.json \
             --github-receipt dist/release/github/github-publication-receipt.json \
-            --output dist/release/npm-publication-receipt.json
+            --output "$PUBLICATION_RECEIPT"
       - name: Upload truthful npm publication receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: npm-publication-receipt-${{ github.run_attempt }}
-          path: dist/release/npm-publication-receipt.json
+          path: ${{ runner.temp }}/npm-publication-receipt.json
           if-no-files-found: error
           retention-days: 30
