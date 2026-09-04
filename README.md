@@ -69,8 +69,9 @@ Cargo workspace package metadata is the product-version authority. The npm
 root, native packages, standalone archive names, generated installers, and CLI
 identity are derived from it and checked with `bun run release:check`.
 Standalone installs will use immutable, checksummed releases from `cpaikr/kasb`
-and carry an adjacent ownership receipt. That path is not publicly usable while
-the repository remains private and no production release has been authorized.
+and carry an adjacent ownership receipt. Standalone installation becomes
+available after the first production release is published. See
+[release posture](docs/release.md) for current status.
 
 ## License
 
