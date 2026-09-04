@@ -43,13 +43,13 @@ runs:
         case "$RUST_TARGET" in
           x86_64-unknown-linux-gnu)
             expected_package=linux-x64-gnu
-            expected_runner=blacksmith-2vcpu-ubuntu-2404
+            expected_runner=ubuntu-24.04
             expected_image=quay.io/pypa/manylinux_2_28_x86_64:2026.08.15-1@sha256:0c87ccb5996dab6c3b7612ee4fda7b80c4ab3c44a86c2541e4a872afdf4f131b
             expected_glibc=true
             ;;
           aarch64-unknown-linux-gnu)
             expected_package=linux-arm64-gnu
-            expected_runner=blacksmith-2vcpu-ubuntu-2404-arm
+            expected_runner=ubuntu-24.04-arm
             expected_image=quay.io/pypa/manylinux_2_28_aarch64:2026.08.15-1@sha256:561427136aabf3787bffb294b3515748241e0962d1527ae28bea1e076bfb9d99
             expected_glibc=true
             ;;

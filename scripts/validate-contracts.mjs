@@ -270,7 +270,8 @@ for (const target of targets.targets || []) {
   check(target.addonFile?.endsWith(".node"), `${target.rustTarget} must name a Node-API artifact`);
   check(target.cliFile === (target.npmPlatform === "win32" ? "kasb.exe" : "kasb"), `${target.rustTarget} must name the native CLI consistently`);
   if (target.libc === "glibc") {
-    check(target.runner?.startsWith("blacksmith-") === true, `${target.rustTarget} continuous CI must use Blacksmith`);
+    const expectedRunner = target.npmArch === "arm64" ? "ubuntu-24.04-arm" : "ubuntu-24.04";
+    check(target.runner === expectedRunner, `${target.rustTarget} continuous CI must use its GitHub-hosted Linux runner`);
     check(
       typeof target.buildContainer === "string" &&
         target.buildContainer.includes("manylinux_2_28") &&

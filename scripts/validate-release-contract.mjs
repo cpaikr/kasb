@@ -133,13 +133,13 @@ function validateCanonicalReleaseMatrix(releaseContract) {
     {
       rustTarget: "x86_64-unknown-linux-gnu",
       packageDirectory: "linux-x64-gnu",
-      releaseRunner: "blacksmith-2vcpu-ubuntu-2404",
+      releaseRunner: "ubuntu-24.04",
       buildContainer: "quay.io/pypa/manylinux_2_28_x86_64:2026.08.15-1@sha256:0c87ccb5996dab6c3b7612ee4fda7b80c4ab3c44a86c2541e4a872afdf4f131b",
     },
     {
       rustTarget: "aarch64-unknown-linux-gnu",
       packageDirectory: "linux-arm64-gnu",
-      releaseRunner: "blacksmith-2vcpu-ubuntu-2404-arm",
+      releaseRunner: "ubuntu-24.04-arm",
       buildContainer: "quay.io/pypa/manylinux_2_28_aarch64:2026.08.15-1@sha256:561427136aabf3787bffb294b3515748241e0962d1527ae28bea1e076bfb9d99",
     },
     {

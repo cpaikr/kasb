@@ -1,8 +1,8 @@
 #requires -Version 5.1
 # Generated from Cargo.toml and native-targets.json. Do not edit.
 $ErrorActionPreference = "Stop"
-$Version = "0.1.0"
-$Tag = "v0.1.0"
+$Version = "0.3.0"
+$Tag = "v0.3.0"
 $Repository = "cpaikr/kasb"
 $ChecksumAsset = "SHA256SUMS"
 $ReceiptName = ".kasb-receipt.json"
@@ -26,10 +26,10 @@ if ($Platform -eq "Unix:Linux" -and -not $env:KASB_INSTALLER_TEST_PLATFORM -and 
   if ([version]$Matches[1] -lt [version]'2.28') { throw "kasb: standalone Linux glibc is below 2.28" }
 }
 switch ("$Platform`:$Architecture") {
-  "Unix:Linux:X64" { $Target = "linux-x64-gnu"; $Archive = "kasb-0.1.0-linux-x64-gnu.tar.gz"; $Executable = "kasb"; $ArchiveEntries = @('kasb', 'LICENSE.md', 'README.md', 'THIRD_PARTY_LICENSES.html') }
-  "Unix:Linux:Arm64" { $Target = "linux-arm64-gnu"; $Archive = "kasb-0.1.0-linux-arm64-gnu.tar.gz"; $Executable = "kasb"; $ArchiveEntries = @('kasb', 'LICENSE.md', 'README.md', 'THIRD_PARTY_LICENSES.html') }
-  "Unix:OSX:Arm64" { $Target = "darwin-arm64"; $Archive = "kasb-0.1.0-darwin-arm64.tar.gz"; $Executable = "kasb"; $ArchiveEntries = @('kasb', 'LICENSE.md', 'README.md', 'THIRD_PARTY_LICENSES.html') }
-  "Win32NT:X64" { $Target = "win32-x64-msvc"; $Archive = "kasb-0.1.0-win32-x64-msvc.tar.gz"; $Executable = "kasb.exe"; $ArchiveEntries = @('kasb.exe', 'LICENSE.md', 'README.md', 'THIRD_PARTY_LICENSES.html') }
+  "Unix:Linux:X64" { $Target = "linux-x64-gnu"; $Archive = "kasb-0.3.0-linux-x64-gnu.tar.gz"; $Executable = "kasb"; $ArchiveEntries = @('kasb', 'LICENSE.md', 'README.md', 'THIRD_PARTY_LICENSES.html') }
+  "Unix:Linux:Arm64" { $Target = "linux-arm64-gnu"; $Archive = "kasb-0.3.0-linux-arm64-gnu.tar.gz"; $Executable = "kasb"; $ArchiveEntries = @('kasb', 'LICENSE.md', 'README.md', 'THIRD_PARTY_LICENSES.html') }
+  "Unix:OSX:Arm64" { $Target = "darwin-arm64"; $Archive = "kasb-0.3.0-darwin-arm64.tar.gz"; $Executable = "kasb"; $ArchiveEntries = @('kasb', 'LICENSE.md', 'README.md', 'THIRD_PARTY_LICENSES.html') }
+  "Win32NT:X64" { $Target = "win32-x64-msvc"; $Archive = "kasb-0.3.0-win32-x64-msvc.tar.gz"; $Executable = "kasb.exe"; $ArchiveEntries = @('kasb.exe', 'LICENSE.md', 'README.md', 'THIRD_PARTY_LICENSES.html') }
   default { throw "kasb: unsupported standalone target $Platform/$Architecture" }
 }
 $InstallDir = if ($env:KASB_INSTALL_DIR) { $env:KASB_INSTALL_DIR } elseif ($RunningWindows) { Join-Path $env:LOCALAPPDATA "kasb\bin" } else { Join-Path $HOME ".local/bin" }

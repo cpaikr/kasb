@@ -2,8 +2,8 @@
 set -eu
 
 # Generated from Cargo.toml and native-targets.json. Do not edit.
-version='0.1.0'
-tag='v0.1.0'
+version='0.3.0'
+tag='v0.3.0'
 repository='cpaikr/kasb'
 checksum_asset='SHA256SUMS'
 receipt_name='.kasb-receipt.json'
@@ -44,9 +44,9 @@ if [ "${os}" = Linux ] && [ -z "${KASB_INSTALLER_TEST_OS:-}${KASB_INSTALLER_TEST
 fi
 
 case "${os}:${arch}" in
-  Linux:x86_64) target='linux-x64-gnu'; archive='kasb-0.1.0-linux-x64-gnu.tar.gz'; executable='kasb' ;;
-  Linux:arm64|Linux:aarch64) target='linux-arm64-gnu'; archive='kasb-0.1.0-linux-arm64-gnu.tar.gz'; executable='kasb' ;;
-  Darwin:arm64|Darwin:aarch64) target='darwin-arm64'; archive='kasb-0.1.0-darwin-arm64.tar.gz'; executable='kasb' ;;
+  Linux:x86_64) target='linux-x64-gnu'; archive='kasb-0.3.0-linux-x64-gnu.tar.gz'; executable='kasb' ;;
+  Linux:arm64|Linux:aarch64) target='linux-arm64-gnu'; archive='kasb-0.3.0-linux-arm64-gnu.tar.gz'; executable='kasb' ;;
+  Darwin:arm64|Darwin:aarch64) target='darwin-arm64'; archive='kasb-0.3.0-darwin-arm64.tar.gz'; executable='kasb' ;;
   *) echo "kasb: unsupported standalone target ${os}/${arch}" >&2; exit 1 ;;
 esac
 

@@ -179,6 +179,7 @@ check(releaseJobs.candidate?.uses === "./.github/workflows/candidate.yml" && rel
 
 check(releaseJobs["github-release"]?.environment === "github-release" && equal(releaseJobs["github-release"]?.permissions, { contents: "write" }), "GitHub executor must be the sole contents:write job");
 check(releaseJobs["npm-release"]?.environment === "npm-release" && equal(releaseJobs["npm-release"]?.permissions, { contents: "read", "id-token": "write" }), "npm executor must use protected OIDC trusted publishing");
+check(releaseJobs["npm-release"]?.if === "${{ false }}", "npm publication must remain disabled for the GitHub-only release");
 check(appSteps(releaseJobs["github-release"]).length === 1, "GitHub executor must mint exactly one fresh release-policy App token");
 validatePolicyAppStep(appSteps(releaseJobs["github-release"])[0], "GitHub executor");
 check(appSteps(releaseJobs["npm-release"]).length === 0, "npm executor must not mint a release-policy App token");

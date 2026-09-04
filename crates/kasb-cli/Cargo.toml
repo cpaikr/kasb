@@ -22,7 +22,7 @@ conformance-fixtures = []
 clap = { version = "4.6.6", features = ["derive"] }
 flate2 = "1.1.9"
 futures-util.workspace = true
-kasb = { path = "../kasb", version = "0.1.0" }
+kasb = { path = "../kasb", version = "0.3.0" }
 semver = "1.0.28"
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, features = ["preserve_order"] }

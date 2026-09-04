@@ -7,7 +7,7 @@ edition = "2024"
 license = "Elastic-2.0"
 repository = "https://github.com/cpaikr/kasb"
 rust-version = "1.88"
-version = "0.1.0"
+version = "0.3.0"
 
 [workspace.dependencies]
 futures-util = "=0.3.32"

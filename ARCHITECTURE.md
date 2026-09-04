@@ -190,7 +190,7 @@ consumer validation. Unsupported or incomplete installations fail with a
 stable actionable error rather than raw loader or spawn details.
 
 Continuous CI is deliberately narrower than the supported matrix. It builds
-and tests Linux GNU x64/ARM64 on Blacksmith; macOS ARM64 and Windows x64 are
+and tests Linux GNU x64/ARM64 on GitHub-hosted runners; macOS ARM64 and Windows x64 are
 omitted to reduce compute cost. Their packages and support claims remain based
 on the recorded cutover validation, but they do not receive ongoing CI evidence.
 `native-targets.json` records this distinction explicitly.

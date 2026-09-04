@@ -32,7 +32,7 @@ The supported npm native targets are Linux GNU x64/ARM64, macOS ARM64, and
 Windows x64. The Linux GNU packages require glibc 2.28 or newer. The launcher
 preserves POSIX signal identity where supported; Windows preserves termination
 without claiming POSIX signal identity. Continuous CI intentionally covers only
-the two Linux targets on Blacksmith to reduce compute cost. macOS and Windows
+the two Linux targets on GitHub-hosted runners. macOS and Windows
 retain their supported packages and recorded native evidence but are not
 continuously tested.
 

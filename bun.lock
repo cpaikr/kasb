@@ -14,23 +14,23 @@
     },
     "packages/native/darwin-arm64": {
       "name": "@sjunepark/kasb-darwin-arm64",
-      "version": "0.1.0",
+      "version": "0.3.0",
     },
     "packages/native/linux-arm64-gnu": {
       "name": "@sjunepark/kasb-linux-arm64-gnu",
-      "version": "0.1.0",
+      "version": "0.3.0",
     },
     "packages/native/linux-x64-gnu": {
       "name": "@sjunepark/kasb-linux-x64-gnu",
-      "version": "0.1.0",
+      "version": "0.3.0",
     },
     "packages/native/win32-x64-msvc": {
       "name": "@sjunepark/kasb-win32-x64-msvc",
-      "version": "0.1.0",
+      "version": "0.3.0",
     },
     "packages/node": {
       "name": "@sjunepark/kasb",
-      "version": "0.1.0",
+      "version": "0.3.0",
       "bin": {
         "kasb": "dist/cli.js",
       },
@@ -40,10 +40,10 @@
         "typescript": "^5.9.0",
       },
       "optionalDependencies": {
-        "@sjunepark/kasb-darwin-arm64": "0.1.0",
-        "@sjunepark/kasb-linux-arm64-gnu": "0.1.0",
-        "@sjunepark/kasb-linux-x64-gnu": "0.1.0",
-        "@sjunepark/kasb-win32-x64-msvc": "0.1.0",
+        "@sjunepark/kasb-darwin-arm64": "0.3.0",
+        "@sjunepark/kasb-linux-arm64-gnu": "0.3.0",
+        "@sjunepark/kasb-linux-x64-gnu": "0.3.0",
+        "@sjunepark/kasb-win32-x64-msvc": "0.3.0",
       },
     },
   },

@@ -182,6 +182,9 @@ jobs:
 
   npm-release:
     name: Execute exact npm projection through trusted publishing
+    # The first Rust/Node release is authorized for GitHub only.
+    # Re-enabling npm publication requires a separately reviewed change.
+    if: ${{ false }}
     needs: [publication-state, candidate, github-release]
     runs-on: ubuntu-24.04
     timeout-minutes: 60

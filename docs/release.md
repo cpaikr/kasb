@@ -1,17 +1,15 @@
 # Release posture
 
-The repository defines and validates a release contract but does not publish
-it. Registry publication, production-version selection, source tags, GitHub
-Releases, and repository visibility changes require separate authorization.
-`cpaikr/kasb` is currently private, so it cannot yet serve unauthenticated
-standalone installs or upgrades.
+The first Rust/Node release is being prepared as GitHub-only version `0.3.0`.
+`cpaikr/kasb` remains private until the authorized privacy audit and log
+remediation are complete. Publication status and remaining setup are tracked in
+[the first-release task](../tasks/perform-first-rust-node-release.md).
 
 ## Identity authorities
 
 `[workspace.package].version` in `Cargo.toml` is the canonical product version.
-The current `0.1.0` value is a development identity, not the selected first
-production release; that release must use an unpublished version newer than
-the retired npm product's `0.2.1`.
+The selected `0.3.0` identity is newer than the retired npm product's `0.2.1`.
+The strict workflow rechecks vacancy immediately before publication.
 
 `native-targets.json` owns the canonical repository, tag prefix, bounds,
 receipt schema, and four-target matrix. Generators derive exact npm versions,
@@ -66,14 +64,25 @@ version, public canonical repository access, repository release immutability,
 fresh native evidence for every claimed target, contracts and adversarial
 conformance, Rust/Node/CLI tests, ABI-floor and clean-consumer checks, license
 checks, and aggregate validation of the exact npm and standalone artifacts.
+Linux container builds use GitHub-hosted runners with pinned manylinux images:
+Blacksmith container initialization exposed runner credentials before workflow
+steps could mask them. Other native runners retain their established mapping.
 The repository may implement and rehearse the automation needed to establish
 that evidence, but doing so performs no release and grants no publication
 authority.
 
 ## Publication prerequisites and authority
 
-Before a separately authorized first release, an operator must verify all of
-the following external state rather than infer it from a passing build:
+The first Rust/Node release is authorized for GitHub only. The `npm-release`
+job is explicitly disabled and workflow validation enforces that guard. npm
+publication requires a separately authorized, reviewed change to re-enable
+that job. Candidate assembly and read-only npm identity checks still run so
+the common version and artifact contract remains intact.
+
+Before the first release, an operator must verify all of
+the applicable external state rather than infer it from a passing build.
+The npm environment and trusted-publisher requirements below apply only when
+npm publication is separately enabled:
 
 - `cpaikr/kasb` is public so canonical release metadata and assets are available
   to unauthenticated installers and managed upgrades.
@@ -160,8 +169,9 @@ Strict publication, when separately authorized, consumes the already validated
 candidate without rebuilding it. Repository release immutability must already
 be enabled. One non-cancelling concurrency group serializes every release
 version. The workflow stages a draft, uploads and verifies the complete GitHub
-asset set, and only then publishes it. It next re-verifies the immutable
-state, tag, commit, and asset set before publishing native npm packages followed
+asset set, and only then publishes it. When npm publication is separately
+enabled, it re-verifies the immutable state, tag, commit, and asset set before
+publishing native npm packages followed
 by the exact-version root package. Any partial publication is reported
 truthfully and resumed only after byte-for-byte identity checks. These operator
 contracts do not authorize running that path. Resume uses the original
