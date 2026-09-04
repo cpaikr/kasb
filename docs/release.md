@@ -1,8 +1,8 @@
 # Release posture
 
 The first Rust/Node release is being prepared as GitHub-only version `0.3.0`.
-`cpaikr/kasb` remains private until the authorized privacy audit and log
-remediation are complete. Publication status and remaining setup are tracked in
+`cpaikr/kasb` is public after the authorized privacy audit and Actions-log
+remediation. Publication status and remaining setup are tracked in
 [the first-release task](../tasks/perform-first-rust-node-release.md).
 
 ## Identity authorities

@@ -27,15 +27,17 @@ independent tracked-content review found no private data blocker. Comments and
 100 retained Actions log archives were also scanned. The 71 archives exposing
 Blacksmith runner tokens were deleted with authorization; run results and
 artifacts remain. Linux container builds now use GitHub-hosted runners with
-unchanged pinned manylinux images. Fresh Actions logs must establish that the
-pre-step credential exposure is eliminated before public visibility changes.
+unchanged pinned manylinux images. Both fresh Linux jobs passed and their full
+logs had no scanner findings or runner-token occurrences. The repository is now
+public, verified through unauthenticated GitHub API access.
 
 The KASB Release Policy App is installed only on `cpaikr/kasb`, with read-only
 Administration, Contents, and mandatory Metadata access, and no webhook.
 Release immutability is enabled. Chrome blocked downloading the generated App
-key, so the environment private key remains unavailable. Required-reviewer
-configuration for the `github-release` environment is blocked by the private
-repository's current plan; configure it after the public transition.
+key, so the environment private key remains unavailable. The `github-release`
+environment now requires review by `sjunepark`, permits only `v*` tags, and holds
+the environment-only sentinel and App client identifier. The signing-key secret
+remains the manual setup step.
 
 PR #26 carries the release-readiness implementation. Its previous head
 `1571e46` passed CI and the complete four-target rehearsal; the current version,
@@ -50,6 +52,6 @@ created.
 ## Next action
 
 Deliver the reviewed release preparation through PR #26 and verify fresh
-four-target CI and credential-free startup logs. Make the repository public,
-configure the protected environment and policy App signing key, and publish the
-exact validated `0.3.0` GitHub assets. Keep npm disabled throughout this release.
+four-target CI. Save the policy App signing key in the protected environment,
+then publish the exact validated `0.3.0` GitHub assets. Keep npm disabled
+throughout this release.
