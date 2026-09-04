@@ -40,8 +40,12 @@ repository's current plan; configure it after the public transition.
 PR #26 carries the release-readiness implementation. Its previous head
 `1571e46` passed CI and the complete four-target rehearsal; the current version,
 runner remediation, and GitHub-only guard require fresh validation. Local
-release checks and publication failure-injection tests pass. No production
-tag or release has been created.
+release checks and publication failure-injection tests pass. The first fresh
+run exposed notices with the old workspace version and upgrade fixtures assuming
+`0.1.1` was newer than the binary. Notices are regenerated, and upgrade fixtures
+now derive a newer patch version; license checks and all local upgrade tests pass.
+Fresh remote validation remains required. No production tag or release has been
+created.
 
 ## Next action
 

@@ -2091,6 +2091,11 @@ mod tests {
         encoded
     }
 
+    fn newer_version() -> String {
+        let current = Version::parse(VERSION).unwrap();
+        Version::new(current.major, current.minor, current.patch + 1).to_string()
+    }
+
     fn fake_source(version: &str) -> FakeSource {
         let manifest = manifest();
         let target = test_target();
@@ -2637,7 +2642,7 @@ mod tests {
             );
         }
 
-        let source = fake_source("0.1.1");
+        let source = fake_source(&newer_version());
         let result = execute_upgrade(true, &manifest, test_target(), &installation, &source)
             .await
             .unwrap();
@@ -2651,7 +2656,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let installation = test_installation(&directory);
         let cancellation = CancellationToken::new();
-        let mut source = fake_source("0.1.1");
+        let mut source = fake_source(&newer_version());
         source.cancel_after = Some((cancellation.clone(), DownloadKind::Metadata));
 
         let error = execute_upgrade_cancellable(
@@ -2683,7 +2688,7 @@ mod tests {
         let manifest = manifest();
         let directory = tempfile::tempdir().unwrap();
         let installation = test_installation(&directory);
-        let source = fake_source("0.1.1");
+        let source = fake_source(&newer_version());
         let result = execute_upgrade(false, &manifest, test_target(), &installation, &source)
             .await
             .unwrap();
@@ -2691,12 +2696,15 @@ mod tests {
         assert_eq!(source.downloads.get(), 2);
         assert_eq!(
             fs::read(&installation.executable).unwrap(),
-            executable_script("0.1.1")
+            executable_script(&newer_version())
         );
         let receipt: Receipt =
             serde_json::from_slice(&fs::read(&installation.receipt_path).unwrap()).unwrap();
-        assert_eq!(receipt.version, "0.1.1");
-        assert_eq!(receipt.sha256, hex_digest(&executable_script("0.1.1")));
+        assert_eq!(receipt.version, newer_version());
+        assert_eq!(
+            receipt.sha256,
+            hex_digest(&executable_script(&newer_version()))
+        );
     }
 
     #[tokio::test]
@@ -2705,7 +2713,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let installation = test_installation(&directory);
 
-        let mut network = fake_source("0.1.1");
+        let mut network = fake_source(&newer_version());
         network.fail_latest = true;
         assert_eq!(
             execute_upgrade(true, &manifest, test_target(), &installation, &network)
@@ -2715,7 +2723,7 @@ mod tests {
             "upgrade_network_failure"
         );
 
-        let mut missing = fake_source("0.1.1");
+        let mut missing = fake_source(&newer_version());
         missing
             .release
             .assets
@@ -2728,7 +2736,7 @@ mod tests {
             "upgrade_asset_missing"
         );
 
-        let mut too_large = fake_source("0.1.1");
+        let mut too_large = fake_source(&newer_version());
         too_large.release.assets[1].size = manifest.release.metadata_limit_bytes as u64 + 1;
         assert_eq!(
             execute_upgrade(false, &manifest, test_target(), &installation, &too_large)
@@ -2738,7 +2746,7 @@ mod tests {
             "upgrade_asset_too_large"
         );
 
-        let mut checksum_size_mismatch = fake_source("0.1.1");
+        let mut checksum_size_mismatch = fake_source(&newer_version());
         checksum_size_mismatch.release.assets[1].size += 1;
         assert_eq!(
             execute_upgrade(
@@ -2754,7 +2762,7 @@ mod tests {
             "upgrade_asset_identity"
         );
 
-        let mut archive_size_mismatch = fake_source("0.1.1");
+        let mut archive_size_mismatch = fake_source(&newer_version());
         archive_size_mismatch.release.assets[0].size -= 1;
         assert_eq!(
             execute_upgrade(
@@ -2770,7 +2778,7 @@ mod tests {
             "upgrade_asset_identity"
         );
 
-        let mut mismatch = fake_source("0.1.1");
+        let mut mismatch = fake_source(&newer_version());
         let name = mismatch.release.assets[0].name.clone();
         mismatch.checksums = format!("{}  {name}\n", "0".repeat(64)).into_bytes();
         assert_eq!(
@@ -2781,7 +2789,7 @@ mod tests {
             "upgrade_checksum_mismatch"
         );
 
-        let mut invalid_metadata_digest = fake_source("0.1.1");
+        let mut invalid_metadata_digest = fake_source(&newer_version());
         invalid_metadata_digest.release.assets[0].digest = Some("sha256:not-a-digest".to_owned());
         assert_eq!(
             execute_upgrade(
