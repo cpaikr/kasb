@@ -7,13 +7,17 @@ edition = "2024"
 license = "Elastic-2.0"
 repository = "https://github.com/cpaikr/kasb"
 rust-version = "1.88"
-version = "0.1.0"
+version = "0.3.0"
 
 [workspace.dependencies]
 futures-util = "=0.3.32"
 napi = { version = "=3.12.2", default-features = false, features = ["async", "napi8"] }
 napi-build = "=2.4.1"
 napi-derive = "=3.6.3"
+serde = "1.0.229"
+serde_json = "1.0.145"
+tokio = "1.48.0"
+wreq = "=6.0.0-rc.29"
 
 [profile.release]
 # The Node binding contains panics with catch_unwind; abort would bypass that boundary.

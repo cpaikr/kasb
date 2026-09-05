@@ -1,0 +1,161 @@
+name: Build and validate one release target
+description: Build one addon and CLI once, then validate exact derived npm and standalone artifacts.
+
+inputs:
+  candidate_sha:
+    required: true
+  candidate_ref:
+    required: true
+  rust_target:
+    required: true
+  package_directory:
+    required: true
+  enforce_glibc:
+    required: true
+  declared_runner:
+    required: true
+  build_image:
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Validate bounded release target inputs
+      shell: bash
+      env:
+        CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        CANDIDATE_REF: ${{ inputs.candidate_ref }}
+        RUST_TARGET: ${{ inputs.rust_target }}
+        PACKAGE_DIRECTORY: ${{ inputs.package_directory }}
+        ENFORCE_GLIBC: ${{ inputs.enforce_glibc }}
+        DECLARED_RUNNER: ${{ inputs.declared_runner }}
+        BUILD_IMAGE: ${{ inputs.build_image }}
+      run: |
+        set -euo pipefail
+        [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "candidate SHA must be a full lowercase commit identity" >&2; exit 1; }
+        if [[ "$CANDIDATE_REF" == refs/kasb-rehearsal/* ]]; then
+          [[ "$CANDIDATE_REF" == "refs/kasb-rehearsal/$CANDIDATE_SHA" ]] || { echo "candidate rehearsal ref does not match its commit" >&2; exit 1; }
+        else
+          [[ "$CANDIDATE_REF" =~ ^refs/tags/v[0-9A-Za-z._+-]+$ ]] || { echo "candidate tag ref has an invalid format" >&2; exit 1; }
+        fi
+
+        case "$RUST_TARGET" in
+          x86_64-unknown-linux-gnu)
+            expected_package=linux-x64-gnu
+            expected_runner=ubuntu-24.04
+            expected_image=quay.io/pypa/manylinux_2_28_x86_64:2026.08.15-1@sha256:0c87ccb5996dab6c3b7612ee4fda7b80c4ab3c44a86c2541e4a872afdf4f131b
+            expected_glibc=true
+            ;;
+          aarch64-unknown-linux-gnu)
+            expected_package=linux-arm64-gnu
+            expected_runner=ubuntu-24.04-arm
+            expected_image=quay.io/pypa/manylinux_2_28_aarch64:2026.08.15-1@sha256:561427136aabf3787bffb294b3515748241e0962d1527ae28bea1e076bfb9d99
+            expected_glibc=true
+            ;;
+          aarch64-apple-darwin)
+            expected_package=darwin-arm64
+            expected_runner=blacksmith-6vcpu-macos-15
+            expected_image=
+            expected_glibc=false
+            ;;
+          x86_64-pc-windows-msvc)
+            expected_package=win32-x64-msvc
+            expected_runner=blacksmith-2vcpu-windows-2025
+            expected_image=
+            expected_glibc=false
+            ;;
+          *) echo "unsupported release target" >&2; exit 1 ;;
+        esac
+
+        [[ "$PACKAGE_DIRECTORY" == "$expected_package" ]] || { echo "target package directory does not match the canonical mapping" >&2; exit 1; }
+        [[ "$DECLARED_RUNNER" == "$expected_runner" ]] || { echo "target runner does not match the canonical mapping" >&2; exit 1; }
+        [[ "$BUILD_IMAGE" == "$expected_image" ]] || { echo "target build image does not match the canonical mapping" >&2; exit 1; }
+        [[ "$ENFORCE_GLIBC" == "$expected_glibc" ]] || { echo "target glibc policy does not match the canonical mapping" >&2; exit 1; }
+    - name: Set up packaging Node 24
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+      with:
+        node-version: 24
+    - name: Pin packaging npm 11.6.2
+      shell: bash
+      run: npm install --global npm@11.6.2
+    - name: Set up Rust 1.88 target
+      uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
+      with:
+        toolchain: 1.88.0
+        target: ${{ inputs.rust_target }}
+    - name: Install Windows LLVM 18.1.8
+      if: runner.os == 'Windows'
+      uses: KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0 # v2
+      with:
+        version: 18.1.8
+    - name: Expose Windows libclang
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $llvmBin = Join-Path $env:LLVM_PATH "bin"
+        if (-not (Test-Path -LiteralPath (Join-Path $llvmBin "libclang.dll") -PathType Leaf)) {
+          throw "the pinned LLVM installation does not contain libclang.dll"
+        }
+        "LIBCLANG_PATH=$llvmBin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+    - name: Build same-revision addon and CLI once
+      shell: bash
+      env:
+        RUST_TARGET: ${{ inputs.rust_target }}
+      run: |
+        set -euo pipefail
+        cargo build --locked --release --target "$RUST_TARGET" -p kasb-node --lib --bin kasb-process-probe
+        cargo build --locked --release --target "$RUST_TARGET" -p kasb-cli --bin kasb
+    - name: Derive native package and standalone archive
+      shell: bash
+      env:
+        RUST_TARGET: ${{ inputs.rust_target }}
+        PACKAGE_DIRECTORY: ${{ inputs.package_directory }}
+        ENFORCE_GLIBC: ${{ inputs.enforce_glibc }}
+      run: |
+        set -euo pipefail
+        node scripts/assemble-native-package.mjs "$RUST_TARGET"
+        node scripts/assemble-cli-archive.mjs "$RUST_TARGET"
+        if [[ "$ENFORCE_GLIBC" == true ]]; then
+          node scripts/validate-glibc-floor.mjs "$RUST_TARGET"
+        fi
+        mkdir -p dist/native
+        npm pack "./packages/native/$PACKAGE_DIRECTORY" --ignore-scripts --pack-destination dist/native
+    - name: Record bounded target provenance
+      shell: bash
+      env:
+        CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        CANDIDATE_REF: ${{ inputs.candidate_ref }}
+        RUST_TARGET: ${{ inputs.rust_target }}
+        DECLARED_RUNNER: ${{ inputs.declared_runner }}
+        BUILD_IMAGE: ${{ inputs.build_image }}
+      run: |
+        set -euo pipefail
+        node scripts/write-release-target-provenance.mjs \
+          --repository "$GITHUB_REPOSITORY" \
+          --commit "$CANDIDATE_SHA" \
+          --ref "$CANDIDATE_REF" \
+          --target "$RUST_TARGET" \
+          --rust "$(rustc --version)" \
+          --npm "$(npm --version)" \
+          --runner "$DECLARED_RUNNER" \
+          --build-image "$BUILD_IMAGE"
+    - name: Upload allowlisted validated target artifacts
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      with:
+        name: candidate-target-${{ inputs.rust_target }}
+        path: |
+          dist/native/*.tgz
+          dist/cli/*.tar.gz
+          dist/provenance/fragments/${{ inputs.rust_target }}.json
+        if-no-files-found: error
+        retention-days: 7
+    - name: Upload isolated consumer process probe
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+      with:
+        name: candidate-consumer-probe-${{ inputs.rust_target }}
+        path: |
+          target/${{ inputs.rust_target }}/release/kasb-process-probe
+          target/${{ inputs.rust_target }}/release/kasb-process-probe.exe
+        if-no-files-found: error
+        retention-days: 7

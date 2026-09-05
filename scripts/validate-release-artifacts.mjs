@@ -2,23 +2,26 @@ import { readdir, readFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { fileURLToPath } from "node:url";
+import { checksummedReleaseAssetNames, loadReleaseContract, repositoryRoot } from "./release-contract.mjs";
 
-const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const inputs = process.argv.slice(2);
-const ciOnly = inputs[0] === "--ci";
-if (ciOnly) inputs.shift();
+const ciOnly = removeFlag(inputs, "--ci");
+const candidate = removeFlag(inputs, "--candidate");
+if (ciOnly && candidate) throw new Error("--ci and --candidate are mutually exclusive.");
+if (inputs.some((input) => input.startsWith("--")) || inputs.length > 3) throw new Error("Unknown release artifact validation option.");
+if (candidate && inputs.length !== 0) throw new Error("--candidate does not accept positional artifact directories.");
 const nativeDirectory = resolve(repositoryRoot, inputs[0] ?? "dist/native");
 const rootDirectory = resolve(repositoryRoot, inputs[1] ?? "dist/root");
 const cliDirectory = resolve(repositoryRoot, inputs[2] ?? "dist/cli");
-const manifest = JSON.parse(await readFile(resolve(repositoryRoot, "native-targets.json"), "utf8"));
+const contract = await loadReleaseContract();
+const { manifest } = contract;
 const rootSource = JSON.parse(await readFile(resolve(repositoryRoot, manifest.rootPackage, "package.json"), "utf8"));
 const license = await readFile(resolve(repositoryRoot, "LICENSE.md"), "utf8");
 const notices = await readFile(resolve(repositoryRoot, "THIRD_PARTY_LICENSES.html"), "utf8");
 const nodeNotices = await readFile(resolve(repositoryRoot, manifest.rootPackage, "THIRD_PARTY_LICENSES.md"), "utf8");
 const validatedTargets = ciOnly
-  ? manifest.targets.filter(({ continuousIntegration }) => continuousIntegration === true)
-  : manifest.targets;
+  ? contract.targets.filter(({ continuousIntegration }) => continuousIntegration === true)
+  : contract.targets;
 const expectedNative = new Map(validatedTargets.map((target) => [target.packageName, target]));
 
 assertPublicPackage(rootSource, "@sjunepark/kasb");
@@ -27,12 +30,35 @@ assertNoPiMetadata(rootSource);
 const nativeTarballs = await tarballs(nativeDirectory);
 const rootTarballs = await tarballs(rootDirectory);
 const cliArchives = await archives(cliDirectory);
+const checksumManifest = await readFile(resolve(cliDirectory, manifest.release.checksumAsset), "utf8");
+const checksums = new Map();
+for (const line of checksumManifest.trimEnd().split(/\r?\n/u)) {
+  const match = line.match(/^([0-9a-f]{64})  ([^/\\]+)$/u);
+  if (!match || checksums.has(match[2])) throw new Error(`Invalid or duplicate checksum entry ${JSON.stringify(line)}.`);
+  checksums.set(match[2], match[1]);
+}
 if (nativeTarballs.length !== expectedNative.size) {
   throw new Error(`Expected ${expectedNative.size} native tarballs, found ${nativeTarballs.length}.`);
 }
 if (rootTarballs.length !== 1) throw new Error(`Expected one root tarball, found ${rootTarballs.length}.`);
 if (cliArchives.length !== expectedNative.size) {
   throw new Error(`Expected ${expectedNative.size} direct CLI archives, found ${cliArchives.length}.`);
+}
+const expectedChecksums = candidate
+  ? checksummedReleaseAssetNames(contract)
+  : validatedTargets.map(({ archiveName }) => archiveName);
+if (JSON.stringify([...checksums.keys()].sort()) !== JSON.stringify([...expectedChecksums].sort())) {
+  throw new Error(`Expected the exact ${candidate ? "publishable candidate asset" : "standalone archive"} checksum set.`);
+}
+if (candidate) {
+  for (const name of [manifest.release.shellInstallerAsset, manifest.release.powershellInstallerAsset]) {
+    const bytes = await readFile(resolve(repositoryRoot, "dist/installers", name));
+    if (checksums.get(name) !== hash(bytes)) throw new Error(`${name} checksum differs from ${manifest.release.checksumAsset}.`);
+  }
+  const provenance = await readFile(resolve(repositoryRoot, "dist/provenance", manifest.release.provenanceAsset));
+  if (checksums.get(manifest.release.provenanceAsset) !== hash(provenance)) {
+    throw new Error(`${manifest.release.provenanceAsset} checksum differs from ${manifest.release.checksumAsset}.`);
+  }
 }
 
 const seen = new Set();
@@ -68,11 +94,14 @@ for (const tarball of nativeTarballs) {
   if (tarballEntry(tarball, "package/LICENSE.md") !== license) throw new Error(`${pkg.name} has a stale license.`);
   if (tarballEntry(tarball, "package/THIRD_PARTY_LICENSES.html") !== notices) throw new Error(`${pkg.name} has stale notices.`);
 
-  const expectedArchiveName = `kasb-${rootSource.version}-${target.packageDirectory}.tar.gz`;
+  const expectedArchiveName = target.archiveName;
   const cliArchive = cliArchives.find((candidate) => basename(candidate) === expectedArchiveName);
   if (!cliArchive) throw new Error(`${pkg.name} is missing its direct CLI archive.`);
+  if (checksums.get(expectedArchiveName) !== hash(await readFile(cliArchive))) {
+    throw new Error(`${pkg.name} direct CLI archive checksum differs from ${manifest.release.checksumAsset}.`);
+  }
   const cliEntries = listArchive(cliArchive).sort();
-  const expectedEntries = [target.cliFile, "LICENSE.md", "README.md", "THIRD_PARTY_LICENSES.html"].sort();
+  const expectedEntries = [...target.archiveEntries].sort();
   if (JSON.stringify(cliEntries) !== JSON.stringify(expectedEntries)) {
     throw new Error(`${pkg.name} direct CLI archive has unexpected contents.`);
   }
@@ -128,7 +157,7 @@ if (!isExecutableMode(tarballMode(rootTarball, "package/dist/cli.js"))) {
   throw new Error("Root launcher is not executable in the npm tarball.");
 }
 
-console.log(`${ciOnly ? "continuous-CI" : "complete"} native artifact set passed for ${root.name}@${root.version}`);
+console.log(`${ciOnly ? "continuous-CI" : candidate ? "complete candidate" : "complete"} native artifact set passed for ${root.name}@${root.version}`);
 
 async function tarballs(directory) {
   return (await readdir(directory, { withFileTypes: true }))
@@ -206,4 +235,11 @@ function assertNoPiMetadata(pkg) {
   if (Object.hasOwn(pkg.exports ?? {}, "./pi") || Object.hasOwn(pkg, "pi")) {
     throw new Error("The canonical package must not expose Pi metadata.");
   }
+}
+
+function removeFlag(inputs, flag) {
+  const index = inputs.indexOf(flag);
+  if (index === -1) return false;
+  inputs.splice(index, 1);
+  return true;
 }

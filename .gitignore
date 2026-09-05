@@ -3,6 +3,8 @@ dist/
 target/
 .tmp/
 .npm-cache/
+.release-candidate-test-*/
+.kasb-exact-candidate-*/
 .env
 .env.local
 .env.*.local

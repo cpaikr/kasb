@@ -25,6 +25,8 @@
    before changing public capability semantics.
 7. Read [plans/rust-node-rewrite.md](plans/rust-node-rewrite.md) before changing
    a cutover-established compatibility or distribution boundary.
+8. Read [plans/release-contract-and-managed-upgrades.md](plans/release-contract-and-managed-upgrades.md)
+   before changing version, release, installer, receipt, or upgrade behavior.
 
 ## Current Commands
 
@@ -38,6 +40,8 @@
 - Check Rust formatting: `cargo fmt --all --check`
 - Check Rust lints: `cargo clippy --locked --workspace --all-targets -- -D warnings`
 - Run opt-in live checks: `bun run test:live`
+- Check release-derived identities: `bun run release:check`
+- Run deterministic installer tests: `bun run test:installers`
 
 Document only commands that exist in `package.json` or Cargo metadata. Update
 this list when the rewrite changes the repository interface.
@@ -60,6 +64,7 @@ this list when the rewrite changes the repository interface.
 - Provider evidence: `docs/research/kasb-standard-source-map.md`
 - Public semantic contract: `docs/specs/kasb-standards-v1.md`
 - Project order and unscheduled work: `ROADMAP.md`
+- Release posture and prerequisites: `docs/release.md`
 
 ## Working Rules
 

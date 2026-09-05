@@ -1,0 +1,153 @@
+{
+  "candidate": {
+    "schemaVersion": 1,
+    "mode": "rehearsal",
+    "phase": "artifacts",
+    "publicationStateSource": "fixture",
+    "gates": {
+      "contracts": true,
+      "generated": true,
+      "licenses": true,
+      "typecheck": true,
+      "tests": true,
+      "conformance": true,
+      "build": true,
+      "rustfmt": true,
+      "clippy": true,
+      "nativeArtifacts": true,
+      "cleanConsumers": true
+    },
+    "repository": "cpaikr/kasb",
+    "version": "1.2.3",
+    "retiredThroughVersion": "0.2.1",
+    "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "canonicalTag": "v1.2.3",
+    "sourceRef": "refs/kasb-rehearsal/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "targets": [
+      {
+        "releaseTarget": "linux-x64-gnu",
+        "packageName": "@sjunepark/kasb-linux-x64-gnu",
+        "archiveName": "kasb-1.2.3-linux-x64-gnu.tar.gz"
+      },
+      {
+        "releaseTarget": "linux-arm64-gnu",
+        "packageName": "@sjunepark/kasb-linux-arm64-gnu",
+        "archiveName": "kasb-1.2.3-linux-arm64-gnu.tar.gz"
+      },
+      {
+        "releaseTarget": "darwin-arm64",
+        "packageName": "@sjunepark/kasb-darwin-arm64",
+        "archiveName": "kasb-1.2.3-darwin-arm64.tar.gz"
+      },
+      {
+        "releaseTarget": "win32-x64-msvc",
+        "packageName": "@sjunepark/kasb-win32-x64-msvc",
+        "archiveName": "kasb-1.2.3-win32-x64-msvc.tar.gz"
+      }
+    ],
+    "githubAssets": [
+      {
+        "name": "kasb-1.2.3-linux-x64-gnu.tar.gz",
+        "file": "dist/cli/kasb-1.2.3-linux-x64-gnu.tar.gz",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      {
+        "name": "SHA256SUMS",
+        "file": "dist/cli/SHA256SUMS",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      {
+        "name": "kasb-1.2.3-linux-arm64-gnu.tar.gz",
+        "file": "dist/cli/kasb-1.2.3-linux-arm64-gnu.tar.gz",
+        "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      {
+        "name": "kasb-1.2.3-darwin-arm64.tar.gz",
+        "file": "dist/cli/kasb-1.2.3-darwin-arm64.tar.gz",
+        "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      {
+        "name": "kasb-1.2.3-win32-x64-msvc.tar.gz",
+        "file": "dist/cli/kasb-1.2.3-win32-x64-msvc.tar.gz",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "name": "install.sh",
+        "file": "dist/installers/install.sh",
+        "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      {
+        "name": "install.ps1",
+        "file": "dist/installers/install.ps1",
+        "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      {
+        "name": "provenance.json",
+        "file": "dist/provenance/provenance.json",
+        "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      }
+    ],
+    "npmPackages": [
+      {
+        "name": "@sjunepark/kasb-linux-x64-gnu",
+        "version": "1.2.3",
+        "role": "native",
+        "file": "dist/native/sjunepark-kasb-linux-x64-gnu-1.2.3.tgz",
+        "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+      },
+      {
+        "name": "@sjunepark/kasb-linux-arm64-gnu",
+        "version": "1.2.3",
+        "role": "native",
+        "file": "dist/native/sjunepark-kasb-linux-arm64-gnu-1.2.3.tgz",
+        "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      {
+        "name": "@sjunepark/kasb-darwin-arm64",
+        "version": "1.2.3",
+        "role": "native",
+        "file": "dist/native/sjunepark-kasb-darwin-arm64-1.2.3.tgz",
+        "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+      },
+      {
+        "name": "@sjunepark/kasb-win32-x64-msvc",
+        "version": "1.2.3",
+        "role": "native",
+        "file": "dist/native/sjunepark-kasb-win32-x64-msvc-1.2.3.tgz",
+        "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+      },
+      {
+        "name": "@sjunepark/kasb",
+        "version": "1.2.3",
+        "role": "root",
+        "file": "dist/root/sjunepark-kasb-1.2.3.tgz",
+        "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+      }
+    ]
+  },
+  "vacant": {
+    "schemaVersion": 1,
+    "source": "fixture",
+    "github": {
+      "schemaVersion": 1,
+      "repository": "cpaikr/kasb",
+      "repositoryPrivate": false,
+      "immutableReleases": true,
+      "highestPublishedVersion": "0.2.1",
+      "tag": "v1.2.3",
+      "tagSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "release": null
+    },
+    "npm": {
+      "schemaVersion": 1,
+      "highestPublishedVersion": "0.2.1",
+      "packages": [
+        { "name": "@sjunepark/kasb-linux-x64-gnu", "version": "1.2.3", "state": "vacant" },
+        { "name": "@sjunepark/kasb-linux-arm64-gnu", "version": "1.2.3", "state": "vacant" },
+        { "name": "@sjunepark/kasb-darwin-arm64", "version": "1.2.3", "state": "vacant" },
+        { "name": "@sjunepark/kasb-win32-x64-msvc", "version": "1.2.3", "state": "vacant" },
+        { "name": "@sjunepark/kasb", "version": "1.2.3", "state": "vacant" }
+      ]
+    }
+  }
+}

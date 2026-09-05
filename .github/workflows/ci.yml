@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
@@ -41,6 +43,8 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
       - name: Test Rust and Node products
+        env:
+          KASB_REQUIRE_POWERSHELL_TESTS: "1"
         run: bun run test
       - name: Run adversarial public-surface judge
         run: bun run conformance:judge
@@ -51,12 +55,54 @@ jobs:
       - name: Check Rust lints
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
 
+  windows-release-contract:
+    name: Windows release contract
+    runs-on: blacksmith-2vcpu-windows-2025
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.3.13
+      - name: Set up Rust 1.88
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
+        with:
+          toolchain: 1.88.0
+          components: clippy
+      - name: Install Windows LLVM 18.1.8
+        uses: KyleMayes/install-llvm-action@ebc0426251bc40c7cd31162802432c68818ab8f0 # v2
+        with:
+          version: 18.1.8
+      - name: Expose Windows libclang
+        shell: pwsh
+        run: |
+          $llvmBin = Join-Path $env:LLVM_PATH "bin"
+          if (-not (Test-Path -LiteralPath (Join-Path $llvmBin "libclang.dll") -PathType Leaf)) {
+            throw "the pinned LLVM installation does not contain libclang.dll"
+          }
+          "LIBCLANG_PATH=$llvmBin" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Compile and test the Windows upgrade protocol
+        run: cargo test --locked -p kasb-cli --lib
+      - name: Lint the Windows CLI target
+        run: cargo clippy --locked -p kasb-cli --all-targets -- -D warnings
+      - name: Test the PowerShell installer behavior
+        env:
+          KASB_REQUIRE_POWERSHELL_TESTS: "1"
+        run: node scripts/test-installers.mjs --powershell-only --build-windows-cli
+
   root-package:
     name: Immutable root npm package
     runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
@@ -80,20 +126,20 @@ jobs:
 
   native-linux:
     name: Native ${{ matrix.rust_target }} at glibc 2.28
-    # macOS ARM64 and Windows x64 remain supported packages but are deliberately
-    # omitted from continuous CI to reduce compute cost; their recorded native
-    # validation remains in plans/rust-node-rewrite.md.
+    # macOS ARM64 and Windows x64 native package builds remain deliberately
+    # omitted from continuous CI to reduce compute cost. The separate Windows
+    # job compiles the CLI and tests release mechanics, not packaged artifacts.
     needs: root-package
     strategy:
       fail-fast: false
       matrix:
         include:
           - rust_target: x86_64-unknown-linux-gnu
-            runner: blacksmith-2vcpu-ubuntu-2404
+            runner: ubuntu-24.04
             package_directory: linux-x64-gnu
             build_container: quay.io/pypa/manylinux_2_28_x86_64:2026.08.15-1@sha256:0c87ccb5996dab6c3b7612ee4fda7b80c4ab3c44a86c2541e4a872afdf4f131b
           - rust_target: aarch64-unknown-linux-gnu
-            runner: blacksmith-2vcpu-ubuntu-2404-arm
+            runner: ubuntu-24.04-arm
             package_directory: linux-arm64-gnu
             build_container: quay.io/pypa/manylinux_2_28_aarch64:2026.08.15-1@sha256:561427136aabf3787bffb294b3515748241e0962d1527ae28bea1e076bfb9d99
     runs-on: ${{ matrix.runner }}
@@ -104,6 +150,8 @@ jobs:
         run: dnf install -y clang-devel cmake curl git ninja-build perl-core pkgconf-pkg-config
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Set up packaging Node 24
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
@@ -198,6 +246,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
       - name: Set up Node 24
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
@@ -220,4 +270,4 @@ jobs:
           merge-multiple: true
           path: dist/cli
       - name: Validate continuously tested artifact set
-        run: node scripts/validate-release-artifacts.mjs --ci
+        run: node scripts/write-release-checksums.mjs --ci && node scripts/validate-release-artifacts.mjs --ci

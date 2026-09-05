@@ -3,8 +3,8 @@
 ## Product
 
 - `name`: `kasb-standards`
-- `status`: Rust/Node cutover implemented; final delivery gates in progress;
-  registry publication not performed
+- `status`: Rust/Node cutover and release readiness complete; first product
+  release not published
 - `domain`: Korean accounting standards and related interpretation material
   exposed through KASB public read surfaces
 - `users`: LLM agents, agent developers, researchers, and humans who need
@@ -23,6 +23,7 @@ The target experience is closer to `yfinance` than browsing:
 - stable identifiers, references, and source metadata;
 - a native Rust API for direct embedding;
 - a parseable Rust `clap` CLI, also installable through an npm launcher;
+- a checksummed standalone CLI with explicit managed check/upgrade commands;
 - an asynchronous Node SDK and neutral npm toolset; and
 - one Rust implementation of provider and domain behavior behind every public
   surface.
@@ -94,7 +95,9 @@ The Pi export and extension are absent and receive no replacement host adapter.
 - a language-neutral KASB OpenAPI wire contract;
 - independent fixtures, conformance cases, and an adversarial public-surface
   judge; and
-- claimed native npm packages only for verified targets.
+- claimed native npm packages only for verified targets; and
+- explicit standalone installation and receipt-managed upgrade for the same
+  four verified CLI targets.
 
 ### Out of scope
 
@@ -108,7 +111,8 @@ The Pi export and extension are absent and receive no replacement host adapter.
 - a second TypeScript KASB conformer;
 - browser, edge, Deno, or Bun-runtime npm support;
 - premature multi-source abstraction; and
-- publication or external provider changes without explicit authorization.
+- publication or external provider changes without explicit authorization; and
+- automatic, background, or ordinary-command update checks.
 
 ## Success Criteria
 

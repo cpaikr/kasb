@@ -2,15 +2,15 @@
 
 ## Current
 
-_None._
+[Perform the first Rust/Node product release](tasks/perform-first-rust-node-release.md)
 
 ## Completed
 
+[Automate canonical GitHub and npm releases](plans/canonical-release-pipeline.md)
+
+[Establish the release, installation, and managed-upgrade contract](plans/release-contract-and-managed-upgrades.md)
+
 [Rewrite KASB around a public Rust SDK, Node SDK, and Rust CLI](plans/rust-node-rewrite.md)
-
-## Plans
-
-_None._
 
 ## Tasks
 

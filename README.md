@@ -32,7 +32,7 @@ The supported npm native targets are Linux GNU x64/ARM64, macOS ARM64, and
 Windows x64. The Linux GNU packages require glibc 2.28 or newer. The launcher
 preserves POSIX signal identity where supported; Windows preserves termination
 without claiming POSIX signal identity. Continuous CI intentionally covers only
-the two Linux targets on Blacksmith to reduce compute cost. macOS and Windows
+the two Linux targets on GitHub-hosted runners. macOS and Windows
 retain their supported packages and recorded native evidence but are not
 continuously tested.
 
@@ -64,6 +64,14 @@ behavior can drift.
 The npm runtime floor is Node.js 20.18.1 and the validated Rust minimum is
 1.88. Registry publication, version selection, and release tags require
 separate authorization.
+
+Cargo workspace package metadata is the product-version authority. The npm
+root, native packages, standalone archive names, generated installers, and CLI
+identity are derived from it and checked with `bun run release:check`.
+Standalone installs will use immutable, checksummed releases from `cpaikr/kasb`
+and carry an adjacent ownership receipt. Standalone installation becomes
+available after the first production release is published. See
+[release posture](docs/release.md) for current status.
 
 ## License
 

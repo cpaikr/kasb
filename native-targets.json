@@ -3,6 +3,33 @@
   "supportClaim": "supported",
   "minimumNodeVersion": "20.18.1",
   "minimumGlibcVersion": "2.28",
+  "release": {
+    "repository": "cpaikr/kasb",
+    "retiredThroughVersion": "0.2.1",
+    "tagPrefix": "v",
+    "archivePrefix": "kasb",
+    "archiveExtension": "tar.gz",
+    "archiveEntries": ["{executable}", "LICENSE.md", "README.md", "THIRD_PARTY_LICENSES.html"],
+    "checksumAsset": "SHA256SUMS",
+    "shellInstallerAsset": "install.sh",
+    "powershellInstallerAsset": "install.ps1",
+    "provenanceAsset": "provenance.json",
+    "candidateReceiptFile": "candidate.json",
+    "toolchain": {
+      "rust": "1.88.0",
+      "node": "24",
+      "npm": "11.6.2"
+    },
+    "receiptFile": ".kasb-receipt.json",
+    "receiptSchemaVersion": 1,
+    "metadataLimitBytes": 1048576,
+    "archiveLimitBytes": 134217728,
+    "requestTimeoutSeconds": 15,
+    "archiveRequestTimeoutSeconds": 300,
+    "transferStallTimeoutSeconds": 15,
+    "connectTimeoutSeconds": 5,
+    "redirectLimit": 5
+  },
   "validationNodeVersions": ["20.18.1", "21", "22", "23", "24", "25", "26"],
   "rootPackage": "packages/node",
   "nativePackageRoot": "packages/native",
@@ -17,7 +44,8 @@
       "addonFile": "kasb.linux-x64-gnu.node",
       "cliFile": "kasb",
       "continuousIntegration": true,
-      "runner": "blacksmith-2vcpu-ubuntu-2404",
+      "runner": "ubuntu-24.04",
+      "releaseRunner": "ubuntu-24.04",
       "buildContainer": "quay.io/pypa/manylinux_2_28_x86_64:2026.08.15-1@sha256:0c87ccb5996dab6c3b7612ee4fda7b80c4ab3c44a86c2541e4a872afdf4f131b"
     },
     {
@@ -30,7 +58,8 @@
       "addonFile": "kasb.linux-arm64-gnu.node",
       "cliFile": "kasb",
       "continuousIntegration": true,
-      "runner": "blacksmith-2vcpu-ubuntu-2404-arm",
+      "runner": "ubuntu-24.04-arm",
+      "releaseRunner": "ubuntu-24.04-arm",
       "buildContainer": "quay.io/pypa/manylinux_2_28_aarch64:2026.08.15-1@sha256:561427136aabf3787bffb294b3515748241e0962d1527ae28bea1e076bfb9d99"
     },
     {
@@ -41,7 +70,8 @@
       "packageDirectory": "darwin-arm64",
       "addonFile": "kasb.darwin-arm64.node",
       "cliFile": "kasb",
-      "continuousIntegration": false
+      "continuousIntegration": false,
+      "releaseRunner": "blacksmith-6vcpu-macos-15"
     },
     {
       "rustTarget": "x86_64-pc-windows-msvc",
@@ -51,7 +81,8 @@
       "packageDirectory": "win32-x64-msvc",
       "addonFile": "kasb.win32-x64-msvc.node",
       "cliFile": "kasb.exe",
-      "continuousIntegration": false
+      "continuousIntegration": false,
+      "releaseRunner": "blacksmith-2vcpu-windows-2025"
     }
   ],
   "notClaimed": [
