@@ -248,13 +248,13 @@ equal(
 );
 equal(
   targets.targets?.filter(({ continuousIntegration }) => continuousIntegration === true).map(({ rustTarget }) => rustTarget),
-  ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"],
-  "continuous native CI must cover exactly the two Linux GNU targets",
+  ["x86_64-unknown-linux-gnu"],
+  "continuous native CI must cover only Linux GNU x64",
 );
 equal(
   targets.targets?.filter(({ continuousIntegration }) => continuousIntegration === false).map(({ rustTarget }) => rustTarget),
-  ["aarch64-apple-darwin", "x86_64-pc-windows-msvc"],
-  "macOS ARM64 and Windows x64 must remain explicit supported targets omitted from continuous CI",
+  ["aarch64-unknown-linux-gnu", "aarch64-apple-darwin", "x86_64-pc-windows-msvc"],
+  "ARM64, macOS, and Windows must remain supported targets omitted from continuous CI",
 );
 check(
   new Set(targets.targets?.map(({ packageName }) => packageName)).size === targets.targets?.length,
@@ -270,8 +270,11 @@ for (const target of targets.targets || []) {
   check(target.addonFile?.endsWith(".node"), `${target.rustTarget} must name a Node-API artifact`);
   check(target.cliFile === (target.npmPlatform === "win32" ? "kasb.exe" : "kasb"), `${target.rustTarget} must name the native CLI consistently`);
   if (target.libc === "glibc") {
-    const expectedRunner = target.npmArch === "arm64" ? "ubuntu-24.04-arm" : "ubuntu-24.04";
-    check(target.runner === expectedRunner, `${target.rustTarget} continuous CI must use its GitHub-hosted Linux runner`);
+    if (target.continuousIntegration) {
+      check(target.runner === "ubuntu-24.04", `${target.rustTarget} continuous CI must use its GitHub-hosted Linux x64 runner`);
+    } else {
+      check(!Object.hasOwn(target, "runner"), `${target.rustTarget} omitted from continuous CI must not declare a runner`);
+    }
     check(
       typeof target.buildContainer === "string" &&
         target.buildContainer.includes("manylinux_2_28") &&

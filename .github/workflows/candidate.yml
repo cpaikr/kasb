@@ -1,8 +1,6 @@
 name: Canonical release candidate
 
 on:
-  pull_request:
-    branches: [main]
   workflow_call:
     inputs:
       mode:
@@ -31,12 +29,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-candidate-${{ inputs.candidate_sha || github.event.pull_request.head.sha || github.sha }}
+  group: release-candidate-${{ inputs.candidate_sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
   metadata:
     name: Bind candidate identity
+    # Reusable calls inherit the caller event; automatic callers cannot build targets.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     outputs:
@@ -55,18 +55,15 @@ jobs:
           REQUESTED_MODE: ${{ inputs.mode }}
           REQUESTED_REF: ${{ inputs.candidate_ref }}
           REQUESTED_SHA: ${{ inputs.candidate_sha }}
-          PR_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           mode="${REQUESTED_MODE:-rehearsal}"
-          sha="${REQUESTED_SHA:-${PR_SHA:-$GITHUB_SHA}}"
+          sha="${REQUESTED_SHA:-$GITHUB_SHA}"
           ref="${REQUESTED_REF:-refs/kasb-rehearsal/$sha}"
           [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "candidate SHA must be a full lowercase commit identity" >&2; exit 1; }
           [[ "$mode" == rehearsal || "$mode" == strict ]] || { echo "invalid candidate mode" >&2; exit 1; }
-          if [[ ("$GITHUB_EVENT_NAME" == pull_request || "$GITHUB_EVENT_NAME" == workflow_dispatch) && "$mode" != rehearsal ]]; then
-            echo "pull-request and manual candidates are rehearsal-only" >&2
-            exit 1
-          fi
+          # Direct dispatch has no mode input and is always a rehearsal.
+          # The manually dispatched release caller supplies strict inputs.
           [[ "$mode" != rehearsal || "$ref" == "refs/kasb-rehearsal/$sha" ]] || { echo "invalid rehearsal ref" >&2; exit 1; }
           [[ "$mode" != strict || "$ref" == refs/tags/v* ]] || { echo "strict candidates require a version tag" >&2; exit 1; }
           {
@@ -138,7 +135,7 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Validate contracts and generated state
-        run: bun run contracts:check && bun run native:check && node scripts/validate-release-workflows.mjs
+        run: bun run contracts:check && bun run native:check
       - name: Install cargo-about
         run: cargo install cargo-about --version 0.9.2 --locked --features cli
       - name: Validate licenses

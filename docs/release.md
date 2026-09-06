@@ -145,17 +145,16 @@ repository metadata does not reveal every secret or publisher constraint.
 
 ## CI platform coverage
 
-Routine `ci.yml` verification runs on Linux. To reduce compute cost,
-`candidate.yml` runs the full four-target matrix only for PRs targeting `main`,
-manual rehearsals, and release workflow calls. Every `main` PR receives this
-platform gate regardless of changed paths; post-merge pushes do not repeat it.
+Routine `ci.yml` verification runs only on Linux GNU x64. The full four-target
+candidate matrix runs only through manual rehearsal or a manually dispatched
+release. PRs, pushes, schedules, and automatic reusable callers do not start it.
+Publication requires manual dispatch against an existing canonical `v*` tag;
+a branch dispatch cannot publish.
 
-This follows the integration/release split in
+This cost policy deliberately narrows the automatic integration coverage in
 [the cost-aware CI guidance](../../mytech/practices/cost-aware-ci-platform-coverage.md).
-At the owner's request, development PRs also omit automatic affected-platform
-checks; use a manual candidate rehearsal when platform-specific evidence is
-needed before integration. Distribution targets and release validation remain
-unchanged.
+Use a manual candidate rehearsal for platform evidence before integration.
+All four distribution targets and their release validation remain supported.
 
 ## Non-publishing candidate verification
 

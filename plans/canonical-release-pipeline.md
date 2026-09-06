@@ -2,7 +2,7 @@
 
 ## Outcome
 
-A tag-triggered, repository-owned pipeline builds and verifies a complete KASB
+A manually dispatched, repository-owned pipeline builds and verifies a complete KASB
 release from one checkout, publishes immutable standalone assets through GitHub
 Releases, and publishes npm only as an exact projection of that same versioned
 artifact set.
@@ -15,7 +15,7 @@ artifact set.
   reusable candidate workflow owns the exhaustive release rehearsal. Continuous
   CI has no tag trigger, release environment, publication permission, or
   registry publishing job.
-- Continuous CI builds the root npm tarball and Linux GNU x64/ARM64 native npm
+- Continuous CI builds the root npm tarball and Linux GNU x64 native npm
   packages and direct CLI archives. It validates the complete continuously
   tested subset after clean-consumer checks across Node 20.18.1 and majors
   21–26.

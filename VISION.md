@@ -133,8 +133,8 @@ The rewrite succeeds when:
 - every claimed native target passes clean packed-consumer tests; and
 - the TypeScript conformer and Pi surface are absent.
 
-Routine development verification may use a narrower platform matrix, while
-integration and release gates verify every supported target. See
+Routine development verification uses a narrower platform matrix, while
+manual candidate and release gates verify every supported target. See
 [CI platform coverage](docs/release.md#ci-platform-coverage).
 
 ## Current State

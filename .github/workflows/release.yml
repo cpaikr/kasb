@@ -1,9 +1,7 @@
 name: Canonical release publication
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,6 +13,8 @@ concurrency:
 jobs:
   publication-state:
     name: Protected immutable-release preflight
+    # Dispatch against an existing canonical tag, never a branch.
+    if: github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: github-release

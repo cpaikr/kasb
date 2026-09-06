@@ -189,8 +189,8 @@ target passed native build, same-revision artifact, direct CLI, and clean packed
 consumer validation. Unsupported or incomplete installations fail with a
 stable actionable error rather than raw loader or spawn details.
 
-Routine CI covers Linux GNU x64/ARM64. The full supported matrix is verified
-at the main integration and release gates; see
+Routine CI covers Linux GNU x64. The full supported matrix is verified
+by manually dispatched candidate and release workflows; see
 [CI platform coverage](docs/release.md#ci-platform-coverage).
 `native-targets.json` records the routine native-build subset separately from
 the release target mapping.

@@ -1,8 +1,9 @@
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseDocument } from "yaml";
+import { schedulingFailures } from "./workflow-scheduling-policy.mjs";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const manifest = JSON.parse(await readFile(resolve(repositoryRoot, "native-targets.json"), "utf8"));
@@ -13,6 +14,14 @@ if (document.errors.length > 0) {
 }
 const workflow = document.toJS();
 const missing = [];
+const workflows = {};
+for (const name of await readdir(resolve(repositoryRoot, ".github/workflows"))) {
+  if (!/\.ya?ml$/u.test(name)) continue;
+  const parsed = parseDocument(await readFile(resolve(repositoryRoot, ".github/workflows", name), "utf8"));
+  if (parsed.errors.length) throw new Error(`${name} is invalid YAML`);
+  workflows[name] = parsed.toJS();
+}
+missing.push(...schedulingFailures(workflows));
 const jobs = workflow?.jobs ?? {};
 const deterministicJob = jobs.deterministic;
 const linuxJob = jobs["native-linux"];
@@ -28,16 +37,13 @@ check(
   "every native target must declare whether it participates in continuous integration",
 );
 check(
-  sameValue(omittedTargets.map(({ rustTarget }) => rustTarget), ["aarch64-apple-darwin", "x86_64-pc-windows-msvc"]),
-  "macOS ARM64 and Windows x64 must be the explicit continuous-CI omissions",
+  sameValue(ciTargets.map(({ rustTarget }) => rustTarget), ["x86_64-unknown-linux-gnu"])
+    && sameValue(omittedTargets.map(({ rustTarget }) => rustTarget), ["aarch64-unknown-linux-gnu", "aarch64-apple-darwin", "x86_64-pc-windows-msvc"]),
+  "only Linux GNU x64 may participate in continuous CI",
 );
 check(
   workflowText.includes("omitted from continuous CI to reduce compute cost"),
-  "the CI workflow must document why macOS and Windows are omitted",
-);
-check(
-  Object.values(jobs).every((job) => !/macos|windows/iu.test(String(job["runs-on"]))),
-  "routine CI must not schedule macOS or Windows runners",
+  "the CI workflow must document why ARM64, macOS, and Windows are omitted",
 );
 check(
   hasRun(deterministicJob, "cargo install cargo-about --version 0.9.2 --locked --features cli"),

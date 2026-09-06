@@ -17,12 +17,9 @@ const action = parse("build-release-target/action.yml", actionText);
 const failures = [];
 
 check(candidate.permissions?.contents === "read", "candidate workflow must be read-only");
-check(Object.hasOwn(candidate.on ?? {}, "pull_request"), "candidate must run a non-publishing PR rehearsal");
-check(equal(candidate.on?.pull_request?.branches, ["main"]), "full candidate PR coverage must be restricted to the main integration gate");
-check(!candidate.on?.pull_request?.paths && !candidate.on?.pull_request?.["paths-ignore"], "every main PR must receive the full platform gate regardless of changed paths");
-check(!Object.hasOwn(candidate.on ?? {}, "push"), "candidate must not repeat the full matrix on post-merge pushes");
-check(Object.hasOwn(candidate.on ?? {}, "workflow_call") && Object.hasOwn(candidate.on ?? {}, "workflow_dispatch"), "candidate must support strict reuse and manual rehearsal");
-check(!candidate.on?.pull_request_target, "candidate must never use pull_request_target");
+check(equal(Object.keys(candidate.on ?? {}).sort(), ["workflow_call", "workflow_dispatch"]), "candidate must support only manual rehearsal and strict reuse");
+check(candidate.on?.workflow_dispatch == null, "direct candidate dispatch must have no strict publication inputs");
+check(candidate.jobs?.metadata?.if === "github.event_name == 'workflow_dispatch'", "candidate metadata must reject automatic reusable callers");
 check(candidate.concurrency?.["cancel-in-progress"] === false, "candidate builds must not be cancelled in flight");
 
 const jobs = candidate.jobs ?? {};
@@ -165,7 +162,8 @@ for (const evidence of ["candidateReceiptFile", "candidateRoot", "installers", "
 }
 check(!/\b(?:cargo build|npm pack|bun run build)\b/u.test(consumerText), "sealed candidate consumer must never rebuild");
 
-check(equal(Object.keys(release.on ?? {}), ["push"]) && equal(release.on?.push?.tags, ["v*"]), "publication must be canonical-tag-only");
+check(equal(Object.keys(release.on ?? {}), ["workflow_dispatch"]), "publication must be manual-only");
+check(release.jobs?.["publication-state"]?.if === "github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')", "publication must require manual dispatch against a canonical tag");
 check(
   release.permissions?.contents === "read"
     && release.concurrency?.group === "canonical-release"
