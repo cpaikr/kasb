@@ -31,10 +31,8 @@ the completed rewrite decision.
 The supported npm native targets are Linux GNU x64/ARM64, macOS ARM64, and
 Windows x64. The Linux GNU packages require glibc 2.28 or newer. The launcher
 preserves POSIX signal identity where supported; Windows preserves termination
-without claiming POSIX signal identity. Continuous CI intentionally covers only
-the two Linux targets on GitHub-hosted runners. macOS and Windows
-retain their supported packages and recorded native evidence but are not
-continuously tested.
+without claiming POSIX signal identity. Routine CI covers Linux; PRs targeting
+`main` and release candidates verify all four targets. See [CI platform coverage](docs/release.md#ci-platform-coverage).
 
 ## Development commands
 

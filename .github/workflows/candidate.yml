@@ -2,30 +2,7 @@ name: Canonical release candidate
 
 on:
   pull_request:
-    paths:
-      - ".github/actions/build-release-target/**"
-      - ".github/workflows/candidate.yml"
-      - ".github/workflows/release.yml"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "crates/**"
-      - "packages/**"
-      - "scripts/**"
-      - "installers/**"
-      - "fixtures/release/**"
-      - "fixtures/release-publication/**"
-      - "conformance/**"
-      - "evals/**"
-      - "native-targets.json"
-      - "package.json"
-      - "bun.lock"
-      - "tsconfig.json"
-      - "README.md"
-      - "LICENSE.md"
-      - "THIRD_PARTY_LICENSES.html"
-      - "about.toml"
-      - "docs/release.md"
-      - "plans/canonical-release-pipeline.md"
+    branches: [main]
   workflow_call:
     inputs:
       mode:
@@ -268,6 +245,17 @@ jobs:
           package_directory: ${{ matrix.package_directory }}
           enforce_glibc: "false"
           declared_runner: ${{ matrix.runner }}
+      - name: Test Windows upgrade and installer protocols
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          KASB_REQUIRE_POWERSHELL_TESTS: "1"
+        run: |
+          set -euo pipefail
+          cargo test --locked -p kasb-cli --lib
+          rustup component add clippy
+          cargo clippy --locked -p kasb-cli --all-targets -- -D warnings
+          node scripts/test-installers.mjs --powershell-only --build-windows-cli
 
   native-consumers:
     name: Clean consumer ${{ matrix.rust_target }} on Node ${{ matrix.node_version }}

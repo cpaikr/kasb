@@ -18,9 +18,9 @@ const failures = [];
 
 check(candidate.permissions?.contents === "read", "candidate workflow must be read-only");
 check(Object.hasOwn(candidate.on ?? {}, "pull_request"), "candidate must run a non-publishing PR rehearsal");
-for (const requiredPath of [".github/actions/build-release-target/**", "crates/**", "packages/**", "README.md", "LICENSE.md", "THIRD_PARTY_LICENSES.html"]) {
-  check(!candidate.on?.pull_request?.paths || candidate.on.pull_request.paths.includes(requiredPath), `candidate PR trigger must include ${requiredPath}`);
-}
+check(equal(candidate.on?.pull_request?.branches, ["main"]), "full candidate PR coverage must be restricted to the main integration gate");
+check(!candidate.on?.pull_request?.paths && !candidate.on?.pull_request?.["paths-ignore"], "every main PR must receive the full platform gate regardless of changed paths");
+check(!Object.hasOwn(candidate.on ?? {}, "push"), "candidate must not repeat the full matrix on post-merge pushes");
 check(Object.hasOwn(candidate.on ?? {}, "workflow_call") && Object.hasOwn(candidate.on ?? {}, "workflow_dispatch"), "candidate must support strict reuse and manual rehearsal");
 check(!candidate.on?.pull_request_target, "candidate must never use pull_request_target");
 check(candidate.concurrency?.["cancel-in-progress"] === false, "candidate builds must not be cancelled in flight");
@@ -65,6 +65,15 @@ check(String(jobs["native-linux"]?.strategy?.matrix).includes("needs.metadata.ou
 check(String(jobs["native-portable"]?.strategy?.matrix).includes("needs.metadata.outputs.portable_matrix"), "portable matrix must be metadata-derived");
 check(String(jobs["native-consumers"]?.strategy?.matrix).includes("needs.metadata.outputs.consumer_matrix"), "clean-consumer matrix must be metadata-derived");
 check(String(jobs["sealed-candidate-e2e"]?.strategy?.matrix).includes("needs.metadata.outputs.e2e_matrix"), "E2E matrix must be metadata-derived");
+const windowsProtocols = (jobs["native-portable"]?.steps ?? []).find((step) => step.name === "Test Windows upgrade and installer protocols");
+check(
+  windowsProtocols?.if === "runner.os == 'Windows'" && windowsProtocols?.shell === "bash"
+    && windowsProtocols?.env?.KASB_REQUIRE_POWERSHELL_TESTS === "1",
+  "Windows candidate must require native upgrade and PowerShell installer protocol tests",
+);
+for (const command of ["cargo test --locked -p kasb-cli --lib", "rustup component add clippy", "cargo clippy --locked -p kasb-cli --all-targets -- -D warnings", "node scripts/test-installers.mjs --powershell-only --build-windows-cli"]) {
+  check(String(windowsProtocols?.run).includes(command), `Windows candidate protocol gate is missing ${command}`);
+}
 check(!Object.hasOwn(action.inputs ?? {}, "validation_node_versions"), "target producers must not accept mutable consumer runtime inputs");
 check(!actionText.includes("npx ") && !actionText.includes("test-native-consumer.mjs"), "target producers must not execute mutable consumer tooling after artifact assembly");
 check(hasRun(jobs["native-consumers"], "test-native-consumer.mjs"), "isolated clean-consumer jobs must exercise installed native packages");
