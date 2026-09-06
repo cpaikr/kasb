@@ -108,7 +108,8 @@ export const readOptionalInteger = (
   key: string,
   options: { readonly defaultValue: number; readonly min: number; readonly max: number },
 ): number => {
-  const value = input[key] ?? options.defaultValue;
+  const supplied = input[key];
+  const value = supplied === undefined ? options.defaultValue : supplied;
   if (!Number.isInteger(value)) {
     throw new InvalidCapabilityRequest({
       parameter: key,
