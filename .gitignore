@@ -8,3 +8,8 @@ target/
 .env
 .env.local
 .env.*.local
+
+# Generated project skill placements and machine-local reconciliation state.
+/.agents/skills/
+/.claude/skills/
+/.sjskills/
