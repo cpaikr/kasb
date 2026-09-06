@@ -26,9 +26,8 @@ native-target, and live verification.
   direct archives, exact packed consumers, and aggregate validation.
 - The private repository is owned by `cpaikr/kasb`, while npm package identity
   remains under `@sjunepark/*`.
-- Continuous CI intentionally covers Linux GNU x64/ARM64 only on Blacksmith to
-  reduce compute cost. macOS ARM64 and Windows x64 remain supported from the
-  recorded Phase 4 evidence but are not continuously tested.
+- Cutover CI covered Linux GNU x64/ARM64 on Blacksmith. Current platform
+  scheduling is owned by [release posture](../docs/release.md#ci-platform-coverage).
 - Phase 5 removed the TypeScript conformer, JavaScript CLI behavior, Pi export,
   Pi registration, and obsolete publication automation. Neutral public
   contracts, schemas, and toolset ergonomics now live with the Node facade.

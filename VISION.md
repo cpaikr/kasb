@@ -133,9 +133,9 @@ The rewrite succeeds when:
 - every claimed native target passes clean packed-consumer tests; and
 - the TypeScript conformer and Pi surface are absent.
 
-Linux GNU x64/ARM64 are the continuously tested native targets. macOS ARM64 and
-Windows x64 remain supported from recorded cutover evidence but are deliberately
-omitted from ongoing CI to reduce compute cost.
+Routine development verification may use a narrower platform matrix, while
+integration and release gates verify every supported target. See
+[CI platform coverage](docs/release.md#ci-platform-coverage).
 
 ## Current State
 

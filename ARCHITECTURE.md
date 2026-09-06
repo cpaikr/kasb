@@ -189,11 +189,11 @@ target passed native build, same-revision artifact, direct CLI, and clean packed
 consumer validation. Unsupported or incomplete installations fail with a
 stable actionable error rather than raw loader or spawn details.
 
-Continuous CI is deliberately narrower than the supported matrix. It builds
-and tests Linux GNU x64/ARM64 on GitHub-hosted runners; macOS ARM64 and Windows x64 are
-omitted to reduce compute cost. Their packages and support claims remain based
-on the recorded cutover validation, but they do not receive ongoing CI evidence.
-`native-targets.json` records this distinction explicitly.
+Routine CI covers Linux GNU x64/ARM64. The full supported matrix is verified
+at the main integration and release gates; see
+[CI platform coverage](docs/release.md#ci-platform-coverage).
+`native-targets.json` records the routine native-build subset separately from
+the release target mapping.
 
 Linux GNU x64 and ARM64 require glibc 2.28. Both artifacts are built in pinned
 manylinux 2.28 containers, rejected if symbols require newer glibc, and tested

@@ -41,9 +41,8 @@ single exact SHA-256 entry. Installation publishes the executable and adjacent
 version, target, executable path, canonical repository and tag, asset name, and
 installed executable digest. The PowerShell path streams and extracts the
 archive through .NET and does not depend on an external `tar` executable.
-CI compiles the Windows-only upgrade path and executes the generated
-PowerShell installer on `blacksmith-2vcpu-windows-2025`; this is protocol
-evidence, not a native package support claim.
+The Windows candidate job also runs native upgrade rollback/crash tests,
+CLI lints, and PowerShell installer behavior tests.
 
 `kasb upgrade --check` performs bounded discovery only. `kasb upgrade` proceeds
 only when the current executable and receipt agree, then verifies immutable
@@ -143,6 +142,20 @@ tarball is byte-for-byte identical to the sealed candidate. Confirm the
 environment-only sentinels, GitHub App scope, reviewers, deployment rules, and
 npm trusted-publisher bindings in their provider settings because read-only
 repository metadata does not reveal every secret or publisher constraint.
+
+## CI platform coverage
+
+Routine `ci.yml` verification runs on Linux. To reduce compute cost,
+`candidate.yml` runs the full four-target matrix only for PRs targeting `main`,
+manual rehearsals, and release workflow calls. Every `main` PR receives this
+platform gate regardless of changed paths; post-merge pushes do not repeat it.
+
+This follows the integration/release split in
+[the cost-aware CI guidance](../../mytech/practices/cost-aware-ci-platform-coverage.md).
+At the owner's request, development PRs also omit automatic affected-platform
+checks; use a manual candidate rehearsal when platform-specific evidence is
+needed before integration. Distribution targets and release validation remain
+unchanged.
 
 ## Non-publishing candidate verification
 

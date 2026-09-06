@@ -19,10 +19,9 @@ artifact set.
   packages and direct CLI archives. It validates the complete continuously
   tested subset after clean-consumer checks across Node 20.18.1 and majors
   21–26.
-- macOS ARM64 and Windows x64 are supported but intentionally omitted from
-  continuous CI. `docs/release.md` correctly requires fresh evidence for every
-  included target before future publication, and the default aggregate
-  artifact validator already expects all four targets.
+- Current routine, integration, and release platform scheduling is owned by
+  [release posture](../docs/release.md#ci-platform-coverage). The aggregate
+  candidate artifact validator expects all four supported targets.
 - Candidate native artifact jobs depend on deterministic validation. GitHub
   Actions artifacts are temporary evidence and are not canonical release
   assets.
