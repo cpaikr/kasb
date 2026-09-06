@@ -703,10 +703,15 @@ const expectedForReason = (reason: string | undefined): string | undefined => {
   }
 };
 
-const safeValidationActual = (value: unknown): unknown => {
+const safeValidationActual = (value: unknown, depth = 0): unknown => {
   if (typeof value === "string") return value.length <= 200 ? value : `${value.slice(0, 200)}…`;
   if (typeof value === "number" || typeof value === "boolean" || value === null || value === undefined) return value;
-  if (Array.isArray(value)) return value.length <= 10 ? value.map(safeValidationActual) : `[array:${value.length}]`;
+  if (Array.isArray(value)) {
+    // Bound both recursion and branching, including cyclic caller-owned arrays.
+    return value.length <= 10 && depth < 3
+      ? value.map((item) => safeValidationActual(item, depth + 1))
+      : `[array:${value.length}]`;
+  }
   if (isRecord(value)) return `[object:${Object.keys(value).slice(0, 10).join(",")}]`;
   return String(value);
 };
