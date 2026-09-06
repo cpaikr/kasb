@@ -38,8 +38,9 @@ streams, termination, and exit behavior without a shell.
 Supported native targets are Linux GNU x64/ARM64, macOS ARM64, and Windows x64.
 Linux GNU requires glibc 2.28 or newer. POSIX targets preserve signal identity;
 Windows preserves termination without claiming POSIX signal identity.
-Continuous CI intentionally covers Linux GNU x64/ARM64 only. macOS ARM64 and
-Windows x64 retain their supported packages but are not continuously tested.
+Continuous CI intentionally covers Linux GNU x64 only. Linux ARM64, macOS
+ARM64, and Windows x64 retain their supported packages and receive fresh native
+validation through manually dispatched candidate and release workflows.
 
 Contained native panics reach callers only as `internal_failure`. Operators may
 subscribe to `sjunepark.kasb.native`; its only panic event is

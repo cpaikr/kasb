@@ -51,7 +51,9 @@ created.
 
 ## Next action
 
-Deliver the reviewed release preparation through PR #26 and verify fresh
-four-target CI. Save the policy App signing key in the protected environment,
-then publish the exact validated `0.3.0` GitHub assets. Keep npm disabled
-throughout this release.
+Obtain fresh four-target evidence through a manually dispatched candidate
+rehearsal. Save the policy App signing key in the protected environment, then
+manually dispatch the release workflow against the authorized canonical tag to
+publish the exact validated `0.3.0` GitHub assets. Keep npm disabled throughout
+this release. See [release posture](../docs/release.md#ci-platform-coverage) for
+the dispatch policy.

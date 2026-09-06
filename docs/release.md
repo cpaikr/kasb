@@ -151,10 +151,20 @@ release. PRs, pushes, schedules, and automatic reusable callers do not start it.
 Publication requires manual dispatch against an existing canonical `v*` tag;
 a branch dispatch cannot publish.
 
+Dispatch `candidate.yml` against the branch or tag to rehearse without
+publication. After separate release authorization, dispatch `release.yml`
+against the canonical version tag. Both workflow files must exist on the
+default branch for GitHub to accept manual dispatch. Creating or pushing a tag
+alone does not start a release.
+
 This cost policy deliberately narrows the automatic integration coverage in
 [the cost-aware CI guidance](../../mytech/practices/cost-aware-ci-platform-coverage.md).
 Use a manual candidate rehearsal for platform evidence before integration.
 All four distribution targets and their release validation remain supported.
+`bun run native:check` enforces the scheduling policy across workflow entry
+points and static runner matrices, including regression tests for automatic
+cross-platform callers. Linux container builds retain the GitHub-hosted x64
+runner for the credential-isolation reason documented above.
 
 ## Non-publishing candidate verification
 

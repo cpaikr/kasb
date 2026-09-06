@@ -98,10 +98,9 @@ native-target, and live verification.
 - Require glibc 2.28 for Linux GNU x64 and ARM64 npm artifacts. Build on that
   runtime, reject addon or CLI imports requiring newer glibc symbols, and run
   clean packed consumers at the floor before promoting support.
-- Keep the four supported npm targets, but continuously validate only Linux GNU
-  x64/ARM64 on Blacksmith. macOS ARM64 and Windows x64 retain their recorded
-  support evidence without ongoing CI; the workflow must state that this
-  deliberate omission reduces compute cost.
+- At cutover, retain all four supported npm targets while continuously
+  validating Linux GNU x64/ARM64 on Blacksmith to reduce compute cost. Current
+  scheduling is owned by [release posture](../docs/release.md#ci-platform-coverage).
 
 ## Delivery plan
 
@@ -238,7 +237,7 @@ completion status.
 - The public-surface judge covers all approved operations and proves it detects
   controlled incorrect behavior.
 - Every claimed native target has recorded native-build, direct-CLI, and clean
-  packed-consumer evidence. The current revision's continuous CI covers Linux
+  packed-consumer evidence. The cutover revision's continuous CI covered Linux
   GNU x64/ARM64; generated declarations, loaders, launchers, manifests, and the
   continuously tested artifact subset are fresh.
 - Deterministic validation, bounded live checks, repository review, and
