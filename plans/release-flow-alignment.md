@@ -1,7 +1,8 @@
 # Align release delivery with mytech
 
-Status: release-flow alignment locally validated; registry cleanup implemented
-and reviewed with focused local checks passed; hosted rehearsal pending.
+Status: implementation and local release verification complete; authorized
+`v0.3.1` was blocked by a Windows test-fixture archive path; the fixture fix is
+under validation before a new patch release.
 
 ## Decisions
 
@@ -38,10 +39,23 @@ and reviewed with focused local checks passed; hosted rehearsal pending.
   documentation reconciliation is complete. Full `verify` was not rerun for
   this cleanup.
 
+## Release execution
+
+- The user authorized commit, push, and CLI publication on 2026-09-08.
+- Pipeline commit `d399ed9` and release preparation commit `8a259ab` are pushed
+  to `main`; tag `v0.3.1` identifies the release candidate.
+- Full local `bun run verify` passed during release preparation; generated
+  release identities and changelog passed bounded review.
+- [Canonical publication run 34181271213](https://github.com/cpaikr/kasb/actions/runs/34181271213)
+  passed source, deterministic gates, and all platform builds, but the Windows
+  installer fixture failed because tar interpreted an absolute `C:` archive
+  path as a remote host. No GitHub Release was published. The tag is preserved.
+- The fixture now reuses the existing local-archive invocation helper to keep
+  the archive basename separate from its Windows working directory.
+
 ## Next step
 
-Integrate the change and run a non-publishing hosted rehearsal for fresh
-four-target evidence. Follow [release posture](../docs/release.md) for operations;
-[the first-release task](../tasks/perform-first-rust-node-release.md) owns
-production version reconciliation and publication. The workspace remains at
-`0.3.0`; no production tag, package, release, or remote configuration changed.
+Follow the canonical publication run through all four platform checks and
+verify the immutable release assets. Then reconcile the delivery record in
+[the first-release task](../tasks/perform-first-rust-node-release.md) and
+[release posture](../docs/release.md).

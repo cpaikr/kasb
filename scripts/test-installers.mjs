@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { loadReleaseContract, releaseTag, repositoryRoot } from "./release-contract.mjs";
+import { localTarInvocation } from "./local-archive-path.mjs";
 
 const contract = await loadReleaseContract();
 const powerShellOnly = process.argv.includes("--powershell-only");
@@ -296,7 +297,8 @@ async function fixtureFor(target, options = {}) {
   const archiveEntries = options.duplicateExecutable
     ? [...entries, target.executableName]
     : entries;
-  const tar = spawnSync("tar", ["--format=ustar", "-czf", archivePath, ...archiveEntries], { cwd: source, encoding: "utf8" });
+  const invocation = localTarInvocation(archivePath, "-czf", ["-C", source, ...archiveEntries]);
+  const tar = spawnSync("tar", ["--format=ustar", ...invocation.args], { ...invocation.options, encoding: "utf8" });
   assert(tar.status === 0, `could not create fixture archive: ${tar.stderr}`);
   const archive = await readFile(archivePath);
   const digest = createHash("sha256").update(archive).digest("hex");
