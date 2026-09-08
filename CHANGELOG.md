@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.2](https://github.com/cpaikr/kasb/compare/v0.3.1...v0.3.2) (2026-09-08)
+
+### Bug Fixes
+
+* **release:** create installer fixtures with local archive paths ([0643c64](https://github.com/cpaikr/kasb/commit/0643c64257e1476d6232eefa0437cc0de8743dd7))
+
 ## [0.3.1](https://github.com/cpaikr/kasb/compare/v0.2.1...v0.3.1) (2026-09-08)
 
 ### Features
