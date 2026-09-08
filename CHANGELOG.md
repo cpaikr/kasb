@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.3](https://github.com/cpaikr/kasb/compare/v0.3.2...v0.3.3) (2026-09-08)
+
+### Bug Fixes
+
+* **release:** discover staged drafts through the release list ([f9535db](https://github.com/cpaikr/kasb/commit/f9535db82378bb49aaaafe826184f790b903924e))
+
 ## [0.3.2](https://github.com/cpaikr/kasb/compare/v0.3.1...v0.3.2) (2026-09-08)
 
 ### Bug Fixes
