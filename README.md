@@ -12,6 +12,58 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for component boundaries,
 [VISION.md](VISION.md) for product scope, and [MIGRATION.md](MIGRATION.md) for
 the completed rewrite decision.
 
+## Install the CLI
+
+The standalone CLI needs no Node.js or Rust installation. Download the latest
+stable release using the installer for your platform, or browse the
+[release assets](https://github.com/cpaikr/kasb/releases/latest).
+
+### macOS and Linux
+
+Supports Apple Silicon Macs and Linux x64/ARM64 with glibc 2.28 or newer.
+The installer uses `curl`, `tar`, `gzip`, and `sha256sum` or `shasum`.
+
+```sh
+curl -fsSL https://github.com/cpaikr/kasb/releases/latest/download/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+kasb --version
+kasb --help
+```
+
+The default install directory is `~/.local/bin`. Add the `export PATH` line to
+your shell profile to make it available in new terminals.
+
+### Windows
+
+Run in PowerShell 5.1 or newer on Windows x64:
+
+```powershell
+Invoke-RestMethod https://github.com/cpaikr/kasb/releases/latest/download/install.ps1 | Invoke-Expression
+$env:Path = "$env:LOCALAPPDATA\kasb\bin;$env:Path"
+kasb --version
+kasb --help
+```
+
+The default install directory is `%LOCALAPPDATA%\kasb\bin`. Add that directory
+to your user `Path` environment variable to make it available in new terminals.
+
+### Upgrade
+
+Both installers verify release checksums and create an adjacent ownership
+receipt. Set `KASB_INSTALL_DIR` in your environment before installing to choose
+a different directory, and add that directory to `PATH`. Keep
+`.kasb-receipt.json` beside the executable so managed upgrades work.
+
+```sh
+kasb upgrade --check
+kasb upgrade
+```
+
+The first command checks for an update; the second starts the upgrade. On
+Windows, replacement finishes after the command exits. See
+[release posture](docs/release.md#standalone-ownership-and-trust) for ownership
+and verification details.
+
 ## System shape
 
 - [`crates/kasb`](crates/kasb/README.md) is the public Rust SDK and sole KASB
