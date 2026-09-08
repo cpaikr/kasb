@@ -1,10 +1,10 @@
 # Roadmap
 
-## Current
+## Completed
 
 [Perform the first Rust/Node product release](tasks/perform-first-rust-node-release.md)
 
-## Completed
+[Align release delivery with mytech](plans/release-flow-alignment.md)
 
 [Establish the canonical release pipeline](plans/canonical-release-pipeline.md)
 

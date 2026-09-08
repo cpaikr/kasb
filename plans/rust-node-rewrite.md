@@ -1,6 +1,7 @@
 # Rewrite KASB around a public Rust SDK, Node SDK, and Rust CLI
 
-Status: complete. Cutover merged by PR #19; publication remains disabled.
+Status: complete. Cutover merged by PR #19. Publication was disabled at cutover;
+current delivery is recorded in [release posture](../docs/release.md).
 
 ## Outcome
 

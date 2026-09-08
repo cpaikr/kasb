@@ -1,6 +1,7 @@
 # Rust/Node Rewrite Decision
 
-Status: complete. Cutover merged by PR #19; publication remains disabled.
+Status: complete. Cutover merged by PR #19. Publication was disabled at cutover;
+current delivery is recorded in [release posture](docs/release.md).
 
 Decision date: 2026-08-22.
 

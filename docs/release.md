@@ -1,16 +1,16 @@
 # Release posture
 
-The first Rust/Node release remains unpublished and GitHub-only. The workspace
-identity is `0.3.0`; production version reconciliation is tracked below.
-`cpaikr/kasb` is public after the authorized privacy audit and Actions-log
-remediation. Publication status and remaining setup are tracked in
-[the first-release task](../tasks/perform-first-rust-node-release.md).
+Standalone Rust CLI releases are available through immutable GitHub Releases
+from the public canonical repository `cpaikr/kasb`. The first Rust/Node product
+release is [v0.3.3](https://github.com/cpaikr/kasb/releases/tag/v0.3.3).
+[The completed first-release task](../tasks/perform-first-rust-node-release.md)
+records its publication and validation evidence.
 
 ## Identity authorities
 
 `[workspace.package].version` in `Cargo.toml` is the canonical product version.
-The workspace `0.3.0` identity is newer than the retired npm product's `0.2.1`.
-The strict workflow rechecks vacancy immediately before publication.
+Product releases must exceed the retired product's `0.2.1` version floor.
+The strict workflow rechecks publication state before mutation.
 
 `native-targets.json` owns the canonical repository, tag prefix, bounds,
 receipt schema, and four-target matrix. Generators derive exact npm versions,
@@ -124,8 +124,7 @@ release commit, canonical `v<version>` tag, and push.
 
 The local tool does not publish packages or create a GitHub Release directly.
 Pushing the tag starts strict CI publication, so running the complete release
-command requires publication authorization. The workspace remains at `0.3.0`;
-this pipeline change does not select a next version or create a release tag.
+command requires publication authorization.
 
 ## CI platform coverage
 

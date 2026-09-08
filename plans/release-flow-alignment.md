@@ -1,8 +1,8 @@
 # Align release delivery with mytech
 
-Status: release preparation and four-target candidate verification complete.
-`v0.3.2` publication failed during draft discovery; the correction passed
-bounded review and release-pipeline tests. The next release attempt is `v0.3.3`.
+Status: complete. The aligned flow delivered the first immutable standalone
+release; [the first-release task](../tasks/perform-first-rust-node-release.md)
+owns publication evidence and the preserved failed attempts.
 
 ## Decisions
 
@@ -16,13 +16,14 @@ bounded review and release-pipeline tests. The next release attempt is `v0.3.3`.
   and Node SDK packaging. Remove the legacy npm registry publisher, registry
   state checks, and its credential gates. Node tarballs remain CI candidate
   evidence; GitHub Release assets remain standalone archives, installers,
-  checksums, and provenance. Publication was separately authorized below.
+  checksums, and provenance. Publication required separate user authorization.
 
 ## Validation
 
 - Before the registry cleanup, `bun run verify` passed local contracts,
   generation, licenses, typechecks, product/installer tests, release regressions,
-  conformance, build, formatting, and clippy. The final preparation changes passed focused release tests.
+  conformance, build, formatting, and clippy. Final preparation changes passed
+  focused release tests.
 - An isolated checkout exercised real version synchronization and release
   identity validation. This exposed Bun 1.3.13 retaining stale workspace versions;
   preparation now synchronizes only that metadata, preserves third-party
@@ -38,37 +39,15 @@ bounded review and release-pipeline tests. The next release attempt is `v0.3.3`.
   documentation reconciliation is complete. Full `verify` was not rerun for
   this cleanup.
 
-## Release execution
+## Delivery
 
-- The user authorized commit, push, and CLI publication on 2026-09-08.
-- Pipeline commit `d399ed9` and release preparation commit `8a259ab` are pushed
-  to `main`; tag `v0.3.1` identifies the release candidate.
-- Full local `bun run verify` passed during release preparation; generated
-  release identities and changelog passed bounded review.
-- [Canonical publication run 34181271213](https://github.com/cpaikr/kasb/actions/runs/34181271213)
-  passed source, deterministic gates, and all platform builds, but the Windows
-  installer fixture failed because tar interpreted an absolute `C:` archive
-  path as a remote host. No GitHub Release was published. The tag is preserved.
-- The fixture now reuses the existing local-archive invocation helper to keep
-  the archive basename separate from its Windows working directory.
-- Fixture fix `0643c64` and release preparation `836e9f0` are pushed to `main`.
-  Full local verification passed for `0.3.2`; tag `v0.3.2` started
-  [publication run 34182452960](https://github.com/cpaikr/kasb/actions/runs/34182452960).
-  All four platform builds, packed consumers, installer/upgrade checks, and
-  candidate sealing passed. Publication failed because the release-by-tag API
-  omitted drafts, causing the executor to create repeated empty drafts. No
-  GitHub Release was published; the tag is preserved.
-- Publication-state capture now discovers matching drafts through the
-  authenticated, paginated release list and rejects duplicate matches. Bounded
-  code review found no actionable issues and `bun run test:release-pipeline`
-  passed. Live capture recognized a remaining draft after duplicate removal;
-  all ten empty drafts from the failed attempt were then removed.
+Pipeline commit `d399ed9`, the Windows fixture correction `0643c64`, and the
+draft-discovery correction `f9535db` are integrated into `main`. Full local
+verification passed for the successful release preparation, followed by the
+complete hosted candidate and publication gates. The Windows fixture uses the
+existing local-archive invocation helper; publication-state capture discovers
+drafts through the authenticated paginated list and rejects duplicate matches.
+Both fixes passed bounded review and relevant tests.
 
-## Next step
-
-Commit the discovery correction and prepare
-`v0.3.3` through the authorized release flow. Follow its candidate and
-publication gates, then verify the immutable release assets before reconciling
-the delivery record in
-[the first-release task](../tasks/perform-first-rust-node-release.md) and
-[release posture](../docs/release.md).
+No implementation work remains in this plan. Follow
+[release posture](../docs/release.md) for future release operations.

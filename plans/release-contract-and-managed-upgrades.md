@@ -156,7 +156,6 @@ binary without runtime addon downloads.
 ## Next action
 
 None within this plan. The completed downstream candidate evidence is recorded
-in `plans/canonical-release-pipeline.md`. The first production release is
-tracked in `tasks/perform-first-rust-node-release.md` and requires separate
-explicit authorization before any version, tag, visibility, GitHub Release, or
-npm mutation.
+in [the pipeline record](canonical-release-pipeline.md), and production delivery
+is recorded in [the completed first-release task](../tasks/perform-first-rust-node-release.md).
+[Release posture](../docs/release.md) owns current release operations.

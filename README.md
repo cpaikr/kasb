@@ -70,9 +70,8 @@ release tags require separate authorization.
 Cargo workspace package metadata is the product-version authority. The npm
 root, native packages, standalone archive names, generated installers, and CLI
 identity are derived from it and checked with `bun run release:check`.
-Standalone installs will use immutable, checksummed releases from `cpaikr/kasb`
-and carry an adjacent ownership receipt. Standalone installation becomes
-available after the first production release is published. See
+Standalone installation is available from immutable, checksummed GitHub Releases
+in `cpaikr/kasb` and carries an adjacent ownership receipt. See
 [release posture](docs/release.md) for current status.
 
 ## License
