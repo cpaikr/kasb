@@ -175,7 +175,10 @@ The root npm package contains JavaScript and declarations and selects an
 exact-version optional native package. Each target package declares its OS,
 architecture, and Linux libc constraints and contains both the Node addon and
 Rust CLI binary built from the same revision. The launcher never downloads or
-compiles artifacts during install or first use.
+compiles artifacts during install or first use. Package assembly and packed
+consumer validation remain in CI; Node tarballs are candidate evidence, not
+GitHub Release assets. The implemented publisher delivers standalone archives,
+installers, checksums, and provenance through GitHub Releases only.
 
 Standalone CLI archives reuse those target binaries but have separate
 ownership. Generated shell and PowerShell installers accept only the canonical
@@ -190,7 +193,7 @@ consumer validation. Unsupported or incomplete installations fail with a
 stable actionable error rather than raw loader or spawn details.
 
 Routine CI covers Linux GNU x64. The full supported matrix is verified
-by manually dispatched candidate and release workflows; see
+by tag-triggered releases and manually dispatched rehearsals; see
 [CI platform coverage](docs/release.md#ci-platform-coverage).
 `native-targets.json` records the routine native-build subset separately from
 the release target mapping.
@@ -213,4 +216,4 @@ gates passed before the TypeScript implementation and Pi surface were removed.
 Final cutover CI, review, and PR delivery gates passed, and PR #20 promoted the
 completed rewrite to `main`.
 [MIGRATION.md](MIGRATION.md) records the decision. Git history is the recovery
-path; registry publication remains a separate, unauthorized action.
+path; [release posture](docs/release.md) owns current publication boundaries.

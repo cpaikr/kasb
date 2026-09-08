@@ -132,22 +132,10 @@
       "schemaVersion": 1,
       "repository": "cpaikr/kasb",
       "repositoryPrivate": false,
-      "immutableReleases": true,
       "highestPublishedVersion": "0.2.1",
       "tag": "v1.2.3",
       "tagSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "release": null
-    },
-    "npm": {
-      "schemaVersion": 1,
-      "highestPublishedVersion": "0.2.1",
-      "packages": [
-        { "name": "@sjunepark/kasb-linux-x64-gnu", "version": "1.2.3", "state": "vacant" },
-        { "name": "@sjunepark/kasb-linux-arm64-gnu", "version": "1.2.3", "state": "vacant" },
-        { "name": "@sjunepark/kasb-darwin-arm64", "version": "1.2.3", "state": "vacant" },
-        { "name": "@sjunepark/kasb-win32-x64-msvc", "version": "1.2.3", "state": "vacant" },
-        { "name": "@sjunepark/kasb", "version": "1.2.3", "state": "vacant" }
-      ]
     }
   }
 }

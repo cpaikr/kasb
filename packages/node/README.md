@@ -3,6 +3,10 @@
 Read-only KASB standards and Q&A access for Node.js and TypeScript hosts,
 backed by the public Rust SDK.
 
+The package is assembled and verified through CI candidate tarballs. The
+current release pipeline publishes standalone CLI assets through GitHub
+Releases and has no npm registry publisher.
+
 The package provides:
 
 - six asynchronous SDK operations through Node-API;
@@ -40,7 +44,7 @@ Linux GNU requires glibc 2.28 or newer. POSIX targets preserve signal identity;
 Windows preserves termination without claiming POSIX signal identity.
 Continuous CI intentionally covers Linux GNU x64 only. Linux ARM64, macOS
 ARM64, and Windows x64 retain their supported packages and receive fresh native
-validation through manually dispatched candidate and release workflows.
+validation through tag-triggered releases and manually dispatched rehearsals.
 
 Contained native panics reach callers only as `internal_failure`. Operators may
 subscribe to `sjunepark.kasb.native`; its only panic event is

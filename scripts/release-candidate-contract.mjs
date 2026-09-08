@@ -178,7 +178,6 @@ export async function validatePrebuildPublicationState(identity, state) {
     throw new Error("publication-state GitHub identity differs from the candidate");
   }
   if (github.repositoryPrivate !== false) throw new Error("canonical release repository must be public before candidate publication");
-  if (github.immutableReleases !== true) throw new Error("canonical repository must enable immutable releases before candidate publication");
   validatePublishedVersionFloor(identity, github.highestPublishedVersion, "GitHub");
   if (github.release !== null) {
     assertObject(github.release, "publication-state GitHub release");
@@ -209,25 +208,6 @@ export async function validatePrebuildPublicationState(identity, state) {
     }
   }
 
-  const expectedPackages = new Set(identity.npmPackages.map(({ name }) => name));
-  const packages = state.npm?.packages;
-  if (state.npm?.schemaVersion !== 1 || !Array.isArray(packages) || packages.length !== expectedPackages.size) {
-    throw new Error("publication-state must contain every candidate npm identity exactly once");
-  }
-  validatePublishedVersionFloor(identity, state.npm.highestPublishedVersion, "npm");
-  for (const pkg of packages) {
-    assertObject(pkg, "publication-state npm package");
-    if (!expectedPackages.delete(pkg.name) || pkg.version !== identity.version || !["vacant", "published"].includes(pkg.state)) {
-      throw new Error("publication-state contains an unexpected, duplicate, or invalid npm identity");
-    }
-    if (pkg.state === "published" && !sha256Pattern.test(pkg.sha256)) {
-      throw new Error(`published npm identity ${pkg.name} is missing its registry tarball digest`);
-    }
-    if (pkg.state === "vacant" && Object.hasOwn(pkg, "sha256")) {
-      throw new Error(`vacant npm identity ${pkg.name} must not include a tarball digest`);
-    }
-  }
-  if (expectedPackages.size !== 0) throw new Error("publication-state is missing a candidate npm identity");
 }
 
 export function validateGates(gates) {

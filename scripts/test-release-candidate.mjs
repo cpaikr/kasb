@@ -140,13 +140,6 @@ try {
     validatePrebuildPublicationState({ ...identity, mode: "strict" }, existingRelease),
     /rerun only the failed publication job/u,
   );
-  await assert.rejects(
-    validatePrebuildPublicationState(identity, {
-      ...occupied,
-      npm: { ...occupied.npm, packages: occupied.npm.packages.map((pkg, index) => index === 0 ? { ...pkg, sha256: undefined } : pkg) },
-    }),
-    /missing its registry tarball digest/u,
-  );
 
   await rejectsWith({ ...manifest, targets: manifest.targets.slice(1) }, /target set must contain every canonical identity exactly once/u);
   await rejectsWith({ ...manifest, gates: { ...manifest.gates, tests: false } }, /deterministic gate tests did not pass/u);
@@ -357,19 +350,10 @@ function prebuildState() {
       schemaVersion: 1,
       repository: identity.repository,
       repositoryPrivate: false,
-      immutableReleases: true,
       highestPublishedVersion: null,
       tag: identity.canonicalTag,
       tagSha: identity.commit,
       release: null,
-    },
-    npm: {
-      schemaVersion: 1,
-      highestPublishedVersion: null,
-      packages: [
-        ...identity.targets.map(({ packageName }) => ({ name: packageName, version: identity.version, state: "published", sha256: "b".repeat(64) })),
-        { name: "@sjunepark/kasb", version: identity.version, state: "published", sha256: "c".repeat(64) },
-      ],
     },
   };
 }

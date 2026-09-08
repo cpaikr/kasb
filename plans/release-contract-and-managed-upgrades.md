@@ -1,5 +1,12 @@
 # Establish the release, installation, and managed-upgrade contract
 
+This is a completed implementation record; its evidence and decisions are
+time-scoped to the original delivery. Version and repository-visibility
+statements below describe the PR #22
+completion state. Current identity, visibility, and release operations are
+owned by [release posture](../docs/release.md); subsequent pipeline changes are
+tracked in [release flow alignment](release-flow-alignment.md).
+
 ## Outcome
 
 KASB has one enforceable release identity and one target-derived artifact and
@@ -8,7 +15,7 @@ Release asset, inspect available upgrades, and upgrade recoverably, while npm
 installations remain owned by npm and continue to launch the same-revision Rust
 binary without runtime addon downloads.
 
-## Current state
+## State at completion
 
 - PR #22 merged this contract into the goal integration branch at `e9c707d`.
   Cargo workspace version `0.1.0` is the current

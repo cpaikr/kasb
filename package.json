@@ -31,15 +31,48 @@
     "release:check": "node scripts/validate-release-contract.mjs",
     "release:candidate": "node scripts/validate-release-candidate.mjs",
     "release:checksums": "node scripts/write-release-checksums.mjs",
-    "test:release-pipeline": "node scripts/test-release-candidate.mjs && node scripts/test-release-publication.mjs && node scripts/execute-release-publication.mjs --self-test",
+    "test:release-pipeline": "node scripts/test-release-candidate.mjs && node scripts/test-release-publication.mjs && node scripts/execute-release-publication.mjs --self-test && node scripts/capture-release-publication-state.mjs --self-test && node --test scripts/release-version.test.mjs",
     "licenses:generate": "node scripts/check-third-party-licenses.mjs --write && node scripts/generate-native-packages.mjs",
-    "licenses:check": "node scripts/check-third-party-licenses.mjs"
+    "licenses:check": "node scripts/check-third-party-licenses.mjs",
+    "verify": "bun run contracts:check && bun run native:check && bun run licenses:check && bun run typecheck && bun run test && bun run test:release-pipeline && bun run conformance:judge && bun run build && cargo fmt --all --check && cargo clippy --locked --workspace --all-targets -- -D warnings",
+    "release": "release-it"
   },
   "devDependencies": {
+    "@release-it/conventional-changelog": "10.0.5",
     "@seriousme/openapi-schema-validator": "2.9.1",
     "@types/bun": "^1.3.1",
     "ajv": "8.20.0",
+    "release-it": "19.2.4",
     "typescript": "^5.9.0",
     "yaml": "^2.9.0"
+  },
+  "release-it": {
+    "hooks": {
+      "before:init": "node scripts/release-version.mjs upstream",
+      "after:bump": [
+        "node scripts/release-version.mjs check",
+        "bun run verify"
+      ]
+    },
+    "git": {
+      "requireBranch": "main",
+      "requireUpstream": true,
+      "requireCleanWorkingDir": true,
+      "addUntrackedFiles": true,
+      "tagName": "v${version}",
+      "commitMessage": "chore(release): prepare v${version}\n\nSynchronize Cargo and derived distribution identities and changelog.\nLocal verification gates this commit; tagged CI certifies and publishes the exact artifacts."
+    },
+    "github": {
+      "release": false
+    },
+    "npm": false,
+    "plugins": {
+      "./scripts/release-it-cargo.mjs": {},
+      "@release-it/conventional-changelog": {
+        "preset": "conventionalcommits",
+        "infile": "CHANGELOG.md",
+        "header": "# Changelog"
+      }
+    }
   }
 }

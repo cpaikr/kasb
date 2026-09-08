@@ -6,7 +6,7 @@
 
 ## Completed
 
-[Automate canonical GitHub and npm releases](plans/canonical-release-pipeline.md)
+[Establish the canonical release pipeline](plans/canonical-release-pipeline.md)
 
 [Establish the release, installation, and managed-upgrade contract](plans/release-contract-and-managed-upgrades.md)
 

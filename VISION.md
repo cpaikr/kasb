@@ -3,8 +3,8 @@
 ## Product
 
 - `name`: `kasb-standards`
-- `status`: Rust/Node cutover and release readiness complete; first product
-  release not published
+- `status`: Rust/Node cutover complete; first product release not published
+  (readiness tracked in [release posture](docs/release.md))
 - `domain`: Korean accounting standards and related interpretation material
   exposed through KASB public read surfaces
 - `users`: LLM agents, agent developers, researchers, and humans who need
@@ -51,6 +51,10 @@ The npm package provides:
 - the Node SDK and `@sjunepark/kasb/toolset`;
 - a `kasb` JavaScript launcher for the packaged Rust CLI binary; and
 - machine-readable success and failure behavior.
+
+The package is assembled and tested in CI. Current release delivery covers
+standalone GitHub Release assets; npm registry distribution has no implemented
+publisher. See [release posture](docs/release.md).
 
 The Pi export and extension are absent and receive no replacement host adapter.
 
@@ -134,7 +138,8 @@ The rewrite succeeds when:
 - the TypeScript conformer and Pi surface are absent.
 
 Routine development verification uses a narrower platform matrix, while
-manual candidate and release gates verify every supported target. See
+manual rehearsals and tag-triggered release gates verify every supported
+target. See
 [CI platform coverage](docs/release.md#ci-platform-coverage).
 
 ## Current State

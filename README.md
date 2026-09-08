@@ -32,7 +32,7 @@ The supported npm native targets are Linux GNU x64/ARM64, macOS ARM64, and
 Windows x64. The Linux GNU packages require glibc 2.28 or newer. The launcher
 preserves POSIX signal identity where supported; Windows preserves termination
 without claiming POSIX signal identity. Routine CI covers Linux GNU x64;
-manual candidates verify all four targets. See
+tag-triggered releases and manual rehearsals verify all four targets. See
 [CI platform coverage](docs/release.md#ci-platform-coverage).
 
 ## Development commands
@@ -49,6 +49,7 @@ cargo fmt --all --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 ```
 
+`bun run verify` runs the complete local release verification sequence.
 `bun run native:feasibility` exercises the current host. The cross-platform
 support claim is backed by native builds, immutable packed consumers, direct
 CLI archives, and aggregate artifact validation recorded in
@@ -61,8 +62,10 @@ Live KASB checks are opt-in through `bun run test:live` because upstream
 behavior can drift.
 
 The npm runtime floor is Node.js 20.18.1 and the validated Rust minimum is
-1.88. Registry publication, version selection, and release tags require
-separate authorization.
+1.88. Node packages are assembled and tested as CI candidate artifacts; the
+release pipeline publishes only standalone GitHub Release assets. Registry
+distribution requires a new decision and implementation. Version selection and
+release tags require separate authorization.
 
 Cargo workspace package metadata is the product-version authority. The npm
 root, native packages, standalone archive names, generated installers, and CLI

@@ -3,6 +3,12 @@
 Status: complete
 Planning scope: ROADMAP.md
 
+This completed record preserves the original delivery contract and evidence.
+Its version, visibility, and publication-prerequisite statements describe that
+delivery. The later [release flow alignment](../plans/release-flow-alignment.md)
+removed npm registry publication and the protected-environment policy.
+[Release posture](../docs/release.md) owns current operations and prerequisites.
+
 ## Original contract
 
 Goal contract

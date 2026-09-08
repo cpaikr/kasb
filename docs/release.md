@@ -1,6 +1,7 @@
 # Release posture
 
-The first Rust/Node release is being prepared as GitHub-only version `0.3.0`.
+The first Rust/Node release remains unpublished and GitHub-only. The workspace
+identity is `0.3.0`; production version reconciliation is tracked below.
 `cpaikr/kasb` is public after the authorized privacy audit and Actions-log
 remediation. Publication status and remaining setup are tracked in
 [the first-release task](../tasks/perform-first-rust-node-release.md).
@@ -8,7 +9,7 @@ remediation. Publication status and remaining setup are tracked in
 ## Identity authorities
 
 `[workspace.package].version` in `Cargo.toml` is the canonical product version.
-The selected `0.3.0` identity is newer than the retired npm product's `0.2.1`.
+The workspace `0.3.0` identity is newer than the retired npm product's `0.2.1`.
 The strict workflow rechecks vacancy immediately before publication.
 
 `native-targets.json` owns the canonical repository, tag prefix, bounds,
@@ -72,99 +73,78 @@ authority.
 
 ## Publication prerequisites and authority
 
-The first Rust/Node release is authorized for GitHub only. The `npm-release`
-job is explicitly disabled and workflow validation enforces that guard. npm
-publication requires a separately authorized, reviewed change to re-enable
-that job. Candidate assembly and read-only npm identity checks still run so
-the common version and artifact contract remains intact.
+GitHub Releases are the only implemented publication channel. The Node SDK,
+npm-format package assembly, tarballs, and clean-consumer tests remain part of
+CI candidate verification. Those packages are not GitHub Release assets; the
+pipeline has no npm registry publisher, registry-state checks, or dormant npm
+publication job. Adding registry distribution requires a new product decision
+and implementation.
 
-Before the first release, an operator must verify all of
-the applicable external state rather than infer it from a passing build.
-The npm environment and trusted-publisher requirements below apply only when
-npm publication is separately enabled:
-
-- `cpaikr/kasb` is public so canonical release metadata and assets are available
-  to unauthenticated installers and managed upgrades.
-- Repository release immutability is enabled and the publication path verifies
-  the final release as immutable before npm publication. Published tags and
-  assets are never moved or replaced; a correction uses a new version.
-- The `github-release` environment limits deployment to canonical release refs
-  through required reviewers and deployment rules configured outside the
-  repository. It defines `KASB_GITHUB_RELEASE_SENTINEL` with the exact value
-  `github-release:v1`; that secret must not exist at repository or organization
-  scope. It also holds environment secret `KASB_RELEASE_APP_PRIVATE_KEY` and
-  defines environment variable `KASB_RELEASE_APP_CLIENT_ID`. Those values
-  identify a GitHub App installation limited to `cpaikr/kasb`; the App has
-  repository Administration read and Contents read permissions and no write
-  permission. The workflow mints a short-lived token in the preflight and again
-  immediately before GitHub mutation, so each live state read proves repository
-  release immutability is still enabled.
-- The separate `npm-release` environment has the same reviewer and canonical
-  ref restrictions and defines environment-only secret
-  `KASB_NPM_RELEASE_SENTINEL=npm-release:v1`. Missing sentinels stop each job
-  before mutation, so GitHub's automatic creation of an unconfigured
-  environment cannot silently authorize publication.
-- npm trusted publishers are registered for the root package and each native
-  package against that exact GitHub repository, the final top-level workflow
-  filename `.github/workflows/release.yml`, and the exact `npm-release`
-  environment name used by this project. The environment binding is required,
-  not optional. Each new registration must select whether it allows
-  `npm publish`, staged publish, or both.
-  Publication uses a GitHub-hosted runner with `id-token: write` scoped to the
-  npm job and no retained npm token; the repository and package must be public
-  for provenance.
-- A production version newer than the occupied retired-product version `0.2.1`
-  has been explicitly authorized and remains vacant or is an exact resumable
-  match. This document does not select that version or authorize its tag.
-
-Configuration or mutation of those prerequisites is outside the
-release-readiness goal. A passing rehearsal reports readiness only; it must not
-change repository visibility, environment protection, trusted-publisher
-registration, tags, releases, or registry state.
-
-Before approving a separately authorized production run, inspect the external
-gates with read-only queries. Set the intended version locally; do not create a
-tag as part of this verification:
+Before publication, an operator must verify that `cpaikr/kasb` is public and
+repository release immutability is enabled. Use read-only queries with an
+operator credential permitted to inspect repository settings:
 
 ```bash
-KASB_RELEASE_VERSION='<authorized-version>'
 gh repo view cpaikr/kasb --json visibility
 gh api repos/cpaikr/kasb/immutable-releases --jq .enabled
-gh api repos/cpaikr/kasb/environments/github-release
-gh api repos/cpaikr/kasb/environments/npm-release
-npm view "@sjunepark/kasb@${KASB_RELEASE_VERSION}" dist.tarball --json
 ```
 
-Repeat the final `npm view` check for every native package named in
-`native-targets.json`. A not-found result is the expected vacant state; an
-existing version is acceptable only when the guarded workflow proves its
-tarball is byte-for-byte identical to the sealed candidate. Confirm the
-environment-only sentinels, GitHub App scope, reviewers, deployment rules, and
-npm trusted-publisher bindings in their provider settings because read-only
-repository metadata does not reveal every secret or publisher constraint.
+The strict workflow validates the canonical tag and its source commit, checks
+GitHub release history, and requires the release state to be vacant or an exact
+resumable match. The retired-product version floor remains part of the product
+identity contract.
+
+GitHub publication uses the workflow job token with `contents: write` only in
+the publication job. It requires no `github-release` environment, sentinel,
+or policy App credential. Source validation checks that the tag matches the
+Cargo version, identifies the checkout, and belongs to `origin/main` history.
+The job token cannot inspect the Administration API's repository immutability
+setting. Enabling it remains an operator prerequisite; the executor verifies
+the actual final release is immutable before reporting success.
+
+If immutability was not enabled, publication may already have occurred when
+that verification fails. Preserve the published tag and bytes, stop retrying
+that version, and recover with a separately authorized new version after
+correcting the prerequisite. A failed final verification is not a successful
+release or permission to overwrite assets.
+
+## Local release preparation
+
+Use Bun 1.3.13, Node 24, Rust 1.88, and cargo-about 0.9.2. Install dependencies
+with `bun install --frozen-lockfile` and `cargo fetch --locked` before preparation.
+
+After separate publication authorization, run `bun run release` from a clean
+`main` checkout tracking `origin/main`. The `before:init` hook fetches upstream
+and rejects a checkout that differs from the freshly fetched branch. The local
+`release-it` flow selects an increased stable version from Cargo metadata,
+synchronizes Cargo dependencies and lockfile, npm metadata and lockfile,
+installers and notices, and updates `CHANGELOG.md` from conventional commits.
+The `after:bump` hooks check identities and run `bun run verify` before the
+release commit, canonical `v<version>` tag, and push.
+
+The local tool does not publish packages or create a GitHub Release directly.
+Pushing the tag starts strict CI publication, so running the complete release
+command requires publication authorization. The workspace remains at `0.3.0`;
+this pipeline change does not select a next version or create a release tag.
 
 ## CI platform coverage
 
-Routine `ci.yml` verification runs only on Linux GNU x64. The full four-target
-candidate matrix runs only through manual rehearsal or a manually dispatched
-release. PRs, pushes, schedules, and automatic reusable callers do not start it.
-Publication requires manual dispatch against an existing canonical `v*` tag;
-a branch dispatch cannot publish.
+Routine `ci.yml` verification runs only on Linux GNU x64. Every tag-triggered
+release and manual rehearsal builds and verifies Linux GNU x64/ARM64, macOS
+ARM64, and Windows x64 through the same candidate workflow. PRs, branch pushes,
+and schedules do not start the full matrix.
 
-Dispatch `candidate.yml` against the branch or tag to rehearse without
-publication. After separate release authorization, dispatch `release.yml`
-against the canonical version tag. Both workflow files must exist on the
-default branch for GitHub to accept manual dispatch. Creating or pushing a tag
-alone does not start a release.
+Pushing a canonical `v*` tag invokes strict publication in `release.yml` after
+source validation and all candidate gates pass. Manual dispatch of either
+`candidate.yml` or `release.yml` is always a non-publishing rehearsal, including
+when dispatched against a tag. Both workflow files must exist on the default
+branch for GitHub to accept manual dispatch.
 
-This cost policy deliberately narrows the automatic integration coverage in
-[the cost-aware CI guidance](../../mytech/practices/cost-aware-ci-platform-coverage.md).
-Use a manual candidate rehearsal for platform evidence before integration.
-All four distribution targets and their release validation remain supported.
-`bun run native:check` enforces the scheduling policy across workflow entry
-points and static runner matrices, including regression tests for automatic
-cross-platform callers. Linux container builds retain the GitHub-hosted x64
-runner for the credential-isolation reason documented above.
+This scheduling policy retains economical continuous validation and full
+release evidence. `bun run native:check` enforces permitted entry points and
+static runner matrices, including regression tests for automatic cross-platform
+callers. Linux container builds retain GitHub-hosted runners for the credential
+isolation reason documented above.
 
 ## Non-publishing candidate verification
 
@@ -176,42 +156,35 @@ tarball, the root npm tarball, all four standalone archives, `SHA256SUMS`, both
 generated installers, and bounded provenance. Its sealed Actions artifact also
 carries an internal raw artifact manifest and the validated `candidate.json`
 receipt that binds every candidate byte to the source commit. Neither internal
-file is part of the GitHub Release or npm projections.
+file is part of the GitHub Release.
 
 Rehearsal substitutes only an unmistakable synthetic candidate ref and
-deterministic publication-state fixtures. It must have no release-write
-permission, protected-environment access, npm publishing identity, or path to a
-live publication step. Failure injection must prove that incomplete target
-sets, failed prerequisites, interrupted upload state, non-immutable release
-metadata, occupied mismatches, partial npm publication, and root-package
-failure stop closed while exact already-published tarballs are the only
-resumable registry state.
+deterministic publication-state fixtures. It has no release-write permission
+or path to a live publication step. Failure injection proves that incomplete
+target sets, failed prerequisites, interrupted uploads, non-immutable release
+metadata, and occupied asset mismatches fail closed. Exact draft assets may be
+reused; an already-published release must match the complete candidate and be
+immutable.
 
-Strict publication, when separately authorized, consumes the already validated
+Strict publication, when separately authorized, consumes the validated
 candidate without rebuilding it. Repository release immutability must already
 be enabled. One non-cancelling concurrency group serializes every release
 version. The workflow stages a draft, uploads and verifies the complete GitHub
-asset set, and only then publishes it. When npm publication is separately
-enabled, it re-verifies the immutable state, tag, commit, and asset set before
-publishing native npm packages followed
-by the exact-version root package. Any partial publication is reported
-truthfully and resumed only after byte-for-byte identity checks. These operator
-contracts do not authorize running that path. Resume uses the original
-validated Actions artifact: rerun only the failed publication job while that
-artifact remains retained. An expired or unavailable artifact fails closed and
-must not be replaced by a rebuild for the same partially published version.
+asset set, publishes it, and verifies its immutable final state. Resume uses
+the original validated Actions artifact: rerun only the failed publication job
+while that artifact remains retained. An expired or unavailable artifact fails
+closed and must not be replaced by a rebuild for the same partially published
+version.
 
-Download and inspect the channel receipt before any retry. `not_started` means
-the job failed before entering its mutation executor; `outcome_unknown` means
-the executor may have reached an external service; and a completed failure
-receipt records the operations already reconciled. In every case use GitHub
-Actions' **Re-run failed jobs** operation so successful publication jobs and
-the sealed candidate are not rebuilt. If GitHub publication failed, the retry
-reconciles the draft, assets, and immutable final state before npm can run. If
-only npm failed, retry only that failed job; it first re-verifies GitHub and
-then accepts only exact already-published tarballs before continuing native
-packages and finally the root package. Never delete or replace a published tag,
-release asset, or package to recover.
+Download and inspect the GitHub publication receipt before any retry. A
+published release that failed the immutability check requires the new-version
+recovery described above. `not_started` means the job failed before entering
+its mutation executor; `outcome_unknown` means the executor may have reached
+GitHub; and a completed failure receipt records the operations already
+reconciled. For recoverable failures, use GitHub Actions' **Re-run failed jobs**
+operation so the sealed candidate is not rebuilt. The retry reconciles the
+draft, assets, and immutable final state. Never delete or replace a published
+tag or release asset to recover.
 
 The current candidate and strict-state artifacts are retained for seven days.
 If either expires, stop. A version with no published external state may proceed

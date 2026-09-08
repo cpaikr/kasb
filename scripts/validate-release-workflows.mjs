@@ -19,7 +19,7 @@ const failures = [];
 check(candidate.permissions?.contents === "read", "candidate workflow must be read-only");
 check(equal(Object.keys(candidate.on ?? {}).sort(), ["workflow_call", "workflow_dispatch"]), "candidate must support only manual rehearsal and strict reuse");
 check(candidate.on?.workflow_dispatch == null, "direct candidate dispatch must have no strict publication inputs");
-check(candidate.jobs?.metadata?.if === "github.event_name == 'workflow_dispatch'", "candidate metadata must reject automatic reusable callers");
+check(candidate.jobs?.metadata?.if === "github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && inputs.mode == 'strict')", "candidate metadata must reject automatic reusable callers");
 check(candidate.concurrency?.["cancel-in-progress"] === false, "candidate builds must not be cancelled in flight");
 
 const jobs = candidate.jobs ?? {};
@@ -115,6 +115,8 @@ check(
 for (const [scope, steps] of [["candidate", candidatePackagingSteps], ["release", releaseSteps], ["target action", actionSteps]]) {
   const nodeSteps = steps.filter(({ uses }) => String(uses).startsWith("actions/setup-node@"));
   check(nodeSteps.length > 0 && nodeSteps.every((step) => String(step.with?.["node-version"]) === manifest.release.toolchain.node), `${scope} Node setup must match native-targets.json`);
+}
+for (const [scope, steps] of [["candidate", candidatePackagingSteps], ["target action", actionSteps]]) {
   const npmVersions = steps.flatMap(({ run }) => [...String(run ?? "").matchAll(/\bnpm install --global npm@([^\s\\]+)/gu)].map((match) => match[1]));
   check(npmVersions.length > 0 && npmVersions.every((version) => version === manifest.release.toolchain.npm), `${scope} npm setup must match native-targets.json`);
 }
@@ -162,37 +164,25 @@ for (const evidence of ["candidateReceiptFile", "candidateRoot", "installers", "
 }
 check(!/\b(?:cargo build|npm pack|bun run build)\b/u.test(consumerText), "sealed candidate consumer must never rebuild");
 
-check(equal(Object.keys(release.on ?? {}), ["workflow_dispatch"]), "publication must be manual-only");
-check(release.jobs?.["publication-state"]?.if === "github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/tags/v')", "publication must require manual dispatch against a canonical tag");
-check(
-  release.permissions?.contents === "read"
-    && release.concurrency?.group === "canonical-release"
-    && release.concurrency?.["cancel-in-progress"] === false,
-  "publication defaults must be read-only, non-cancelling, and serialized across versions",
-);
+const tagPush = "github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')";
+check(equal(Object.keys(release.on ?? {}), ["push", "workflow_dispatch"]) && equal(release.on.push, { tags: ["v*"] }), "publication must start only from version tag pushes; dispatch is rehearsal");
+check(release.permissions?.contents === "read" && release.concurrency?.group === "canonical-release" && release.concurrency?.["cancel-in-progress"] === false, "publication defaults must be read-only, non-cancelling, and serialized across versions");
 const releaseJobs = release.jobs ?? {};
 const preflight = releaseJobs["publication-state"];
-check(preflight?.environment === "github-release" && equal(preflight.permissions, { contents: "read" }), "immutability preflight must run read-only inside github-release");
-const appSteps = (job) => (job?.steps ?? []).filter(({ uses }) => String(uses).startsWith("actions/create-github-app-token@"));
-const validatePolicyAppStep = (step, jobName) => {
-  check(step?.uses === "actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1", `${jobName} must pin create-github-app-token v3`);
-  check(step?.with?.["permission-administration"] === "read" && step?.with?.["permission-contents"] === "read", `${jobName} release-policy App token must be administration/read and contents/read only`);
-  check(String(step?.with?.["client-id"]).includes("KASB_RELEASE_APP_CLIENT_ID") && String(step?.with?.["private-key"]).includes("KASB_RELEASE_APP_PRIVATE_KEY"), `${jobName} release-policy App credentials must use the documented variable and secret`);
-};
-check(appSteps(preflight).length === 1, "immutability preflight must mint exactly one release-policy App token");
-validatePolicyAppStep(appSteps(preflight)[0], "immutability preflight");
-check(hasRun(preflight, "github-release:v1"), "immutability preflight must require the environment-only GitHub sentinel");
-check(releaseJobs.candidate?.uses === "./.github/workflows/candidate.yml" && releaseJobs.candidate?.with?.mode === "strict", "tag workflow must invoke the strict reusable candidate");
-
-check(releaseJobs["github-release"]?.environment === "github-release" && equal(releaseJobs["github-release"]?.permissions, { contents: "write" }), "GitHub executor must be the sole contents:write job");
-check(releaseJobs["npm-release"]?.environment === "npm-release" && equal(releaseJobs["npm-release"]?.permissions, { contents: "read", "id-token": "write" }), "npm executor must use protected OIDC trusted publishing");
-check(releaseJobs["npm-release"]?.if === "${{ false }}", "npm publication must remain disabled for the GitHub-only release");
-check(appSteps(releaseJobs["github-release"]).length === 1, "GitHub executor must mint exactly one fresh release-policy App token");
-validatePolicyAppStep(appSteps(releaseJobs["github-release"])[0], "GitHub executor");
-check(appSteps(releaseJobs["npm-release"]).length === 0, "npm executor must not mint a release-policy App token");
-check(hasRun(releaseJobs["github-release"], "github-release:v1"), "GitHub executor must require the environment-only sentinel");
-check(hasRun(releaseJobs["npm-release"], "npm-release:v1"), "npm executor must require the environment-only sentinel");
-for (const [name, channel] of [["github-release", "github"], ["npm-release", "npm"]]) {
+check(preflight?.if === tagPush && equal(preflight.permissions, { contents: "read" }) && !preflight.environment, "preflight must inspect tag pushes with the read-only job token");
+check(hasRun(preflight, 'release-version.mjs source "$GITHUB_REF_NAME"'), "preflight must bind tag/version/checkout and main ancestry");
+check(releaseJobs.candidate?.uses === "./.github/workflows/candidate.yml" && releaseJobs.candidate?.with?.mode === "${{ github.event_name == 'push' && 'strict' || 'rehearsal' }}", "release must route tag pushes to strict candidates and manual runs to rehearsals");
+check(releaseJobs.candidate?.if === "always() && (needs.publication-state.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.publication-state.result == 'skipped'))", "manual rehearsal must survive the skipped preflight without bypassing a failed release preflight");
+check(releaseJobs["github-release"]?.if === tagPush && !releaseJobs["github-release"].environment && equal(releaseJobs["github-release"].permissions, { contents: "write" }), "GitHub executor must use a tag-push-only job-scoped write token");
+check(!releaseText.includes("KASB_GITHUB_RELEASE_SENTINEL") && !releaseText.includes("create-github-app-token@") && !releaseText.includes("KASB_RELEASE_APP"), "GitHub release must not depend on sentinels or a policy App");
+for (const name of ["publication-state", "github-release"]) {
+  check((releaseJobs[name]?.steps ?? []).some((step) => step.env?.GH_TOKEN === "${{ github.token }}"), `${name} must use the job token`);
+}
+check(equal(Object.keys(releaseJobs).sort(), ["candidate", "github-release", "publication-state"]), "release must contain only GitHub state, candidate, and publication jobs");
+check(!releaseText.includes("id-token:") && !releaseText.includes("KASB_NPM_RELEASE_SENTINEL"), "release must not retain registry publication credentials");
+{
+  const name = "github-release";
+  const channel = "github";
   const firstStep = releaseJobs[name]?.steps?.[0];
   const receiptPath = `\${{ runner.temp }}/${channel}-publication-receipt.json`;
   check(
@@ -211,22 +201,16 @@ for (const [name, channel] of [["github-release", "github"], ["npm-release", "np
   );
   const uploadStep = (releaseJobs[name]?.steps ?? []).find(({ uses }) => String(uses).startsWith("actions/upload-artifact@"));
   check(uploadStep?.with?.path === receiptPath, `${name} must upload the durable receipt from runner.temp`);
-}
-for (const name of ["github-release", "npm-release"]) {
   check(hasInput(releaseJobs[name], "artifact-ids"), `${name} must consume the exact candidate artifact by ID`);
   check(hasRun(releaseJobs[name], "--artifact-manifest dist/release/artifact-manifest.json") && hasRun(releaseJobs[name], "--output dist/release/candidate.json"), `${name} must revalidate the raw manifest into the default planner candidate path`);
   check(!hasAnyRun(releaseJobs[name], /\b(?:cargo build|npm pack|bun run build)\b/u), `${name} must never rebuild`);
   check(hasRun(releaseJobs[name], "execute-release-publication.mjs"), `${name} must invoke the tested deterministic executor`);
 }
 check(!releaseText.includes("gh release") && !releaseText.includes("npm publish"), "workflow YAML must not duplicate publication mutation logic");
-check(releaseText.includes("KASB_RELEASE_POLICY_TOKEN: ${{ steps.release-policy-token.outputs.token }}") && executorText.includes("KASB_RELEASE_POLICY_TOKEN"), "GitHub executor must use the fresh read-only App token for live policy rereads");
 check(!releaseText.includes("--immutability-confirmation"), "publication must not trust an unauthenticated immutability confirmation file");
 check(!releaseText.includes("(?:sha256:)"), "workflow digest validation must use portable Bash ERE syntax");
-check(releaseText.includes("--verify-immutable-release-only true") && hasRun(releaseJobs["npm-release"], "plan-github-publication.mjs"), "npm must reverify the exact immutable release using contents:read only");
-check(releaseText.includes("npm install --global npm@11.6.2"), "npm inspection and publishing CLI must be pinned to 11.6.2");
 check((releaseJobs["github-release"]?.steps ?? []).some((step) => step.if === "always()" && String(step.uses).startsWith("actions/upload-artifact@")), "GitHub receipt must upload on failure");
-check((releaseJobs["npm-release"]?.steps ?? []).some((step) => step.if === "always()" && String(step.uses).startsWith("actions/upload-artifact@")), "npm receipt must upload on failure");
-check(executorText.includes("executeGitHubPublication") && executorText.includes("executeNpmPublication"), "production CLI must use the deterministically tested executors");
+check(executorText.includes("executeGitHubPublication"), "production CLI must use the deterministically tested GitHub executor");
 check(candidateContractText.includes("rerun only the failed publication job"), "strict fresh candidates must fail closed when release state already exists");
 check(!candidateText.includes("npm publish") && !candidateText.includes("gh release"), "rehearsal must remain structurally non-publishing");
 

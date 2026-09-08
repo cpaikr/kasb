@@ -8,9 +8,12 @@ export function schedulingFailures(workflows) {
     const events = typeof workflow.on === "string" ? [workflow.on]
       : Array.isArray(workflow.on) ? workflow.on : Object.keys(workflow.on ?? {});
     if (name === "candidate.yml" || name === "release.yml") {
-      const expected = name === "candidate.yml" ? ["workflow_call", "workflow_dispatch"] : ["workflow_dispatch"];
+      const expected = name === "candidate.yml" ? ["workflow_call", "workflow_dispatch"] : ["push", "workflow_dispatch"];
       if (JSON.stringify([...events].sort()) !== JSON.stringify(expected)) {
-        failures.push(`${name}: cross-platform workflows must be manual-only`);
+        failures.push(`${name}: cross-platform workflows require explicit rehearsal or release entry points`);
+      }
+      if (name === "release.yml" && JSON.stringify(workflow.on?.push) !== JSON.stringify({ tags: ["v*"] })) {
+        failures.push(`${name}: automatic releases must be restricted to v* tag pushes`);
       }
       continue;
     }

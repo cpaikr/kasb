@@ -35,8 +35,8 @@ concurrency:
 jobs:
   metadata:
     name: Bind candidate identity
-    # Reusable calls inherit the caller event; automatic callers cannot build targets.
-    if: github.event_name == 'workflow_dispatch'
+    # Only manual rehearsals and canonical tag releases may build all targets.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && inputs.mode == 'strict')
     runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 10
     outputs:
@@ -63,7 +63,7 @@ jobs:
           [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "candidate SHA must be a full lowercase commit identity" >&2; exit 1; }
           [[ "$mode" == rehearsal || "$mode" == strict ]] || { echo "invalid candidate mode" >&2; exit 1; }
           # Direct dispatch has no mode input and is always a rehearsal.
-          # The manually dispatched release caller supplies strict inputs.
+          # The tag-push release caller supplies strict inputs.
           [[ "$mode" != rehearsal || "$ref" == "refs/kasb-rehearsal/$sha" ]] || { echo "invalid rehearsal ref" >&2; exit 1; }
           [[ "$mode" != strict || "$ref" == refs/tags/v* ]] || { echo "strict candidates require a version tag" >&2; exit 1; }
           {

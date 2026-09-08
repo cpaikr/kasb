@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -19,9 +20,8 @@ async function main() {
   const output = resolve(repositoryRoot, options.output ?? "dist/release/publication-state.json");
   const temporary = await mkdtemp(join(tmpdir(), "kasb-publication-state-"));
   try {
-    const github = await githubSnapshot(contract, tag, commit, temporary, options);
+    const github = await githubSnapshot(contract, tag, commit, temporary);
     const snapshot = { schemaVersion: 1, source: "live", github };
-    if (options["github-only"] !== "true") snapshot.npm = await npmSnapshot(contract, temporary);
     await mkdir(dirname(output), { recursive: true });
     await writeFile(output, `${JSON.stringify(snapshot, null, 2)}\n`);
     console.log(`captured read-only publication state for ${tag}`);
@@ -30,25 +30,16 @@ async function main() {
   }
 }
 
-async function githubSnapshot(contract, tag, expectedCommit, directory, options) {
+async function githubSnapshot(contract, tag, expectedCommit, directory, runCommand = command) {
   const { release } = contract;
   const { repository } = release;
   const limits = commandLimits(release);
-  const repositoryResponse = await command("gh", ["api", `repos/${repository}`], limits);
+  const repositoryResponse = await runCommand("gh", ["api", `repos/${repository}`], limits);
   const repositoryMetadata = JSON.parse(repositoryResponse.stdout);
   if (repositoryMetadata.private !== false) throw new Error("canonical release repository must be public before strict publication");
-  let immutableReleases;
-  if (options["verify-immutable-release-only"] === "true") {
-    immutableReleases = undefined;
-  } else {
-    const immutableResponse = await command("gh", ["api", `repos/${repository}/immutable-releases`], limits);
-    const immutableSettings = JSON.parse(immutableResponse.stdout);
-    if (immutableSettings.enabled !== true) throw new Error("canonical repository must enable immutable releases before strict publication");
-    immutableReleases = true;
-  }
-  const tagSha = await resolveRemoteTag(repository, tag, limits);
+  const tagSha = await resolveRemoteTag(repository, tag, limits, runCommand);
   if (tagSha !== expectedCommit) throw new Error("remote release tag does not peel to the requested candidate commit");
-  const releaseHistory = (await command("gh", [
+  const releaseHistory = (await runCommand("gh", [
     "api",
     `repos/${repository}/releases?per_page=100`,
     "--paginate",
@@ -59,18 +50,11 @@ async function githubSnapshot(contract, tag, expectedCommit, directory, options)
     .map((releaseTagName) => releaseTagName.startsWith(release.tagPrefix)
       ? releaseTagName.slice(release.tagPrefix.length)
       : null));
-  const response = await command("gh", ["api", `repos/${repository}/releases/tags/${tag}`], { ...limits, allowNotFound: true });
+  const response = await runCommand("gh", ["api", `repos/${repository}/releases/tags/${tag}`], { ...limits, allowNotFound: true });
   if (response.notFound) {
-    if (immutableReleases !== true) throw new Error("release-only immutability verification requires an existing published immutable release");
-    return { schemaVersion: 1, repository, repositoryPrivate: false, immutableReleases: true, highestPublishedVersion, tag, tagSha, release: null };
+    return { schemaVersion: 1, repository, repositoryPrivate: false, highestPublishedVersion, tag, tagSha, release: null };
   }
   const published = JSON.parse(response.stdout);
-  if (immutableReleases === undefined) {
-    if (published.draft === true || published.immutable !== true) {
-      throw new Error("release-only immutability verification requires the exact published release to be immutable");
-    }
-    immutableReleases = true;
-  }
   const expectedAssets = new Set(releaseAssetNames(contract));
   if ((published.assets ?? []).length > expectedAssets.size) throw new Error("GitHub Release contains more assets than the canonical candidate allows");
   const assets = [];
@@ -98,7 +82,6 @@ async function githubSnapshot(contract, tag, expectedCommit, directory, options)
     schemaVersion: 1,
     repository,
     repositoryPrivate: false,
-    immutableReleases,
     highestPublishedVersion,
     tag,
     tagSha,
@@ -113,52 +96,14 @@ async function githubSnapshot(contract, tag, expectedCommit, directory, options)
   };
 }
 
-async function resolveRemoteTag(repository, tag, limits) {
-  let response = JSON.parse((await command("gh", ["api", `repos/${repository}/git/ref/tags/${tag}`], limits)).stdout);
+async function resolveRemoteTag(repository, tag, limits, runCommand = command) {
+  let response = JSON.parse((await runCommand("gh", ["api", `repos/${repository}/git/ref/tags/${tag}`], limits)).stdout);
   for (let depth = 0; depth < 5; depth += 1) {
     if (response.object?.type === "commit" && /^[0-9a-f]{40}$/u.test(response.object.sha)) return response.object.sha;
     if (response.object?.type !== "tag" || !/^[0-9a-f]{40}$/u.test(response.object.sha)) break;
-    response = JSON.parse((await command("gh", ["api", `repos/${repository}/git/tags/${response.object.sha}`], limits)).stdout);
+    response = JSON.parse((await runCommand("gh", ["api", `repos/${repository}/git/tags/${response.object.sha}`], limits)).stdout);
   }
   throw new Error("remote release tag did not resolve to a bounded commit identity");
-}
-
-async function npmSnapshot(contract, directory) {
-  const limits = commandLimits(contract.release);
-  const root = JSON.parse(await readFile(resolve(repositoryRoot, contract.manifest.rootPackage, "package.json"), "utf8"));
-  const identities = [
-    ...contract.targets.map(({ packageName }) => packageName),
-    root.name,
-  ];
-  const packages = [];
-  const publishedVersions = [];
-  for (const name of identities) {
-    const identity = `${name}@${contract.version}`;
-    const versionsResponse = await command("npm", ["view", name, "versions", "--json"], { ...limits, allowNotFound: true });
-    const versions = versionsResponse.notFound ? [] : JSON.parse(versionsResponse.stdout);
-    const versionList = Array.isArray(versions) ? versions : [versions];
-    if (versionList.some((version) => typeof version !== "string")) throw new Error(`npm returned invalid version history for ${name}`);
-    publishedVersions.push(...versionList);
-    if (!versionList.includes(contract.version)) {
-      packages.push({ name, version: contract.version, state: "vacant" });
-      continue;
-    }
-    const response = await command("npm", ["view", identity, "dist.tarball", "--json"], { ...limits, allowNotFound: true });
-    if (response.notFound) {
-      packages.push({ name, version: contract.version, state: "vacant" });
-      continue;
-    }
-    const tarballUrl = JSON.parse(response.stdout);
-    validateRegistryUrl(tarballUrl, identity);
-    const destination = join(directory, `npm-${packages.length}.tgz`);
-    await commandToFile("curl", ["--fail", "--location", "--proto", "=https", "--tlsv1.2", tarballUrl], destination, {
-      ...limits,
-      timeoutMs: contract.release.archiveRequestTimeoutSeconds * 1000,
-      maxBytes: contract.release.archiveLimitBytes,
-    });
-    packages.push({ name, version: contract.version, state: "published", sha256: await sha256(destination) });
-  }
-  return { schemaVersion: 1, highestPublishedVersion: highestStableVersion(publishedVersions), packages };
 }
 
 function command(executable, args, { allowNotFound = false, maxOutputBytes = 1024 * 1024, timeoutMs = 15_000 } = {}) {
@@ -186,7 +131,7 @@ function command(executable, args, { allowNotFound = false, maxOutputBytes = 102
       settled = true;
       clearTimeout(timer);
       if (status === 0) return resolvePromise({ stdout, stderr, notFound: false });
-      if (allowNotFound && /(?:HTTP 404|E404|not found)/iu.test(`${stdout}\n${stderr}`)) {
+      if (allowNotFound && /(?:HTTP 404|not found)/iu.test(`${stdout}\n${stderr}`)) {
         return resolvePromise({ stdout, stderr, notFound: true });
       }
       reject(new Error(`${executable} ${args[0]} failed (${status}): ${stderr.trim()}`));
@@ -253,14 +198,6 @@ async function sha256(path) {
   return createHash("sha256").update(await readFile(path)).digest("hex");
 }
 
-function validateRegistryUrl(value, identity) {
-  if (typeof value !== "string") throw new Error(`npm returned a noncanonical tarball URL for ${identity}`);
-  const url = new URL(value);
-  if (url.protocol !== "https:" || url.hostname !== "registry.npmjs.org" || url.port !== "" || url.username || url.password) {
-    throw new Error(`npm returned a noncanonical tarball URL for ${identity}`);
-  }
-}
-
 function commandLimits(release) {
   return {
     maxOutputBytes: release.metadataLimitBytes,
@@ -270,15 +207,32 @@ function commandLimits(release) {
 }
 
 async function selfTest() {
-  validateRegistryUrl("https://registry.npmjs.org/@scope/pkg/-/pkg-1.0.0.tgz", "fixture");
-  for (const value of ["http://registry.npmjs.org/pkg.tgz", "https://registry.npmjs.org.evil.example/pkg.tgz", "https://user@registry.npmjs.org/pkg.tgz"]) {
-    let rejected = false;
-    try { validateRegistryUrl(value, "fixture"); } catch { rejected = true; }
-    if (!rejected) throw new Error(`capture adapter accepted unsafe registry URL ${value}`);
-  }
-  let invalidBooleanRejected = false;
-  try { parseOptions(["--verify-immutable-release-only", "false"]); } catch { invalidBooleanRejected = true; }
-  if (!invalidBooleanRejected) throw new Error("capture adapter accepted a false boolean-mode flag");
+  const contract = await loadReleaseContract();
+  const tag = releaseTag(contract.release, contract.version);
+  const commit = "a".repeat(40);
+  let published = null;
+  const readOnlyContents = async (executable, args) => {
+    assert.equal(executable, "gh");
+    assert.equal(args[0], "api");
+    const endpoint = args[1];
+    const repository = `repos/${contract.release.repository}`;
+    let body;
+    if (endpoint === repository) body = { private: false };
+    else if (endpoint === `${repository}/git/ref/tags/${tag}`) body = { object: { type: "commit", sha: commit } };
+    else if (endpoint === `${repository}/releases?per_page=100`) return { stdout: "", notFound: false };
+    else if (endpoint === `${repository}/releases/tags/${tag}`) {
+      if (!published) return { stdout: "", notFound: true };
+      body = published;
+    } else throw new Error(`unexpected endpoint with a contents-only token: ${endpoint}`);
+    return { stdout: JSON.stringify(body), notFound: false };
+  };
+  const vacant = await githubSnapshot(contract, tag, commit, tmpdir(), readOnlyContents);
+  assert.equal(vacant.release, null);
+  assert.equal(Object.hasOwn(vacant, "immutableReleases"), false);
+  published = { tag_name: tag, draft: false, prerelease: false, immutable: false, assets: [] };
+  assert.equal((await githubSnapshot(contract, tag, commit, tmpdir(), readOnlyContents)).release.immutable, false);
+  published.immutable = true;
+  assert.equal((await githubSnapshot(contract, tag, commit, tmpdir(), readOnlyContents)).release.immutable, true);
   const temporary = await mkdtemp(join(tmpdir(), "kasb-capture-self-test-"));
   try {
     let rejected = false;
@@ -289,7 +243,7 @@ async function selfTest() {
   } finally {
     await rm(temporary, { recursive: true, force: true });
   }
-  console.log("publication-state capture adapter bounds and URL policy passed");
+  console.log("publication-state capture adapter GitHub state and download bounds passed");
 }
 
 function parseOptions(args) {
@@ -297,14 +251,10 @@ function parseOptions(args) {
   for (let index = 0; index < args.length; index += 2) {
     const name = args[index];
     const value = args[index + 1];
-    if (!["--commit", "--output", "--github-only", "--verify-immutable-release-only"].includes(name) || value === undefined) {
-      throw new Error("Usage: node scripts/capture-release-publication-state.mjs --commit <sha> [--output <path>] [--github-only true | --verify-immutable-release-only true]");
+    if (!["--commit", "--output"].includes(name) || value === undefined) {
+      throw new Error("Usage: node scripts/capture-release-publication-state.mjs --commit <sha> [--output <path>]");
     }
     result[name.slice(2)] = value;
-  }
-  if (result["github-only"] !== undefined && result["github-only"] !== "true") throw new Error("--github-only only accepts true");
-  if (result["verify-immutable-release-only"] !== undefined && result["verify-immutable-release-only"] !== "true") {
-    throw new Error("--verify-immutable-release-only only accepts true");
   }
   return result;
 }

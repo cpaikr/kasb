@@ -15,7 +15,7 @@ for (const name of await readdir(new URL("../.github/workflows/", import.meta.ur
   workflows[name] = document.toJS();
 }
 
-test("current workflows schedule only Linux x64 automatically", () => {
+test("routine workflows use Linux x64 and releases permit tag-triggered target builds", () => {
   assert.deepEqual(schedulingFailures(workflows), []);
 });
 
@@ -32,11 +32,11 @@ for (const runner of ["ubuntu-24.04-arm", "blacksmith-6vcpu-macos-15", "blacksmi
   });
 }
 
-for (const [name, event] of [["candidate.yml", "pull_request"], ["candidate.yml", "schedule"], ["release.yml", "push"]]) {
+for (const [name, event] of [["candidate.yml", "pull_request"], ["candidate.yml", "schedule"]]) {
   test(`rejects automatic ${event} entry to ${name}`, () => {
     const changed = structuredClone(workflows);
     changed[name].on[event] = {};
-    assert.match(schedulingFailures(changed).join("\n"), /cross-platform workflows must be manual-only/u);
+    assert.match(schedulingFailures(changed).join("\n"), /cross-platform workflows require explicit rehearsal or release entry points/u);
   });
 }
 
@@ -57,7 +57,7 @@ for (const matrix of ["${{ fromJSON(needs.metadata.outputs.matrix) }}", { runner
 const sha = "1".repeat(40);
 for (const scenario of [
   { name: "direct manual rehearsal", mode: "", ref: "", expectedMode: "rehearsal", expectedRef: `refs/kasb-rehearsal/${sha}` },
-  { name: "strict reuse from a manual tag release", mode: "strict", ref: "refs/tags/v0.3.0", expectedMode: "strict", expectedRef: "refs/tags/v0.3.0" },
+  { name: "strict reuse from a tag release", mode: "strict", ref: "refs/tags/v0.3.0", expectedMode: "strict", expectedRef: "refs/tags/v0.3.0" },
   { name: "strict reuse with a branch", mode: "strict", ref: "refs/heads/main", invalid: true },
   { name: "rehearsal with a real tag", mode: "rehearsal", ref: "refs/tags/v0.3.0", invalid: true },
 ]) {
@@ -81,5 +81,13 @@ for (const scenario of [
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+}
+
+for (const push of [{}, { branches: ["main"] }, { tags: ["*"] }, { tags: ["v*"], branches: ["main"] }]) {
+  test(`rejects noncanonical release push filter ${JSON.stringify(push)}`, () => {
+    const changed = structuredClone(workflows);
+    changed["release.yml"].on.push = push;
+    assert.match(schedulingFailures(changed).join("\n"), /restricted to v\* tag pushes/u);
   });
 }

@@ -110,7 +110,6 @@ export function validatePublicationStateSnapshot(candidateInput, snapshot) {
     schemaVersion: 1,
     source: snapshot.source,
     github: planGitHubPublication(candidate, snapshot.github, "stage"),
-    npm: planNpmPublication(candidate, snapshot.npm),
   };
 }
 
@@ -121,7 +120,6 @@ export function validatePublicationStateEnvelope(candidateInput, snapshot) {
   const expectedSource = candidate.mode === "strict" ? "live" : "fixture";
   requireEqual(snapshot.source, expectedSource, "snapshot_source", `${candidate.mode} candidate requires a ${expectedSource} publication-state snapshot`);
   requireObject(snapshot.github, "publication-state GitHub snapshot");
-  requireObject(snapshot.npm, "publication-state npm snapshot");
   return candidate;
 }
 
@@ -186,109 +184,12 @@ export function planGitHubPublication(candidateInput, state, phase = "stage") {
   );
 }
 
-export function planNpmPublication(candidateInput, state) {
-  const candidate = validateCandidateForPublication(candidateInput);
-  requireObject(state, "npm publication snapshot");
-  requireEqual(state.schemaVersion, 1, "npm_snapshot_schema", "npm publication snapshot schemaVersion must be 1");
-  validateHighestPublishedVersion(candidate, state.highestPublishedVersion, "npm");
-  requireArray(state.packages, "npm publication packages");
-
-  const expected = new Map(candidate.npmPackages.map((pkg) => [packageIdentity(pkg), pkg]));
-  const actual = new Map();
-  for (const entry of state.packages) {
-    requireObject(entry, "npm publication package");
-    requireString(entry.name, "npm publication package name");
-    requireString(entry.version, "npm publication package version");
-    const identity = packageIdentity(entry);
-    if (!expected.has(identity)) fail("npm_unexpected_identity", `unexpected npm publication identity ${identity}`);
-    if (actual.has(identity)) fail("npm_duplicate_identity", `duplicate npm publication identity ${identity}`);
-    requireOneOf(entry.state, ["vacant", "published"], "npm_package_state", `${identity} state must be vacant or published`);
-    if (entry.state === "published") requireDigest(entry.sha256, `${identity} registry tarball`);
-    if (entry.state === "vacant" && Object.hasOwn(entry, "sha256")) {
-      fail("npm_vacant_digest", `${identity} is vacant but includes a tarball digest`);
-    }
-    actual.set(identity, entry);
-  }
-  const missingSnapshots = [...expected.keys()].filter((identity) => !actual.has(identity));
-  if (missingSnapshots.length !== 0) {
-    fail("npm_snapshot_incomplete", "npm publication snapshot must classify every candidate identity", { identities: missingSnapshots });
-  }
-
-  const classifications = candidate.npmPackages.map((pkg) => {
-    const identity = packageIdentity(pkg);
-    const published = actual.get(identity);
-    if (published.state === "published" && published.sha256 !== pkg.sha256) {
-      fail("npm_digest_mismatch", `${identity} is occupied by bytes that differ from the validated candidate`, {
-        candidateSha256: pkg.sha256,
-        registrySha256: published.sha256,
-      });
-    }
-    return {
-      name: pkg.name,
-      version: pkg.version,
-      role: pkg.role,
-      status: published.state === "published" ? "exact" : "vacant",
-      action: published.state === "published" ? "skip" : "publish",
-      sha256: pkg.sha256,
-    };
-  });
-  const ordered = [
-    ...candidate.npmPackages.filter(({ role }) => role === "native"),
-    ...candidate.npmPackages.filter(({ role }) => role === "root"),
-  ];
-  const actions = ordered
-    .filter((pkg) => actual.get(packageIdentity(pkg)).state === "vacant")
-    .map((pkg) => ({
-      type: "publishPackage",
-      name: pkg.name,
-      version: pkg.version,
-      role: pkg.role,
-      file: pkg.file,
-      sha256: pkg.sha256,
-    }));
-  const nativeActions = actions.filter(({ role }) => role === "native");
-  const rootAction = actions.find(({ role }) => role === "root");
-  return {
-    schemaVersion: 1,
-    channel: "npm",
-    mode: candidate.mode,
-    mutationAllowed: false,
-    githubReleaseVerified: false,
-    status: actions.length === 0 ? "published" : classifications.some(({ status }) => status === "exact") ? "partial" : "vacant",
-    packageOrder: ordered.map(({ name, version }) => ({ name, version })),
-    classifications,
-    actions,
-    rootGate: {
-      status: rootAction ? (nativeActions.length === 0 ? "ready" : "afterNativePublication") : "notRequired",
-      nativePackages: ordered.filter(({ role }) => role === "native").map(({ name, version }) => ({ name, version })),
-    },
-  };
-}
-
-export function planNpmPublicationAfterGitHub(candidateInput, snapshot) {
-  const candidate = validatePublicationStateEnvelope(candidateInput, snapshot);
-  const github = planGitHubPublication(candidate, snapshot.github, "verify");
-  const npm = planNpmPublication(candidate, snapshot.npm);
-  return {
-    ...npm,
-    mutationAllowed: candidate.mode === "strict",
-    githubReleaseVerified: true,
-    github: {
-      repository: github.repository,
-      tag: github.tag,
-      targetSha: github.targetSha,
-      status: github.status,
-    },
-  };
-}
-
 function validateGitHubIdentity(candidate, state) {
   requireObject(state, "GitHub publication snapshot");
   requireEqual(state.schemaVersion, 1, "github_snapshot_schema", "GitHub publication snapshot schemaVersion must be 1");
   validateHighestPublishedVersion(candidate, state.highestPublishedVersion, "GitHub");
   requireEqual(state.repository, candidate.repository, "github_repository_mismatch", "GitHub publication repository differs from the candidate repository");
   requireEqual(state.repositoryPrivate, false, "github_repository_private", "canonical release repository must be public before publication");
-  requireEqual(state.immutableReleases, true, "github_immutability_disabled", "canonical repository must enforce immutable releases before publication");
   requireEqual(state.tag, candidate.canonicalTag, "github_tag_mismatch", "GitHub tag differs from the candidate tag");
   requireEqual(state.tagSha, candidate.commit, "github_tag_sha_mismatch", "GitHub tag would move away from the validated candidate commit");
   if (state.release !== null) requireObject(state.release, "GitHub release snapshot");

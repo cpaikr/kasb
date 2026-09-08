@@ -4,7 +4,7 @@
 
 Publish the completed Rust CLI, standalone installers, checksums, and provenance
 through the canonical GitHub Release. The public Rust SDK source is versioned
-by the same tag. npm publication is excluded from the current authorization;
+by the same tag. npm registry publication has been removed from the pipeline;
 crates.io remains a separate distribution decision.
 
 ## Current state
@@ -19,7 +19,8 @@ following a privacy audit, deletion of affected Actions logs, and creation of
 a read-only policy App scoped only to this repository. CLI authentication and
 GitHub Mobile verification succeeded. The selected release identity is `0.3.0`;
 GitHub tags/releases and all five npm package versions were vacant when checked.
-The npm publication job is hard-disabled and validated.
+The then-disabled npm publication job has since been removed by release flow
+alignment; its registry checks and credential gates are also removed.
 
 A fresh mirror of all remote branches, tags, and pull-request heads covered
 204 commits. The only scanner match was an invalid private-key test fixture;
@@ -31,17 +32,17 @@ unchanged pinned manylinux images. Both fresh Linux jobs passed and their full
 logs had no scanner findings or runner-token occurrences. The repository is now
 public, verified through unauthenticated GitHub API access.
 
-The KASB Release Policy App is installed only on `cpaikr/kasb`, with read-only
-Administration, Contents, and mandatory Metadata access, and no webhook.
-Release immutability is enabled. Chrome blocked downloading the generated App
-key, so the environment private key remains unavailable. The `github-release`
-environment now requires review by `sjunepark`, permits only `v*` tags, and holds
-the environment-only sentinel and App client identifier. The signing-key secret
-remains the manual setup step.
+Release immutability was enabled during setup. The earlier policy App signing-key
+blocker is superseded by [release flow alignment](../plans/release-flow-alignment.md):
+GitHub publication now uses the workflow job token and requires no policy App
+or `github-release` environment. Operators must still verify repository
+immutability before publication; the final immutable-release check cannot
+prevent publication under a mistakenly disabled setting. Current prerequisites
+and recovery rules are owned by [release posture](../docs/release.md).
 
 PR #26 carries the release-readiness implementation. Its previous head
 `1571e46` passed CI and the complete four-target rehearsal; the current version,
-runner remediation, and GitHub-only guard require fresh validation. Local
+runner remediation, and release-flow alignment require fresh validation. Local
 release checks and publication failure-injection tests pass. The first fresh
 run exposed notices with the old workspace version and upgrade fixtures assuming
 `0.1.1` was newer than the binary. Notices are regenerated, and upgrade fixtures
@@ -51,9 +52,15 @@ created.
 
 ## Next action
 
-Obtain fresh four-target evidence through a manually dispatched candidate
-rehearsal. Save the policy App signing key in the protected environment, then
-manually dispatch the release workflow against the authorized canonical tag to
-publish the exact validated `0.3.0` GitHub assets. Keep npm disabled throughout
-this release. See [release posture](../docs/release.md#ci-platform-coverage) for
-the dispatch policy.
+Obtain fresh four-target evidence through a manually dispatched rehearsal after
+pipeline alignment is integrated. Local validation evidence and its coverage
+are recorded in [release flow alignment](../plans/release-flow-alignment.md);
+no fresh hosted rehearsal has run for it. The workspace remains at
+`0.3.0`; this pipeline task does not publish or select a new release version.
+
+Before production, reconcile the intended first-release version with the local
+release flow, which requires a version increase, and confirm publication
+authorization. Verify the external prerequisites, then follow
+[local release preparation](../docs/release.md#local-release-preparation).
+Pushing the authorized canonical tag starts strict publication; manually
+dispatching either workflow only rehearses.
