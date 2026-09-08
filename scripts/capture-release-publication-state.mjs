@@ -39,22 +39,26 @@ async function githubSnapshot(contract, tag, expectedCommit, directory, runComma
   if (repositoryMetadata.private !== false) throw new Error("canonical release repository must be public before strict publication");
   const tagSha = await resolveRemoteTag(repository, tag, limits, runCommand);
   if (tagSha !== expectedCommit) throw new Error("remote release tag does not peel to the requested candidate commit");
-  const releaseHistory = (await runCommand("gh", [
+  // The tag endpoint returns published releases only. Listing with the publisher's
+  // write token also exposes drafts, so staging can resume without creating more.
+  const releases = (await runCommand("gh", [
     "api",
     `repos/${repository}/releases?per_page=100`,
     "--paginate",
     "--jq",
-    ".[] | select(.draft == false and .prerelease == false) | .tag_name",
-  ], limits)).stdout.split(/\r?\n/u).filter(Boolean);
-  const highestPublishedVersion = highestStableVersion(releaseHistory
-    .map((releaseTagName) => releaseTagName.startsWith(release.tagPrefix)
-      ? releaseTagName.slice(release.tagPrefix.length)
+    ".[] | {tag_name, draft, prerelease, immutable, assets: [.assets[] | {id, name, size}]}",
+  ], limits)).stdout.split(/\r?\n/u).filter(Boolean).map((line) => JSON.parse(line));
+  const highestPublishedVersion = highestStableVersion(releases
+    .filter((entry) => entry.draft === false && entry.prerelease === false)
+    .map((entry) => entry.tag_name.startsWith(release.tagPrefix)
+      ? entry.tag_name.slice(release.tagPrefix.length)
       : null));
-  const response = await runCommand("gh", ["api", `repos/${repository}/releases/tags/${tag}`], { ...limits, allowNotFound: true });
-  if (response.notFound) {
+  const matches = releases.filter((entry) => entry.tag_name === tag);
+  if (matches.length > 1) throw new Error("GitHub Release tag has multiple releases; resolve duplicate drafts before publication");
+  const published = matches[0];
+  if (!published) {
     return { schemaVersion: 1, repository, repositoryPrivate: false, highestPublishedVersion, tag, tagSha, release: null };
   }
-  const published = JSON.parse(response.stdout);
   const expectedAssets = new Set(releaseAssetNames(contract));
   if ((published.assets ?? []).length > expectedAssets.size) throw new Error("GitHub Release contains more assets than the canonical candidate allows");
   const assets = [];
@@ -211,6 +215,7 @@ async function selfTest() {
   const tag = releaseTag(contract.release, contract.version);
   const commit = "a".repeat(40);
   let published = null;
+  let duplicate = false;
   const readOnlyContents = async (executable, args) => {
     assert.equal(executable, "gh");
     assert.equal(args[0], "api");
@@ -219,17 +224,22 @@ async function selfTest() {
     let body;
     if (endpoint === repository) body = { private: false };
     else if (endpoint === `${repository}/git/ref/tags/${tag}`) body = { object: { type: "commit", sha: commit } };
-    else if (endpoint === `${repository}/releases?per_page=100`) return { stdout: "", notFound: false };
-    else if (endpoint === `${repository}/releases/tags/${tag}`) {
-      if (!published) return { stdout: "", notFound: true };
-      body = published;
+    else if (endpoint === `${repository}/releases?per_page=100`) {
+      return { stdout: published ? [published, ...(duplicate ? [published] : [])].map((entry) => JSON.stringify(entry)).join("\n") : "", notFound: false };
     } else throw new Error(`unexpected endpoint with a contents-only token: ${endpoint}`);
     return { stdout: JSON.stringify(body), notFound: false };
   };
   const vacant = await githubSnapshot(contract, tag, commit, tmpdir(), readOnlyContents);
   assert.equal(vacant.release, null);
   assert.equal(Object.hasOwn(vacant, "immutableReleases"), false);
-  published = { tag_name: tag, draft: false, prerelease: false, immutable: false, assets: [] };
+  published = { tag_name: tag, draft: true, prerelease: false, immutable: false, assets: [] };
+  const staged = await githubSnapshot(contract, tag, commit, tmpdir(), readOnlyContents);
+  assert.equal(staged.release.draft, true);
+  assert.equal(staged.highestPublishedVersion, null);
+  duplicate = true;
+  await assert.rejects(githubSnapshot(contract, tag, commit, tmpdir(), readOnlyContents), /multiple releases/u);
+  duplicate = false;
+  published.draft = false;
   assert.equal((await githubSnapshot(contract, tag, commit, tmpdir(), readOnlyContents)).release.immutable, false);
   published.immutable = true;
   assert.equal((await githubSnapshot(contract, tag, commit, tmpdir(), readOnlyContents)).release.immutable, true);
