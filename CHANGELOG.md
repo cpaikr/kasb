@@ -1,5 +1,7 @@
 # Changelog
 
+## [0.4.2](https://github.com/cpaikr/kasb/compare/v0.4.1...v0.4.2) (2026-09-09)
+
 ## [0.4.1](https://github.com/cpaikr/kasb/compare/v0.4.0...v0.4.1) (2026-09-09)
 
 ### Bug Fixes
