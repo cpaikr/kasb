@@ -10,7 +10,13 @@ import { cliSuccessCases, createFixtureConfig, expectedCliValue, inspectCliProce
 setDefaultTimeout(180_000);
 const root = join(import.meta.dir, "..");
 const manifest = loadManifest(root);
-const fixtureReleases = JSON.parse(readFileSync(join(root, "fixtures/version-check/releases.json"), "utf8"));
+const releaseTemplates = JSON.parse(readFileSync(join(root, "fixtures/version-check/releases.json"), "utf8"));
+// Keep the independent provider fixture newer across product release bumps.
+const productVersion = JSON.parse(readFileSync(join(root, "packages/node/package.json"), "utf8")).version;
+const [major, minor] = productVersion.split(".").map(BigInt);
+const newerVersion = `${major}.${minor + 1n}.0`;
+const fixtureReleases = structuredClone(releaseTemplates);
+fixtureReleases[1] = releaseVersion(newerVersion);
 const schema = JSON.parse(readFileSync(join(import.meta.dir, "version-check.schema.json"), "utf8"));
 const validate = new Ajv({ allErrors: true, strict: false }).compile(schema);
 const binary = join(root, "target/cli-conformance-fixtures/debug", process.platform === "win32" ? "kasb.exe" : "kasb");
@@ -29,6 +35,7 @@ beforeAll(() => {
   expect(build.status, build.stderr).toBe(0);
   const version = spawnSync(binary, ["--version"], { encoding: "utf8" });
   currentVersion = version.stdout.trim().replace(/^kasb /, "");
+  expect(currentVersion).toBe(productVersion);
 });
 afterAll(() => { server.stop(true); if (temporary) rmSync(temporary, { recursive: true, force: true }); });
 
@@ -62,7 +69,7 @@ function cachePath(directory: string) {
 }
 function changeCache(directory: string, mutate: (value: any) => void) { const path = cachePath(directory); const value = JSON.parse(readFileSync(path, "utf8")); mutate(value); writeFileSync(path, JSON.stringify(value)); }
 function releaseVersion(version: string) {
-  const release = structuredClone(fixtureReleases[1]); release.tag_name = `v${version}`; release.html_url = `https://github.com/cpaikr/kasb/releases/tag/v${version}`;
+  const release = structuredClone(releaseTemplates[1]); release.tag_name = `v${version}`; release.html_url = `https://github.com/cpaikr/kasb/releases/tag/v${version}`;
   for (const asset of release.assets) { asset.name = asset.name.replace("0.4.0", version); asset.browser_download_url = `https://github.com/cpaikr/kasb/releases/download/v${version}/${asset.name}`; }
   return release;
 }
@@ -70,7 +77,7 @@ function releaseVersion(version: string) {
 test("explicit cold/warm evidence is independent of provider initialization and working directory", async () => {
   const { directory, env } = context();
   const cold = report(await run(["version-check", "--pretty"], { ...env, KASB_CLI_CONFORMANCE_CONFIG: "missing-initialization-config" }));
-  expect(cold.comparison).toBe("newer"); expect(cold.freshness).toBe("fresh"); expect(cold.release.version).toBe("0.4.0"); expect(cold.installation.owner).toBe("unknown"); expect(cold.currentVersion).toBe(currentVersion);
+  expect(cold.comparison).toBe("newer"); expect(cold.freshness).toBe("fresh"); expect(cold.release.version).toBe(newerVersion); expect(cold.installation.owner).toBe("unknown"); expect(cold.currentVersion).toBe(currentVersion);
   expect(requests).toEqual([listPath]);
   const other = join(directory, "other-working-directory"); mkdirSync(other);
   const warm = report(await run(["version-check"], env, binary, other));
@@ -146,7 +153,7 @@ test("highest release readiness remains incomplete for missing, duplicate, mutab
     if (corrupt === "url") for (const asset of releases[1].assets) asset.browser_download_url = "https://evil.example/file";
     if (corrupt === "size") for (const asset of releases[1].assets) asset.size = 999_999_999;
     route = () => Response.json(releases);
-    const evidence = report(await run(["version-check"], env)); expect(evidence.comparison).toBe("newer"); expect(evidence.release.version).toBe("0.4.0"); expect(evidence.distribution.status).toBe("incomplete"); expect(requests).toEqual([listPath]);
+    const evidence = report(await run(["version-check"], env)); expect(evidence.comparison).toBe("newer"); expect(evidence.release.version).toBe(newerVersion); expect(evidence.distribution.status).toBe("incomplete"); expect(requests).toEqual([listPath]);
   }
 });
 
@@ -204,13 +211,13 @@ test("independent advisory judge rejects corrupt reports and process or primary-
 });
 
 test("complete pagination selects across pages and rejects unfinished or untrusted navigation", async () => {
-  const irrelevant = (index: number) => ({ ...releaseVersion("0.4.0"), tag_name: `other-${index}`, assets: [] });
+  const irrelevant = (index: number) => ({ ...releaseVersion(newerVersion), tag_name: `other-${index}`, assets: [] });
   const fullPage = Array.from({ length: 100 }, (_, index) => irrelevant(index));
   {
     const { env } = context(); route = url => Number(url.searchParams.get("page")) === 1
       ? Response.json(fullPage, { headers: { link: `<${origin}/repos/cpaikr/kasb/releases?per_page=100&page=2>; rel="next"` } })
       : Response.json(fixtureReleases);
-    const evidence = report(await run(["version-check"], env)); expect(evidence.release.version).toBe("0.4.0"); expect(requests).toHaveLength(2);
+    const evidence = report(await run(["version-check"], env)); expect(evidence.release.version).toBe(newerVersion); expect(requests).toHaveLength(2);
   }
   for (const failure of ["exhausted", "foreign", "truncated", "malformed", "oversized", "redirect", "duplicate", "release-url"]) {
     const { env } = context();
@@ -222,8 +229,8 @@ test("complete pagination selects across pages and rejects unfinished or untrust
       if (failure === "malformed") return new Response("not json");
       if (failure === "oversized") return new Response("x".repeat(1024 * 1024 + 1));
       if (failure === "redirect") return new Response(null, { status: 302, headers: { location: `${origin}/must-not-follow` } });
-      if (failure === "duplicate") return Response.json([releaseVersion("0.4.0"), releaseVersion("0.4.0")]);
-      return Response.json([{ ...releaseVersion("0.4.0"), html_url: "https://evil.example/release" }]);
+      if (failure === "duplicate") return Response.json([releaseVersion(newerVersion), releaseVersion(newerVersion)]);
+      return Response.json([{ ...releaseVersion(newerVersion), html_url: "https://evil.example/release" }]);
     };
     const evidence = report(await run(["version-check"], env)); expect(evidence.comparison).toBe("unavailable"); expect(evidence.release).toBeUndefined(); expect(requests).toHaveLength(failure === "exhausted" ? 5 : 1);
   }
@@ -231,7 +238,7 @@ test("complete pagination selects across pages and rejects unfinished or untrust
 
 test("one aggregate byte limit applies across individually bounded pages", async () => {
   const { env } = context();
-  const page = Array.from({ length: 100 }, (_, index) => ({ ...releaseVersion("0.4.0"), tag_name: `unrelated-${index}`, assets: [], ignoredPadding: "x".repeat(6000) }));
+  const page = Array.from({ length: 100 }, (_, index) => ({ ...releaseVersion(newerVersion), tag_name: `unrelated-${index}`, assets: [], ignoredPadding: "x".repeat(6000) }));
   route = url => Response.json(page, { headers: { link: `<${origin}/repos/cpaikr/kasb/releases?per_page=100&page=${Number(url.searchParams.get("page")) + 1}>; rel="next"` } });
   expect(report(await run(["version-check"], env)).comparison).toBe("unavailable"); expect(requests).toHaveLength(2);
 });
@@ -318,11 +325,11 @@ test("a complete full terminal page is valid, including the fifth bounded page",
     const { env } = context();
     route = url => {
       const page = Number(url.searchParams.get("page"));
-      const releases = Array.from({ length: 100 }, (_, index) => ({ ...releaseVersion("0.4.0"), tag_name: `unrelated-${page}-${index}`, assets: [] }));
-      if (page === finalPage) { releases[99] = releaseVersion("0.4.0"); return Response.json(releases); }
+      const releases = Array.from({ length: 100 }, (_, index) => ({ ...releaseVersion(newerVersion), tag_name: `unrelated-${page}-${index}`, assets: [] }));
+      if (page === finalPage) { releases[99] = releaseVersion(newerVersion); return Response.json(releases); }
       return Response.json(releases, { headers: { link: `<${origin}/repos/cpaikr/kasb/releases?per_page=100&page=${page + 1}>; rel="next"` } });
     };
-    expect(report(await run(["version-check"], env)).release.version).toBe("0.4.0");
+    expect(report(await run(["version-check"], env)).release.version).toBe(newerVersion);
     expect(requests).toHaveLength(finalPage);
   }
 });
