@@ -2,24 +2,22 @@
 
 ## Current state
 
-- Publication is authorized. Target version is v0.4.1; latest published release
+- Publication is authorized. Target version is v0.4.2; latest published release
   remains v0.3.3 until strict publication succeeds.
-- The v0.4.0 tag is preserved. Its [release run](https://github.com/cpaikr/kasb/actions/runs/34299379084)
-  passed deterministic gates and Linux/macOS native builds, but Windows cache
-  unit tests failed before asset publication.
-- A [Windows diagnostic](https://github.com/cpaikr/kasb/actions/runs/34300602896)
-  confirmed that probing a bare canonical drive prefix returns OS error 1.
-  Cache directory validation now waits for the root separator before probing.
-- Local cache tests, formatting, Clippy, and independent review passed.
-  The [Windows CLI run](https://github.com/cpaikr/kasb/actions/runs/34300729068)
-  passed all 40 existing tests; its new regression exposed acceptance of an
-  incomplete drive prefix. An explicit root-component guard fixes that edge,
-  and the [focused Windows check](https://github.com/cpaikr/kasb/actions/runs/34301284555)
-  passed. Full Windows validation will run again in the release gate.
+- The v0.4.0 and v0.4.1 tags are preserved. Neither attempt published assets.
+- [v0.4.0](https://github.com/cpaikr/kasb/actions/runs/34299379084) exposed
+  Windows canonical-drive-prefix handling. The fix validates complete roots
+  and rejects incomplete prefixes; v0.4.1 passed the full Windows CLI and
+  installer tests, all four native builds, and all 28 Node consumer checks.
+- [v0.4.1](https://github.com/cpaikr/kasb/actions/runs/34301515003) stopped at
+  the sealed installer consumer's stale requirement to request the retired
+  `/releases/latest` endpoint. Removing that unused fixture route preserves
+  checks for the release-list, exact-tag, archive, and checksum requests.
+- The corrected consumer passed locally against the exact sealed macOS
+  candidate downloaded from v0.4.1 CI. Independent review passed.
 
 ## Next step
 
-Prepare v0.4.1 through
-`bun run release patch --ci`. Follow strict publication through all candidate
-and consumer gates; verify immutable assets, then update this record and
-[release posture](../docs/release.md).
+Prepare v0.4.2 through `bun run release patch --ci`. Follow strict publication
+through all candidate and consumer gates; verify immutable assets, then update
+this record and [release posture](../docs/release.md).

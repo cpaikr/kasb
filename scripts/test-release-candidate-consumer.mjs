@@ -51,7 +51,6 @@ const metadata = Buffer.from(JSON.stringify({
 const routes = new Map([
   [`/repos/${contract.release.repository}/releases?per_page=100&page=1`, { body: Buffer.from(`[${metadata}]`), type: "application/json" }],
   [`/repos/${contract.release.repository}/releases/tags/${tag}`, { body: metadata, type: "application/json" }],
-  [`/repos/${contract.release.repository}/releases/latest`, { body: metadata, type: "application/json" }],
   [`/${contract.release.repository}/releases/download/${tag}/${target.archiveName}`, { body: archiveBytes }],
   [`/${contract.release.repository}/releases/download/${tag}/${contract.release.checksumAsset}`, { body: checksums }],
 ]);
