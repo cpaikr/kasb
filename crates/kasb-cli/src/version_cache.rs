@@ -170,9 +170,18 @@ fn check_directory(path: &Path, create: bool, deadline: &LocalBudget) -> Result<
         return Err(Problem::CacheUnavailable);
     }
     let mut current = PathBuf::new();
-    for component in path.components() {
+    let mut components = path.components().peekable();
+    while let Some(component) = components.next() {
         check_deadline(deadline)?;
         current.push(component);
+        // A Windows drive prefix is not a directory until RootDir is added;
+        // probing a canonical prefix such as \\?\C: fails with ERROR_INVALID_FUNCTION.
+        if matches!(component, std::path::Component::Prefix(_)) {
+            if !matches!(components.peek(), Some(std::path::Component::RootDir)) {
+                return Err(Problem::CacheUnavailable);
+            }
+            continue;
+        }
         match fs::symlink_metadata(&current) {
             Ok(metadata) if metadata.is_dir() && !is_link(&metadata) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound && create => {
@@ -382,6 +391,20 @@ mod tests {
     }
     fn directory() -> tempfile::TempDir {
         tempfile::tempdir().unwrap()
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn canonical_windows_directories_are_checked_after_the_drive_root() {
+        let temp = directory();
+        let canonical = fs::canonicalize(temp.path()).unwrap();
+        let prefix = canonical.components().next().unwrap();
+        assert!(matches!(prefix, std::path::Component::Prefix(_)));
+        assert!(check_directory(Path::new(prefix.as_os_str()), false, &deadline()).is_err());
+        check_directory(&canonical, false, &deadline()).unwrap();
+        let child = canonical.join("cache");
+        check_directory(&child, true, &deadline()).unwrap();
+        assert!(child.is_dir());
     }
 
     #[test]
