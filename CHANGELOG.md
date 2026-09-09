@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.1](https://github.com/cpaikr/kasb/compare/v0.4.0...v0.4.1) (2026-09-09)
+
+### Bug Fixes
+
+* **cli:** validate complete Windows cache path roots ([8cec854](https://github.com/cpaikr/kasb/commit/8cec85426caac2c73b6247918beec994d63f9e49))
+
 ## [0.4.0](https://github.com/cpaikr/kasb/compare/v0.3.3...v0.4.0) (2026-09-09)
 
 ### Features
