@@ -64,6 +64,12 @@ CLI-local cached advisories after successful content operations and an explicit
 and cancellation. Evidence never authorizes replacement, and a standalone
 release does not establish npm registry availability. This capability shipped in v0.4.2.
 
+The checkout adds Windows physical-path diagnostics and current/new-shell
+consumer checks; these await release and independent Windows validation.
+[Windows installation and recovery](windows-installation.md) owns consumer
+setup; the [implementation record](../tasks/windows-installation-visibility.md)
+owns incident evidence and the remaining validation gap.
+
 ## Required evidence before publication
 
 A separately authorized release still requires an unoccupied production

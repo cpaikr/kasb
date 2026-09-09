@@ -1,3 +1,4 @@
+import { testWindowsPathGuidance, testVisibilityReporting } from './test-windows-path-guidance.mjs';
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
 import { chmod, mkdir, mkdtemp, readdir, readFile, readlink, realpath, rm, symlink, writeFile } from "node:fs/promises";
@@ -380,6 +381,8 @@ async function validatePowerShellInstaller() {
   const syntax = await run(executable, ["-NoLogo", "-NoProfile", "-Command", `$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile('${resolve(repositoryRoot, "installers/install.ps1").replaceAll("'", "''")}', [ref]$tokens, [ref]$errors) | Out-Null; if ($errors.Count) { $errors | Out-String | Write-Error; exit 1 }`]);
   assert(syntax.code === 0, `PowerShell installer syntax failed: ${syntax.stderr}`);
 
+  testWindowsPathGuidance(executable);
+  testVisibilityReporting(executable);
   const behaviorTargets = process.platform === "win32"
     ? contract.targets.filter(({ npmPlatform }) => npmPlatform === "win32")
     : contract.targets;
@@ -389,6 +392,11 @@ async function validatePowerShellInstaller() {
     const installDir = join(root, `PowerShell ${target.releaseTarget} path with spaces`);
     const result = await runPowerShell(executable, target, installDir);
     assert(result.code === 0, `${target.releaseTarget} PowerShell install failed: ${result.stderr}`);
+    if (process.platform === "win32") {
+      assert(result.stdout.includes("Physical file in installer context:"), "Windows physical-path diagnostic did not execute");
+      assert(!result.stderr.includes("diagnostic unavailable"), `Windows handle resolution failed: ${result.stderr}`);
+      assert(result.stdout.includes("External terminal visibility and PATH are not verified"), "installer overstated consumer verification");
+    }
     const receipt = JSON.parse(await readFile(join(installDir, contract.release.receiptFile), "utf8"));
     assert(receipt.manager === "standalone", `${target.releaseTarget} PowerShell receipt manager drifted`);
     assert(receipt.version === contract.version, `${target.releaseTarget} PowerShell receipt version drifted`);

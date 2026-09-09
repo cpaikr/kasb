@@ -2,7 +2,7 @@
 
 ## Current
 
-_None._
+[Address Windows installation visibility and PATH setup](tasks/windows-installation-visibility.md)
 
 ## Plans
 

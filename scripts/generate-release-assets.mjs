@@ -531,6 +531,49 @@ $HadDestination = $false
 $HadReceipt = $false
 
 Add-Type -AssemblyName System.Net.Http
+function Write-InstallationVisibility([string]$Path) {
+  # Resolve an open handle: Resolve-Path alone can retain a virtualized AppData path.
+  try {
+    if (-not ('KasbInstaller.FinalPath' -as [type])) {
+      Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
+namespace KasbInstaller {
+  public static class FinalPath {
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+    private static extern uint GetFinalPathNameByHandleW(SafeFileHandle handle, StringBuilder path, uint size, uint flags);
+    public static string Read(SafeFileHandle handle) {
+      var path = new StringBuilder(512);
+      uint size = GetFinalPathNameByHandleW(handle, path, (uint)path.Capacity, 0);
+      if (size == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
+      if (size >= path.Capacity) {
+        path = new StringBuilder(checked((int)size + 1));
+        size = GetFinalPathNameByHandleW(handle, path, (uint)path.Capacity, 0);
+        if (size == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
+        if (size >= path.Capacity) throw new InvalidOperationException("Final path exceeded buffer");
+      }
+      string result = path.ToString();
+      if (result.StartsWith(@"\\\\?\\UNC\\", StringComparison.OrdinalIgnoreCase)) return @"\\\\" + result.Substring(8);
+      if (result.StartsWith(@"\\\\?\\", StringComparison.OrdinalIgnoreCase)) return result.Substring(4);
+      return result;
+    }
+  }
+}
+'@
+    }
+    $Stream = [System.IO.File]::OpenRead($Path)
+    try { $Physical = [KasbInstaller.FinalPath]::Read($Stream.SafeFileHandle) } finally { $Stream.Dispose() }
+    Write-Output "Physical file in installer context: $Physical"
+    if (-not [string]::Equals($Physical, $Path, [StringComparison]::OrdinalIgnoreCase)) {
+      [Console]::Error.WriteLine("kasb: selected path '$Path' resolves to '$Physical'. Redirection or a filesystem alias may be involved; ordinary terminals may not see the selected path.")
+    }
+  } catch {
+    [Console]::Error.WriteLine("kasb: physical-path diagnostic unavailable for '$Path': $($_.Exception.Message)")
+  }
+}
 function Save-BoundedReleaseFile([string]$Uri, [string]$Path, [long]$Limit, [int]$TimeoutSeconds) {
   $Parsed = [uri]$Uri
   $AllowInsecureTestUrl = $env:KASB_INSTALLER_TEST_ALLOW_NONCANONICAL_URLS -eq '1' -and $Parsed.Scheme -eq 'http'
@@ -812,7 +855,14 @@ try {
   Flush-DurableFile $Destination
   Flush-DurableFile $Receipt
   $Committed = $true
-  Write-Output "Installed kasb $Version at $Destination"
+  Write-Output "Installed kasb $Version at $CanonicalDestination (verified in installer context)"
+  if ($RunningWindows) {
+    Write-InstallationVisibility $CanonicalDestination
+    Write-InstallationVisibility (Join-Path $CanonicalInstallDir $ReceiptName)
+    Write-Output "External terminal visibility and PATH are not verified. From an independently opened PowerShell, check the full executable path, then command discovery."
+    Write-Output "If the file is missing there, rerun the official installer there or choose a visible directory with KASB_INSTALL_DIR (incident recovery: %USERPROFILE%\\.local\\bin). Keep the adjacent receipt."
+    Write-Output "Persistent user PATH and current-session PATH need separate setup: https://github.com/cpaikr/kasb/blob/main/docs/windows-installation.md"
+  }
 } finally {
   $PreserveWork = $false
   if (-not $Committed -and $PublishStarted) {

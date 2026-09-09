@@ -35,17 +35,24 @@ your shell profile to make it available in new terminals.
 
 ### Windows
 
-Run in PowerShell 5.1 or newer on Windows x64:
+Run in PowerShell 5.1 or newer on Windows x64, from an ordinary terminal
+opened independently of a packaged desktop agent:
 
 ```powershell
 Invoke-RestMethod https://github.com/cpaikr/kasb/releases/latest/download/install.ps1 | Invoke-Expression
-$env:Path = "$env:LOCALAPPDATA\kasb\bin;$env:Path"
-kasb --version
-kasb --help
 ```
 
-The default install directory is `%LOCALAPPDATA%\kasb\bin`. Add that directory
-to your user `Path` environment variable to make it available in new terminals.
+The default install directory is `%LOCALAPPDATA%\kasb\bin`. Set
+`KASB_INSTALL_DIR` before installing to choose another directory. Follow the
+[Windows PATH setup and verification](docs/windows-installation.md#register-persistent-user-path)
+to register that selected directory persistently, update the current session
+separately, and verify full-path execution and `kasb --version` / `kasb --help`
+in both current and newly opened ordinary terminals.
+
+If the installer sees the executable but your terminal cannot see the same full
+path, use [Windows installation recovery](docs/windows-installation.md#choose-a-visible-destination).
+Packaged apps can redirect AppData writes; restarting a shell or changing PATH
+alone cannot make a privately stored file visible.
 
 ### Upgrade
 

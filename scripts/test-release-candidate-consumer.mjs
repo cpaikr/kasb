@@ -132,6 +132,36 @@ try {
     }
   }
 
+  if (process.platform === "win32") {
+    // This runner and its children share a filesystem context. These checks
+    // cover discovery, not escape from a packaged installer's private view.
+    const check = `
+$ErrorActionPreference = 'Stop'
+$Expected = Join-Path $env:KASB_INSTALL_DIR 'kasb.exe'
+if (-not (Test-Path -LiteralPath $Expected -PathType Leaf)) { throw 'consumer cannot see executable' }
+$Found = (Get-Command kasb -CommandType Application -ErrorAction Stop).Source
+if ($Found -ine $Expected) { throw "unexpected kasb command: $Found" }
+foreach ($Argument in @('--version', '--help')) {
+  & $Expected $Argument
+  if ($LASTEXITCODE -ne 0) { throw 'full-path invocation failed' }
+  kasb $Argument
+  if ($LASTEXITCODE -ne 0) { throw 'command-name invocation failed' }
+}
+`;
+    // Node chooses one lexicographically first key when Windows env contains
+    // both PATH and Path. Supply exactly one to preserve the intended prepend.
+    const consumerEnvironment = Object.fromEntries(Object.entries(process.env)
+      .filter(([key]) => key.toLowerCase() !== "path"));
+    const consumer = await run("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", check + `
+# A second shell checks inherited PATH; it is still in the runner context.
+& powershell.exe -NoLogo -NoProfile -NonInteractive -Command $env:KASB_CONSUMER_CHECK
+if ($LASTEXITCODE -ne 0) { throw 'new consumer shell failed' }
+`], { env: { ...consumerEnvironment, KASB_INSTALL_DIR: installDirectory,
+      Path: `${installDirectory};${process.env.Path ?? process.env.PATH ?? ""}`,
+      KASB_CONSUMER_CHECK: check } });
+    assertProcessSucceeded(consumer, "Windows runner current/new-shell discovery (shared filesystem context)");
+  }
+
   for (const [args, operation] of [
     [["upgrade", "--check"], "upgrade-check"],
     [["upgrade"], "upgrade"],
