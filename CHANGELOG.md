@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.3](https://github.com/cpaikr/kasb/compare/v0.4.2...v0.4.3) (2026-09-09)
+
+### Bug Fixes
+
+* **installer:** diagnose Windows installation visibility and document PATH recovery ([940a93d](https://github.com/cpaikr/kasb/commit/940a93db1ab77f86ff2b4273d0c6b9ee1c71c16d))
+
 ## [0.4.2](https://github.com/cpaikr/kasb/compare/v0.4.1...v0.4.2) (2026-09-09)
 
 ## [0.4.1](https://github.com/cpaikr/kasb/compare/v0.4.0...v0.4.1) (2026-09-09)

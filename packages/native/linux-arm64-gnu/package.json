@@ -1,6 +1,6 @@
 {
   "name": "@sjunepark/kasb-linux-arm64-gnu",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Native KASB Node addon and Rust CLI for linux-arm64.",
   "main": "kasb.linux-arm64-gnu.node",
   "files": [

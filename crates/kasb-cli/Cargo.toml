@@ -25,7 +25,7 @@ flate2 = "1.1.9"
 fs2 = "0.4.3"
 tempfile = "3.23.0"
 futures-util.workspace = true
-kasb = { path = "../kasb", version = "0.4.2" }
+kasb = { path = "../kasb", version = "0.4.3" }
 semver = "1.0.28"
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true, features = ["preserve_order"] }
