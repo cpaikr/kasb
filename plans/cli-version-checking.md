@@ -1,7 +1,9 @@
 # Add cached CLI version advisories
 
 Status: complete (2026-09-08). Implementation, bounded review, documentation
-harmonization, and host validation passed. Publication is outside this item.
+harmonization, and host validation passed. The subsequent
+[release task](../tasks/release-cli-version-checking.md) completed cross-platform
+validation and publication.
 
 ## Outcome and decision
 
@@ -92,6 +94,5 @@ commit, push, or PR is part of this work.
 
 ## Next action
 
-None within this implementation item. Windows/Linux runtime evidence remains
-a prerequisite of the existing release gates; a release requires separate
-authorization.
+None. Subsequent Windows/Linux runtime validation and publication are recorded
+in the [completed release task](../tasks/release-cli-version-checking.md).

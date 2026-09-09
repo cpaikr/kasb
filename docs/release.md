@@ -4,7 +4,10 @@ Standalone Rust CLI releases are available through immutable GitHub Releases
 from the public canonical repository `cpaikr/kasb`. The first Rust/Node product
 release is [v0.3.3](https://github.com/cpaikr/kasb/releases/tag/v0.3.3).
 [The completed first-release task](../tasks/perform-first-rust-node-release.md)
-records its publication and validation evidence.
+records its publication and validation evidence. The current release is
+[v0.4.2](https://github.com/cpaikr/kasb/releases/tag/v0.4.2), which delivers CLI
+version checking. Its [release record](../tasks/release-cli-version-checking.md)
+contains the completed platform and publication evidence.
 
 ## Identity authorities
 
@@ -59,9 +62,7 @@ CLI-local cached advisories after successful content operations and an explicit
 `version-check` report for every installation. See the
 [CLI contract](../crates/kasb-cli/README.md) for schema, caching, opt-outs, bounds,
 and cancellation. Evidence never authorizes replacement, and a standalone
-release does not establish npm registry availability. This addition awaits a
-separately authorized release; it does not change the already-published v0.3.3
-artifact.
+release does not establish npm registry availability. This capability shipped in v0.4.2.
 
 ## Required evidence before publication
 
