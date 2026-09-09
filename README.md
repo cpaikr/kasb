@@ -71,9 +71,8 @@ On Windows, replacement finishes after the command exits. See
 [release posture](docs/release.md#standalone-ownership-and-trust) for ownership
 and verification details.
 
-This checkout also implements `kasb version-check [--refresh]` for any
-installation and cached JSON advisories after successful content commands.
-These additions await the next release. The
+Since v0.4.2, `kasb version-check [--refresh]` works for any installation,
+with cached JSON advisories after successful content commands. The
 [CLI contract](crates/kasb-cli/README.md#output-and-version-advisories) describes
 output, latency, caching, and opt-outs.
 

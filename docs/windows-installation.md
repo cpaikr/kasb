@@ -25,11 +25,11 @@ do not copy only the executable or hand-edit the receipt. The receipt must
 name the selected executable and match its digest for
 [managed upgrades](release.md#standalone-ownership-and-trust).
 
-The checkout installer reports handle-resolved paths for the executable and
+Since v0.4.3, the installer reports handle-resolved paths for the executable and
 receipt, warns when they differ from the selected paths, and explicitly leaves
-external visibility unverified. This diagnostic awaits a release; published
-installers may only print the install location. A difference can also be a
-junction or another filesystem alias; it does not alone identify virtualization.
+external visibility unverified. Older installers may only print the install
+location. A difference can also be a junction or another filesystem alias; it
+does not alone identify virtualization.
 A failed diagnostic is reported without undoing a completed installation.
 
 ## Register persistent user PATH

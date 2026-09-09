@@ -5,9 +5,12 @@ from the public canonical repository `cpaikr/kasb`. The first Rust/Node product
 release is [v0.3.3](https://github.com/cpaikr/kasb/releases/tag/v0.3.3).
 [The completed first-release task](../tasks/perform-first-rust-node-release.md)
 records its publication and validation evidence. The current release is
-[v0.4.2](https://github.com/cpaikr/kasb/releases/tag/v0.4.2), which delivers CLI
-version checking. Its [release record](../tasks/release-cli-version-checking.md)
-contains the completed platform and publication evidence.
+[v0.4.3](https://github.com/cpaikr/kasb/releases/tag/v0.4.3), which delivers
+Windows installation visibility diagnostics and PATH recovery guidance. Its
+[implementation and release record](../tasks/windows-installation-visibility.md)
+contains native platform and publication evidence and the remaining independent
+Windows terminal verification gap. CLI version checking shipped in
+[v0.4.2](../tasks/release-cli-version-checking.md).
 
 ## Identity authorities
 
@@ -64,8 +67,10 @@ CLI-local cached advisories after successful content operations and an explicit
 and cancellation. Evidence never authorizes replacement, and a standalone
 release does not establish npm registry availability. This capability shipped in v0.4.2.
 
-The checkout adds Windows physical-path diagnostics and current/new-shell
-consumer checks; these await release and independent Windows validation.
+The v0.4.3 release includes Windows physical-path diagnostics, validated by
+native Windows installer tests and current/new-shell candidate consumer checks.
+Those runner checks do not establish visibility from an ordinary terminal
+outside a packaged installer's filesystem context.
 [Windows installation and recovery](windows-installation.md) owns consumer
 setup; the [implementation record](../tasks/windows-installation-visibility.md)
 owns incident evidence and the remaining validation gap.

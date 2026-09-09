@@ -2,7 +2,7 @@
 
 ## Current
 
-[Address Windows installation visibility and PATH setup](tasks/windows-installation-visibility.md)
+[Verify Windows installation from an independent ordinary terminal](tasks/windows-installation-visibility.md)
 
 ## Plans
 
