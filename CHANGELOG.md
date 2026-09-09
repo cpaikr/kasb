@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.0](https://github.com/cpaikr/kasb/compare/v0.3.3...v0.4.0) (2026-09-09)
+
+### Features
+
+* **cli:** add bounded version checks and cached update advisories ([972fc24](https://github.com/cpaikr/kasb/commit/972fc24b5a1df9e583644b6b70cbcf508ce272d4))
+
 ## [0.3.3](https://github.com/cpaikr/kasb/compare/v0.3.2...v0.3.3) (2026-09-08)
 
 ### Bug Fixes
