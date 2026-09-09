@@ -35,6 +35,7 @@ const tag = releaseTag(contract.release, contract.version);
 const requests = [];
 const metadata = Buffer.from(JSON.stringify({
   tag_name: tag,
+  html_url: `https://github.com/${contract.release.repository}/releases/tag/${tag}`,
   immutable: true,
   draft: false,
   prerelease: false,
@@ -48,6 +49,7 @@ const metadata = Buffer.from(JSON.stringify({
   ],
 }));
 const routes = new Map([
+  [`/repos/${contract.release.repository}/releases?per_page=100&page=1`, { body: Buffer.from(`[${metadata}]`), type: "application/json" }],
   [`/repos/${contract.release.repository}/releases/tags/${tag}`, { body: metadata, type: "application/json" }],
   [`/repos/${contract.release.repository}/releases/latest`, { body: metadata, type: "application/json" }],
   [`/${contract.release.repository}/releases/download/${tag}/${target.archiveName}`, { body: archiveBytes }],

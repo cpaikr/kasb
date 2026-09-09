@@ -5,31 +5,32 @@ description: Research public KASB standards and Q&A material with the read-only 
 
 # KASB
 
-Use the published CLI as the live contract for finding and retrieving KASB source material. Keep this skill procedural; do not treat it as a command manual.
+Use the installed standalone CLI as the live contract for finding and retrieving KASB source material. Keep this skill procedural; do not treat it as a command manual.
 
 ## Discover the Current Interface
 
-1. Run the current package's top-level help before querying:
+1. Run the installed CLI's top-level help before querying:
 
    ```sh
-   npx --yes @sjunepark/kasb@latest --help
+   kasb --help
    ```
 
 2. Choose the relevant command from that output and inspect its current contract:
 
    ```sh
-   npx --yes @sjunepark/kasb@latest help <command>
+   kasb help <command>
    ```
 
 3. Derive commands, options, required inputs, workflows, cautions, and output handling from that help. Do not rely on remembered flags or copy a previous invocation without checking it.
 
-If Node.js, `npx`, or the package is unavailable, report the missing prerequisite and stop. Do not silently replace KASB retrieval with memory or browser results.
+If `kasb` is unavailable, report that prerequisite and point to the repository's standalone installation instructions. The GitHub release channel does not establish npm registry availability. Do not silently replace KASB retrieval with memory or browser results.
 
 ## Retrieve Evidence
 
-- Run the narrowest command that answers the request, using the same `npx --yes @sjunepark/kasb@latest` prefix.
+- Run the narrowest command that answers the request, using the same `kasb` executable.
 - Follow identifiers and next steps returned by the CLI or described in its help. Never invent or translate standard numbers, paragraph references, section identifiers, or Q&A document numbers.
 - Inspect structured success and failure output before deciding the next action. On invalid input, revisit that command's help and repair only the identified input.
+- Treat `advisories.versionCheck` as separate release evidence; preserve the primary result even when the advisory is uncertain. Do not install or upgrade merely because an advisory is present.
 - Keep the workflow read-only. Treat returned material as source evidence, not accounting, legal, tax, investment, or audit advice.
 
 ## Report the Result

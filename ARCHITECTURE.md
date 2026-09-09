@@ -107,8 +107,16 @@ kasb upgrade -> immutable cpaikr/kasb release -> checksum + binary identity
 
 `upgrade --check` performs bounded release discovery without replacement.
 Source-built, npm-owned, missing-receipt, or digest-mismatched executables are
-unmanaged and must be upgraded by their owner. Ordinary KASB commands never
-perform update discovery.
+unmanaged and must be upgraded by their owner. CLI-local `release.rs` owns
+complete, bounded stable-release selection shared with version reporting.
+
+After successful content operations, the CLI evaluates disposable cached release
+evidence and may add `advisories.versionCheck` to the same JSON document.
+`version-check` explicitly reports evidence for every installation without a
+KASB client. The cache carries no ownership or replacement authority; actual
+upgrades always obtain fresh evidence. See the
+[CLI contract](crates/kasb-cli/README.md) for schema, bounds, opt-outs, and
+cancellation. This behavior does not extend SDK envelopes or the npm launcher.
 
 The Node facade may reject malformed public input without network access. Rust
 validates again at the native trust boundary. `KasbClient` owns transport

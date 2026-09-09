@@ -365,7 +365,16 @@ The CLI should:
 - keep help text, examples, and output presentation outside capability contracts
 - make `kasb help <command>` and `<command> --help` both exit successfully without JSON failure envelopes
 
-Success envelope shape:
+Successful CLI content responses may add an optional top-level
+`advisories.versionCheck` beside the primary envelope fields. This additive
+CLI-local version-evidence extension does not change SDK envelopes or provider
+warnings. An explicit `version-check` command reports the same object at
+`result.versionCheck` with CLI-local metadata. The
+[CLI contract](../../crates/kasb-cli/README.md) owns its schema and runtime
+policy. The six-operation semantic judge opts out explicitly and remains exact;
+a separate advisory judge validates the extension.
+
+Success envelope shape without an advisory:
 
 ```json
 {

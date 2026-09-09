@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn, spawnSync } from "node:child_process";
+import { execFile, spawn, spawnSync } from "node:child_process";
 import {
   chmod,
   access,
@@ -13,6 +13,8 @@ import {
   rm,
   writeFile
 } from "node:fs/promises";
+import { createServer } from "node:http";
+import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -91,6 +93,7 @@ try {
   await testLauncherContract(consumer, targetDirectory);
   await testSignals(consumer, targetDirectory);
   await testSignalProbeCleanup(consumer, targetDirectory);
+  await testVersionAdvisory(consumer, targetDirectory);
   await testInstallationErrors(consumer);
 
   const missingConsumer = join(scratch, "consumer-missing-native");
@@ -255,6 +258,75 @@ async function testPackedAddon(consumer) {
     );
   `;
   run(process.execPath, ["--input-type=module", "-e", source], { cwd: consumer });
+}
+
+async function testVersionAdvisory(consumer, targetDirectory) {
+  const fixtureTarget = join(targetDirectory, "cli-conformance-fixtures");
+  run("cargo", ["build", "--locked", "-p", "kasb-cli", "--bin", "kasb", "--features", "conformance-fixtures", "--target-dir", fixtureTarget]);
+  const fixtureBinary = join(fixtureTarget, "debug", target.cliFile);
+  const installedCli = join(consumer, "node_modules", ...target.packageName.split("/"), target.cliFile);
+  const saved = await readFile(installedCli);
+  const cases = JSON.parse(await readFile(join(repositoryRoot, "conformance/v1/cases.json"), "utf8"));
+  const fixture = cases.cases.find(value => value.id === "get-paragraph-success");
+  const expected = JSON.parse(await readFile(join(repositoryRoot, fixture.expected), "utf8")).value;
+  const routes = await Promise.all(fixture.routes.map(async route => ({ requestUrl: route.requestUrl, payload: JSON.parse(await readFile(join(repositoryRoot, route.fixture), "utf8")) })));
+  const directory = await realpath(consumer);
+  const config = join(directory, "version-fixtures.json");
+  await writeFile(config, JSON.stringify({ routes, callsPath: join(directory, "version-provider-calls.jsonl") }));
+  const releases = JSON.parse(await readFile(join(repositoryRoot, "fixtures/version-check/releases.json"), "utf8"));
+  const requests = [];
+  let interruptPendingRequest;
+  const server = createServer((request, response) => {
+    requests.push(request.url);
+    if (request.url !== "/repos/cpaikr/kasb/releases?per_page=100&page=1") { response.writeHead(404).end(); return; }
+    if (interruptPendingRequest) { interruptPendingRequest(response); return; }
+    response.setHeader("content-type", "application/json"); response.end(JSON.stringify(releases));
+  });
+  await new Promise((ready, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", ready); });
+  try {
+    await copyFile(fixtureBinary, installedCli);
+    const env = { ...process.env, HOME: directory, XDG_CACHE_HOME: directory, LOCALAPPDATA: directory, CI: "1", KASB_NO_VERSION_CHECK: "0", KASB_CLI_CONFORMANCE_CONFIG: config, KASB_UPGRADE_TEST_ALLOW_NONCANONICAL_URLS: "1", KASB_UPGRADE_TEST_LATEST_URL: `http://127.0.0.1:${server.address().port}/repos/cpaikr/kasb/releases/latest` };
+    const args = ["get-paragraph", "--std-num", "1116", "--para-num", "23", "--pretty"];
+    const launched = await promisify(execFile)(process.execPath, [launcherPath(consumer), ...args], { cwd: consumer, env, timeout: 10000 });
+    assert.equal(launched.stderr, ""); assert(launched.stdout.endsWith("\n"));
+    const value = JSON.parse(launched.stdout);
+    assert.equal(value.advisories.versionCheck.release.version, "0.4.0");
+    assert.equal(value.advisories.versionCheck.installation.owner, "npm");
+    delete value.advisories;
+    value.metadata.fetchedAt = expected.metadata.fetchedAt;
+    assert.deepEqual(value, expected, "packed launcher must preserve the complete primary result with default-on advisories");
+    assert.deepEqual(requests, ["/repos/cpaikr/kasb/releases?per_page=100&page=1"]);
+    if (process.platform !== "win32") {
+      for (const signal of ["SIGINT", "SIGTERM"]) {
+        const home = join(directory, signal); await mkdir(home);
+        await new Promise((resolve, reject) => {
+          let pendingResponse;
+          const child = spawn(process.execPath, [launcherPath(consumer), ...args], {
+            cwd: consumer, env: { ...env, HOME: home, XDG_CACHE_HOME: home }, stdio: ["ignore", "pipe", "pipe"],
+          });
+          let stdout = ""; let stderr = "";
+          const timeout = setTimeout(() => { child.kill("SIGKILL"); reject(new Error("packaged incidental cancellation timed out")); }, 10000);
+          interruptPendingRequest = response => { pendingResponse = response; child.kill(signal); };
+          child.stdout.setEncoding("utf8"); child.stderr.setEncoding("utf8");
+          child.stdout.on("data", chunk => { stdout += chunk; }); child.stderr.on("data", chunk => { stderr += chunk; });
+          child.once("error", error => { clearTimeout(timeout); reject(error); });
+          child.once("close", (code, interrupted) => {
+            clearTimeout(timeout); interruptPendingRequest = undefined; pendingResponse?.end();
+            try {
+              assert.equal(code, 0); assert.equal(interrupted, null); assert.equal(stderr, "");
+              const preserved = JSON.parse(stdout); preserved.metadata.fetchedAt = expected.metadata.fetchedAt;
+              assert.deepEqual(preserved, expected, `packed ${signal} must preserve successful primary output`);
+              resolve();
+            } catch (error) { reject(error); }
+          });
+        });
+      }
+    }
+
+  } finally {
+    await writeFile(installedCli, saved);
+    await new Promise(resolve => server.close(resolve));
+  }
 }
 
 async function testLauncherContract(consumer, targetDirectory) {

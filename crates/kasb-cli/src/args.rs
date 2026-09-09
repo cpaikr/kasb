@@ -91,6 +91,9 @@ Notes:
     color = clap::ColorChoice::Never
 )]
 pub(crate) struct Cli {
+    /// Skip incidental version inspection, cache access, and fetching.
+    #[arg(long, global = true)]
+    no_version_check: bool,
     #[command(subcommand)]
     command: Operation,
 }
@@ -117,6 +120,8 @@ enum Operation {
     GetQna(GetQnaArgs),
     /// Check or apply a managed standalone CLI upgrade.
     Upgrade(UpgradeArgs),
+    /// Report cached release evidence for any installation without changing it.
+    VersionCheck(VersionCheckArgs),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -128,6 +133,7 @@ pub(crate) enum OperationName {
     SearchQna,
     GetQna,
     Upgrade,
+    VersionCheck,
 }
 
 impl OperationName {
@@ -140,6 +146,7 @@ impl OperationName {
             Self::SearchQna => "search-qna",
             Self::GetQna => "get-qna",
             Self::Upgrade => "upgrade",
+            Self::VersionCheck => "version-check",
         }
     }
 }
@@ -378,6 +385,16 @@ struct GetQnaArgs {
 }
 
 #[derive(Debug, Args)]
+struct VersionCheckArgs {
+    /// Bypass the evidence TTL and failure cooldown.
+    #[arg(long)]
+    refresh: bool,
+    /// Print indented JSON.
+    #[arg(long)]
+    pretty: bool,
+}
+
+#[derive(Debug, Args)]
 struct UpgradeArgs {
     /// Check the latest immutable release without changing the installation.
     #[arg(long)]
@@ -393,11 +410,13 @@ pub(crate) struct Invocation {
     pub failure_pretty: bool,
     pub used_options: BTreeMap<&'static str, &'static str>,
     pub upgrade_check: bool,
+    pub no_version_check: bool,
+    pub version_refresh: bool,
 }
 
 impl Cli {
     pub(crate) fn into_invocation(self) -> Invocation {
-        match self.command {
+        let mut invocation = match self.command {
             Operation::SearchStandards(args) => {
                 let mut input = Map::new();
                 let mut used = BTreeMap::new();
@@ -501,6 +520,17 @@ impl Cli {
                 insert_string(&mut input, &mut used, "keyword", "--keyword", args.keyword);
                 Invocation::new(OperationName::GetQna, input, args.output, args.pretty, used)
             }
+            Operation::VersionCheck(args) => {
+                let mut invocation = Invocation::new(
+                    OperationName::VersionCheck,
+                    Map::new(),
+                    None,
+                    args.pretty,
+                    BTreeMap::new(),
+                );
+                invocation.version_refresh = args.refresh;
+                invocation
+            }
             Operation::Upgrade(args) => {
                 let mut invocation = Invocation::new(
                     OperationName::Upgrade,
@@ -512,7 +542,9 @@ impl Cli {
                 invocation.upgrade_check = args.check;
                 invocation
             }
-        }
+        };
+        invocation.no_version_check = self.no_version_check;
+        invocation
     }
 }
 
@@ -532,6 +564,8 @@ impl Invocation {
             failure_pretty: pretty,
             used_options,
             upgrade_check: false,
+            no_version_check: false,
+            version_refresh: false,
         }
     }
 }

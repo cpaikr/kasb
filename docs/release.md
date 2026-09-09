@@ -54,8 +54,14 @@ waits for the running executable to exit, applies or rolls back both files, and
 records a terminal status; scheduling is not reported as an applied upgrade.
 
 npm, Cargo/source, missing-receipt, and receipt/digest-mismatched installations
-remain owned by their installation method. Ordinary KASB commands never check
-for updates or change behavior because an update exists.
+remain owned by their installation method. The repository now implements
+CLI-local cached advisories after successful content operations and an explicit
+`version-check` report for every installation. See the
+[CLI contract](../crates/kasb-cli/README.md) for schema, caching, opt-outs, bounds,
+and cancellation. Evidence never authorizes replacement, and a standalone
+release does not establish npm registry availability. This addition awaits a
+separately authorized release; it does not change the already-published v0.3.3
+artifact.
 
 ## Required evidence before publication
 

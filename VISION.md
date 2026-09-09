@@ -23,7 +23,7 @@ The target experience is closer to `yfinance` than browsing:
 - stable identifiers, references, and source metadata;
 - a native Rust API for direct embedding;
 - a parseable Rust `clap` CLI, also installable through an npm launcher;
-- a checksummed standalone CLI with explicit managed check/upgrade commands;
+- a checksummed standalone CLI with cached version evidence and explicit managed upgrades;
 - an asynchronous Node SDK and neutral npm toolset; and
 - one Rust implementation of provider and domain behavior behind every public
   surface.
@@ -116,7 +116,7 @@ The Pi export and extension are absent and receive no replacement host adapter.
 - browser, edge, Deno, or Bun-runtime npm support;
 - premature multi-source abstraction; and
 - publication or external provider changes without explicit authorization; and
-- automatic, background, or ordinary-command update checks.
+- automatic installation or background update refresh.
 
 ## Success Criteria
 

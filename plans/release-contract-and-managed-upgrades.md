@@ -5,7 +5,9 @@ time-scoped to the original delivery. Version and repository-visibility
 statements below describe the PR #22
 completion state. Current identity, visibility, and release operations are
 owned by [release posture](../docs/release.md); subsequent pipeline changes are
-tracked in [release flow alignment](release-flow-alignment.md).
+tracked in [release flow alignment](release-flow-alignment.md). The later
+[CLI version-checking plan](cli-version-checking.md) supersedes this record's
+ordinary-command check prohibition.
 
 ## Outcome
 

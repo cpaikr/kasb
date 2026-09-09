@@ -48,7 +48,10 @@ semantic outcomes and exact outbound request multisets. It also covers help,
 failure transport, summary/raw projections, alias precedence, production
 feature isolation, and OS-native signal termination. Deliberate bad controls
 prove that exit, stderr, newline, and JSON drift are detected before the real
-binary is judged.
+binary is judged. These exact capability checks explicitly opt out of incidental
+version checks. `version-check.test.ts` separately exercises the default-on
+CLI extension against `version-check.schema.json`, independent release fixtures,
+and loopback release transport; it preserves the primary judge's exactness.
 
 `node-sdk.test.ts` stages a judge-only Node addon and invokes the public Node
 facade in a separate process. The addon routes every operation through the same

@@ -1,0 +1,366 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "KASB CLI version evidence report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "currentVersion",
+    "comparison",
+    "freshness",
+    "distribution",
+    "installation",
+    "problems"
+  ],
+  "properties": {
+    "currentVersion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "comparison": {
+      "enum": [
+        "newer",
+        "equal",
+        "ahead",
+        "noStableRelease",
+        "uncomparable",
+        "unavailable"
+      ]
+    },
+    "freshness": {
+      "enum": [
+        "fresh",
+        "stale",
+        "unavailable"
+      ]
+    },
+    "observedAt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "ageSeconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "tag",
+        "url",
+        "repository"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "maxLength": 64
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "maxLength": 65
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://github\\.com/cpaikr/kasb/releases/tag/v[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "repository": {
+          "const": "cpaikr/kasb"
+        },
+        "target": {
+          "enum": [
+            "linux-x64-gnu",
+            "linux-arm64-gnu",
+            "darwin-arm64",
+            "win32-x64-msvc"
+          ]
+        }
+      }
+    },
+    "distribution": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "ready",
+                "unsupported",
+                "unknown"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "problems"
+          ],
+          "properties": {
+            "status": {
+              "const": "incomplete"
+            },
+            "problems": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "code"
+                    ],
+                    "properties": {
+                      "code": {
+                        "const": "mutableRelease"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "code",
+                      "name",
+                      "reason"
+                    ],
+                    "properties": {
+                      "code": {
+                        "const": "asset"
+                      },
+                      "name": {
+                        "type": "string",
+                        "maxLength": 160,
+                        "pattern": "^(kasb-[0-9]+\\.[0-9]+\\.[0-9]+-(linux-x64-gnu|linux-arm64-gnu|darwin-arm64|win32-x64-msvc)\\.tar\\.gz|SHA256SUMS|install\\.sh|install\\.ps1)$"
+                      },
+                      "reason": {
+                        "enum": [
+                          "missing",
+                          "duplicate",
+                          "invalidUrl",
+                          "invalidSize"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "installation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "verified",
+        "nextAction"
+      ],
+      "properties": {
+        "owner": {
+          "enum": [
+            "standalone",
+            "npm",
+            "cargo",
+            "unknown"
+          ]
+        },
+        "verified": {
+          "type": "boolean"
+        },
+        "nextAction": {
+          "enum": [
+            "upgradeWithKasb",
+            "consultNpmOwner",
+            "rebuildWithCargo",
+            "inspectInstallationOwner",
+            "inspectRelease"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "owner": {
+                "const": "standalone"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "verified": {
+                "const": true
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "verified": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "problems": {
+      "type": "array",
+      "maxItems": 9,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "refreshFailed",
+          "refreshTimedOut",
+          "refreshInProgress",
+          "cacheUnavailable",
+          "cacheInvalid",
+          "inspectionFailed",
+          "inspectionTimedOut",
+          "clockInvalid",
+          "uncomparableIdentity"
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "freshness": {
+            "const": "unavailable"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "observedAt"
+              ]
+            },
+            {
+              "required": [
+                "ageSeconds"
+              ]
+            },
+            {
+              "required": [
+                "release"
+              ]
+            }
+          ]
+        },
+        "properties": {
+          "comparison": {
+            "enum": [
+              "unavailable",
+              "uncomparable"
+            ]
+          },
+          "distribution": {
+            "properties": {
+              "status": {
+                "const": "unknown"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "observedAt",
+          "ageSeconds"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "enum": [
+              "newer",
+              "equal",
+              "ahead"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "release"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "comparison": {
+            "const": "noStableRelease"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "release"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "installation": {
+            "properties": {
+              "nextAction": {
+                "const": "upgradeWithKasb"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "comparison": {
+            "const": "newer"
+          },
+          "freshness": {
+            "const": "fresh"
+          },
+          "distribution": {
+            "properties": {
+              "status": {
+                "const": "ready"
+              }
+            }
+          },
+          "installation": {
+            "properties": {
+              "owner": {
+                "const": "standalone"
+              },
+              "verified": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

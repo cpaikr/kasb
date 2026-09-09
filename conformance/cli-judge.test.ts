@@ -68,8 +68,8 @@ describe("Rust CLI process judge", () => {
   }
 
   test.each([
-    [[], "Usage: kasb <COMMAND>"],
-    [["--help"], "Usage: kasb <COMMAND>"],
+    [[], "Usage: kasb [OPTIONS] <COMMAND>"],
+    [["--help"], "Usage: kasb [OPTIONS] <COMMAND>"],
     [["help", "search-standards"], "Usage: kasb search-standards"],
     [["get-paragraph"], "Usage: kasb get-paragraph"],
     [["get-section", "--help"], "--index-document-id <text>"],
@@ -435,7 +435,7 @@ describe("Rust CLI process judge", () => {
         const processHandle = Bun.spawn({
           cmd: [fixtureBinary, ...cliCase.argv],
           cwd: repoRoot,
-          env: { ...process.env, KASB_CLI_CONFORMANCE_CONFIG: configPath },
+          env: { ...process.env, KASB_NO_VERSION_CHECK: "1", KASB_CLI_CONFORMANCE_CONFIG: configPath },
           stdout: "pipe",
           stderr: "pipe",
         });
@@ -494,6 +494,7 @@ const runBinary = (
     cwd: repoRoot,
     env: {
       ...process.env,
+      KASB_NO_VERSION_CHECK: "1",
       ...(configPath === undefined ? {} : { KASB_CLI_CONFORMANCE_CONFIG: configPath }),
     },
     encoding: "utf8",

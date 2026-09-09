@@ -1,0 +1,263 @@
+{
+  "newer": {
+    "result": {
+      "versionCheck": {
+        "currentVersion": "0.3.3",
+        "comparison": "newer",
+        "freshness": "fresh",
+        "observedAt": 1788825600,
+        "ageSeconds": 12,
+        "release": {
+          "version": "0.4.0",
+          "tag": "v0.4.0",
+          "url": "https://github.com/cpaikr/kasb/releases/tag/v0.4.0",
+          "repository": "cpaikr/kasb",
+          "target": "darwin-arm64"
+        },
+        "distribution": {
+          "status": "ready"
+        },
+        "installation": {
+          "owner": "standalone",
+          "verified": true,
+          "nextAction": "upgradeWithKasb"
+        },
+        "problems": []
+      }
+    },
+    "metadata": {
+      "cliTransportVersion": "1",
+      "operation": "version-check"
+    },
+    "references": {},
+    "warnings": []
+  },
+  "equal": {
+    "result": {
+      "versionCheck": {
+        "currentVersion": "0.4.0",
+        "comparison": "equal",
+        "freshness": "fresh",
+        "observedAt": 1788825600,
+        "ageSeconds": 12,
+        "release": {
+          "version": "0.4.0",
+          "tag": "v0.4.0",
+          "url": "https://github.com/cpaikr/kasb/releases/tag/v0.4.0",
+          "repository": "cpaikr/kasb",
+          "target": "darwin-arm64"
+        },
+        "distribution": {
+          "status": "ready"
+        },
+        "installation": {
+          "owner": "standalone",
+          "verified": true,
+          "nextAction": "inspectRelease"
+        },
+        "problems": []
+      }
+    },
+    "metadata": {
+      "cliTransportVersion": "1",
+      "operation": "version-check"
+    },
+    "references": {},
+    "warnings": []
+  },
+  "ahead": {
+    "result": {
+      "versionCheck": {
+        "currentVersion": "0.5.0",
+        "comparison": "ahead",
+        "freshness": "fresh",
+        "observedAt": 1788825600,
+        "ageSeconds": 12,
+        "release": {
+          "version": "0.4.0",
+          "tag": "v0.4.0",
+          "url": "https://github.com/cpaikr/kasb/releases/tag/v0.4.0",
+          "repository": "cpaikr/kasb",
+          "target": "darwin-arm64"
+        },
+        "distribution": {
+          "status": "ready"
+        },
+        "installation": {
+          "owner": "standalone",
+          "verified": true,
+          "nextAction": "inspectRelease"
+        },
+        "problems": []
+      }
+    },
+    "metadata": {
+      "cliTransportVersion": "1",
+      "operation": "version-check"
+    },
+    "references": {},
+    "warnings": []
+  },
+  "noStableRelease": {
+    "result": {
+      "versionCheck": {
+        "currentVersion": "0.3.3",
+        "comparison": "noStableRelease",
+        "freshness": "fresh",
+        "observedAt": 1788825600,
+        "ageSeconds": 12,
+        "distribution": {
+          "status": "unknown"
+        },
+        "installation": {
+          "owner": "standalone",
+          "verified": true,
+          "nextAction": "inspectRelease"
+        },
+        "problems": []
+      }
+    },
+    "metadata": {
+      "cliTransportVersion": "1",
+      "operation": "version-check"
+    },
+    "references": {},
+    "warnings": []
+  },
+  "uncomparable": {
+    "result": {
+      "versionCheck": {
+        "currentVersion": "0.4.0-dev.1",
+        "comparison": "uncomparable",
+        "freshness": "fresh",
+        "observedAt": 1788825600,
+        "ageSeconds": 12,
+        "release": {
+          "version": "0.4.0",
+          "tag": "v0.4.0",
+          "url": "https://github.com/cpaikr/kasb/releases/tag/v0.4.0",
+          "repository": "cpaikr/kasb",
+          "target": "darwin-arm64"
+        },
+        "distribution": {
+          "status": "ready"
+        },
+        "installation": {
+          "owner": "unknown",
+          "verified": false,
+          "nextAction": "inspectInstallationOwner"
+        },
+        "problems": [
+          "uncomparableIdentity"
+        ]
+      }
+    },
+    "metadata": {
+      "cliTransportVersion": "1",
+      "operation": "version-check"
+    },
+    "references": {},
+    "warnings": []
+  },
+  "unavailable": {
+    "result": {
+      "versionCheck": {
+        "currentVersion": "0.3.3",
+        "comparison": "unavailable",
+        "freshness": "unavailable",
+        "distribution": {
+          "status": "unknown"
+        },
+        "installation": {
+          "owner": "unknown",
+          "verified": false,
+          "nextAction": "inspectInstallationOwner"
+        },
+        "problems": [
+          "refreshFailed"
+        ]
+      }
+    },
+    "metadata": {
+      "cliTransportVersion": "1",
+      "operation": "version-check"
+    },
+    "references": {},
+    "warnings": []
+  },
+  "stale": {
+    "result": {
+      "versionCheck": {
+        "currentVersion": "0.3.3",
+        "comparison": "newer",
+        "freshness": "stale",
+        "observedAt": 1788825600,
+        "ageSeconds": 25200,
+        "release": {
+          "version": "0.4.0",
+          "tag": "v0.4.0",
+          "url": "https://github.com/cpaikr/kasb/releases/tag/v0.4.0",
+          "repository": "cpaikr/kasb",
+          "target": "darwin-arm64"
+        },
+        "distribution": {
+          "status": "ready"
+        },
+        "installation": {
+          "owner": "standalone",
+          "verified": true,
+          "nextAction": "inspectRelease"
+        },
+        "problems": [
+          "refreshFailed"
+        ]
+      }
+    },
+    "metadata": {
+      "cliTransportVersion": "1",
+      "operation": "version-check"
+    },
+    "references": {},
+    "warnings": []
+  },
+  "incomplete": {
+    "result": {
+      "versionCheck": {
+        "currentVersion": "0.3.3",
+        "comparison": "newer",
+        "freshness": "fresh",
+        "observedAt": 1788825600,
+        "ageSeconds": 12,
+        "release": {
+          "version": "0.4.0",
+          "tag": "v0.4.0",
+          "url": "https://github.com/cpaikr/kasb/releases/tag/v0.4.0",
+          "repository": "cpaikr/kasb",
+          "target": "darwin-arm64"
+        },
+        "distribution": {
+          "status": "incomplete",
+          "problems": [
+            {
+              "code": "asset",
+              "name": "SHA256SUMS",
+              "reason": "missing"
+            }
+          ]
+        },
+        "installation": {
+          "owner": "standalone",
+          "verified": true,
+          "nextAction": "inspectRelease"
+        },
+        "problems": []
+      }
+    },
+    "metadata": {
+      "cliTransportVersion": "1",
+      "operation": "version-check"
+    },
+    "references": {},
+    "warnings": []
+  }
+}

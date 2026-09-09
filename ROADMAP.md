@@ -1,6 +1,16 @@
 # Roadmap
 
+## Current
+
+_None._
+
+## Plans
+
+_None._
+
 ## Completed
+
+[Add cached CLI version advisories](plans/cli-version-checking.md)
 
 [Perform the first Rust/Node product release](tasks/perform-first-rust-node-release.md)
 

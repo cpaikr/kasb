@@ -6,64 +6,19 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-#[cfg(test)]
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 use flate2::read::GzDecoder;
-use futures_util::StreamExt;
 use kasb::http::CancellationToken;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use wreq::header::{ACCEPT, USER_AGENT};
 
+use crate::release::*;
 use crate::render::ProcessOutput;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const MANIFEST_JSON: &str = include_str!("../../../native-targets.json");
 const ARCHIVE_EXPANSION_OVERHEAD: u64 = 8 * 1024 * 1024;
 const UPGRADE_CANCELLED: &str = "upgrade_cancelled";
-
-#[cfg(test)]
-static RELEASE_TRANSPORT_CONSTRUCTIONS: AtomicUsize = AtomicUsize::new(0);
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ReleaseManifest {
-    release: ReleasePolicy,
-    targets: Vec<NativeTarget>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ReleasePolicy {
-    repository: String,
-    tag_prefix: String,
-    archive_prefix: String,
-    archive_extension: String,
-    archive_entries: Vec<String>,
-    checksum_asset: String,
-    receipt_file: String,
-    receipt_schema_version: u32,
-    metadata_limit_bytes: usize,
-    archive_limit_bytes: usize,
-    request_timeout_seconds: u64,
-    archive_request_timeout_seconds: u64,
-    transfer_stall_timeout_seconds: u64,
-    connect_timeout_seconds: u64,
-    redirect_limit: usize,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct NativeTarget {
-    npm_platform: String,
-    npm_arch: String,
-    libc: Option<String>,
-    package_directory: String,
-    cli_file: String,
-}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -79,60 +34,10 @@ struct Receipt {
     sha256: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-struct Release {
-    tag_name: String,
-    immutable: bool,
-    draft: bool,
-    prerelease: bool,
-    assets: Vec<ReleaseAsset>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct ReleaseAsset {
-    name: String,
-    browser_download_url: String,
-    size: u64,
-    digest: Option<String>,
-}
-
 #[derive(Debug)]
-struct ManagedInstallation {
+pub(crate) struct ManagedInstallation {
     executable: PathBuf,
     receipt_path: PathBuf,
-}
-
-#[derive(Debug)]
-struct UpgradeError {
-    code: &'static str,
-    message: String,
-    retryable: bool,
-    recovery: Option<String>,
-}
-
-impl UpgradeError {
-    fn new(code: &'static str, message: impl Into<String>) -> Self {
-        Self {
-            code,
-            message: message.into(),
-            retryable: false,
-            recovery: None,
-        }
-    }
-
-    fn network(message: impl Into<String>) -> Self {
-        Self {
-            code: "upgrade_network_failure",
-            message: message.into(),
-            retryable: true,
-            recovery: None,
-        }
-    }
-
-    fn recovery(mut self, recovery: impl Into<String>) -> Self {
-        self.recovery = Some(recovery.into());
-        self
-    }
 }
 
 pub(crate) async fn run(check_only: bool, cancellation: &CancellationToken) -> ProcessOutput {
@@ -197,22 +102,6 @@ fn should_clear_completed_replacements(check_only: bool) -> bool {
     !check_only
 }
 
-trait ReleaseSource {
-    async fn latest(&self) -> Result<Release, UpgradeError>;
-    async fn download(
-        &self,
-        asset: &ReleaseAsset,
-        limit: usize,
-        kind: DownloadKind,
-    ) -> Result<Vec<u8>, UpgradeError>;
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum DownloadKind {
-    Metadata,
-    Archive,
-}
-
 async fn execute_upgrade_cancellable<S: ReleaseSource>(
     check_only: bool,
     manifest: &ReleaseManifest,
@@ -228,6 +117,9 @@ async fn execute_upgrade_cancellable<S: ReleaseSource>(
     };
     check_cancellation(cancellation)?;
     let release = cancellable(cancellation, source.latest()).await?;
+    if !check_only {
+        cancellable(cancellation, source.revalidate(&release)).await?;
+    }
     check_cancellation(cancellation)?;
     validate_release(&release, &manifest.release)?;
     let latest = release_version(&release.tag_name, &manifest.release.tag_prefix)?;
@@ -379,16 +271,7 @@ async fn execute_upgrade<S: ReleaseSource>(
     .await
 }
 
-fn release_manifest() -> Result<ReleaseManifest, UpgradeError> {
-    serde_json::from_str(MANIFEST_JSON).map_err(|_| {
-        UpgradeError::new(
-            "upgrade_contract_invalid",
-            "The embedded release target contract is invalid.",
-        )
-    })
-}
-
-fn managed_installation(
+pub(crate) fn managed_installation(
     manifest: &ReleaseManifest,
     target: &TargetIdentity,
 ) -> Result<ManagedInstallation, UpgradeError> {
@@ -407,6 +290,17 @@ fn validate_managed_paths(
     executable: PathBuf,
     receipt_path: PathBuf,
 ) -> Result<ManagedInstallation, UpgradeError> {
+    validate_managed_paths_deadline(manifest, target, executable, receipt_path, None)
+}
+
+fn validate_managed_paths_deadline(
+    manifest: &ReleaseManifest,
+    target: &TargetIdentity,
+    executable: PathBuf,
+    receipt_path: PathBuf,
+    deadline: Option<&crate::version_check::LocalBudget>,
+) -> Result<ManagedInstallation, UpgradeError> {
+    inspection_deadline(deadline)?;
     let bytes = match read_bounded_regular(&receipt_path, manifest.release.metadata_limit_bytes) {
         Ok(bytes) => bytes,
         Err(BoundedFileError::Open) => return Err(unmanaged()),
@@ -448,7 +342,8 @@ fn validate_managed_paths(
         || receipt.asset_name != expected_asset
         || fs::canonicalize(&receipt.executable).ok().as_ref() != Some(&executable)
         || !is_sha256(&receipt.sha256)
-        || receipt.sha256 != file_digest(&executable, manifest.release.archive_limit_bytes)?
+        || receipt.sha256
+            != file_digest_deadline(&executable, manifest.release.archive_limit_bytes, deadline)?
     {
         return Err(UpgradeError::new(
             "upgrade_receipt_mismatch",
@@ -459,6 +354,69 @@ fn validate_managed_paths(
         executable,
         receipt_path,
     })
+}
+
+fn inspection_deadline(
+    deadline: Option<&crate::version_check::LocalBudget>,
+) -> Result<(), UpgradeError> {
+    if deadline.is_some_and(|budget| !budget.active()) {
+        Err(UpgradeError::new(
+            "inspection_timed_out",
+            "Installation inspection exceeded its budget.",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+pub(crate) fn inspect_owner(
+    manifest: &ReleaseManifest,
+    deadline: &crate::version_check::LocalBudget,
+) -> Result<crate::version_check::Owner, crate::version_check::Problem> {
+    use crate::version_check::{Owner, Problem};
+    inspection_deadline(Some(deadline)).map_err(|_| Problem::InspectionTimedOut)?;
+    let executable = std::env::current_exe()
+        .and_then(fs::canonicalize)
+        .map_err(|_| Problem::InspectionFailed)?;
+    let parent = executable.parent().ok_or(Problem::InspectionFailed)?;
+    let receipt = parent.join(&manifest.release.receipt_file);
+    match fs::symlink_metadata(&receipt) {
+        Ok(_) => {
+            let target = current_target(manifest).map_err(|_| Problem::InspectionFailed)?;
+            return validate_managed_paths_deadline(
+                manifest,
+                &target,
+                executable,
+                receipt,
+                Some(deadline),
+            )
+            .map(|_| Owner::Standalone)
+            .map_err(|error| {
+                if error.code == "inspection_timed_out" {
+                    Problem::InspectionTimedOut
+                } else {
+                    Problem::InspectionFailed
+                }
+            });
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err(Problem::InspectionFailed),
+    }
+    inspection_deadline(Some(deadline)).map_err(|_| Problem::InspectionTimedOut)?;
+    // These are owner hints only: path layout never authorizes self-replacement.
+    if executable
+        .components()
+        .any(|part| part.as_os_str() == "node_modules")
+    {
+        return Ok(Owner::Npm);
+    }
+    let cargo_home = std::env::var_os("CARGO_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".cargo")));
+    if cargo_home.is_some_and(|home| parent == home.join("bin")) {
+        return Ok(Owner::Cargo);
+    }
+    Ok(Owner::Unknown)
 }
 
 fn unmanaged() -> UpgradeError {
@@ -638,240 +596,6 @@ fn clear_completed_replacements(statuses: Vec<PathBuf>) -> Result<(), UpgradeErr
     Ok(())
 }
 
-struct GithubReleaseSource {
-    client: wreq::Client,
-    latest_url: String,
-    metadata_limit: usize,
-    metadata_timeout: Duration,
-    archive_timeout: Duration,
-    stall_timeout: Duration,
-}
-
-impl GithubReleaseSource {
-    fn new(policy: &ReleasePolicy) -> Result<Self, UpgradeError> {
-        #[cfg(test)]
-        RELEASE_TRANSPORT_CONSTRUCTIONS.fetch_add(1, Ordering::SeqCst);
-        let latest_url = test_latest_url(&policy.repository)?.unwrap_or_else(|| {
-            format!(
-                "https://api.github.com/repos/{}/releases/latest",
-                policy.repository
-            )
-        });
-        let client = wreq::Client::builder()
-            .https_only(latest_url.starts_with("https://"))
-            .timeout(Duration::from_secs(policy.request_timeout_seconds))
-            .connect_timeout(Duration::from_secs(policy.connect_timeout_seconds))
-            .redirect(wreq::redirect::Policy::limited(policy.redirect_limit))
-            .retry(wreq::retry::Policy::never())
-            .build()
-            .map_err(|_| {
-                UpgradeError::network("Could not initialize bounded release transport.")
-            })?;
-        Ok(Self {
-            client,
-            latest_url,
-            metadata_limit: policy.metadata_limit_bytes,
-            metadata_timeout: Duration::from_secs(policy.request_timeout_seconds),
-            archive_timeout: Duration::from_secs(policy.archive_request_timeout_seconds),
-            stall_timeout: Duration::from_secs(policy.transfer_stall_timeout_seconds),
-        })
-    }
-
-    async fn get(
-        &self,
-        url: &str,
-        limit: usize,
-        timeout: Duration,
-    ) -> Result<Vec<u8>, UpgradeError> {
-        let response = self
-            .client
-            .get(url)
-            .header(ACCEPT, "application/vnd.github+json")
-            .header(USER_AGENT, format!("kasb/{VERSION}"))
-            .timeout(timeout)
-            .read_timeout(self.stall_timeout)
-            .send()
-            .await
-            .map_err(|error| {
-                UpgradeError::network(if error.is_timeout() {
-                    "The release request timed out."
-                } else {
-                    "The release request failed."
-                })
-            })?;
-        let status = response.status().as_u16();
-        if let Some(error) = http_status_error(status) {
-            return Err(error);
-        }
-        if response
-            .content_length()
-            .is_some_and(|length| length > limit as u64)
-        {
-            return Err(UpgradeError::new(
-                "upgrade_response_too_large",
-                "The release response exceeds its size limit.",
-            ));
-        }
-        let mut body = Vec::new();
-        let mut stream = response.bytes_stream();
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk
-                .map_err(|_| UpgradeError::network("The release download was interrupted."))?;
-            if body.len().saturating_add(chunk.len()) > limit {
-                return Err(UpgradeError::new(
-                    "upgrade_response_too_large",
-                    "The release response exceeds its size limit.",
-                ));
-            }
-            body.extend_from_slice(&chunk);
-        }
-        Ok(body)
-    }
-}
-
-fn test_latest_url(repository: &str) -> Result<Option<String>, UpgradeError> {
-    let allow = std::env::var("KASB_UPGRADE_TEST_ALLOW_NONCANONICAL_URLS").ok();
-    let latest = std::env::var("KASB_UPGRADE_TEST_LATEST_URL").ok();
-    if allow.is_none() && latest.is_none() {
-        return Ok(None);
-    }
-    if allow.as_deref() != Some("1")
-        || latest
-            .as_deref()
-            .is_none_or(|url| !is_loopback_test_url(url, repository))
-    {
-        return Err(UpgradeError::new(
-            "upgrade_test_contract_invalid",
-            "The test-only release URL must be the canonical loopback latest-release route.",
-        ));
-    }
-    Ok(latest)
-}
-
-fn is_loopback_test_url(value: &str, repository: &str) -> bool {
-    let Some(authority_and_path) = value.strip_prefix("http://127.0.0.1:") else {
-        return false;
-    };
-    let Some((port, path)) = authority_and_path.split_once('/') else {
-        return false;
-    };
-    !port.is_empty()
-        && port.bytes().all(|byte| byte.is_ascii_digit())
-        && port.parse::<u16>().is_ok_and(|port| port > 0)
-        && path == format!("repos/{repository}/releases/latest")
-}
-
-fn http_status_error(status: u16) -> Option<UpgradeError> {
-    if (200..300).contains(&status) {
-        return None;
-    }
-    Some(match status {
-        403 | 429 => UpgradeError::network("GitHub rate-limited the release request."),
-        500..=599 => UpgradeError::network("GitHub could not serve the release request."),
-        404 => UpgradeError::new(
-            "upgrade_asset_missing",
-            "The canonical release or asset is missing.",
-        ),
-        _ => UpgradeError::new(
-            "upgrade_http_failure",
-            format!("GitHub rejected the release request with HTTP {status}."),
-        ),
-    })
-}
-
-#[cfg(test)]
-pub(crate) fn reset_release_transport_constructions() {
-    RELEASE_TRANSPORT_CONSTRUCTIONS.store(0, Ordering::SeqCst);
-}
-
-#[cfg(test)]
-pub(crate) fn release_transport_constructions() -> usize {
-    RELEASE_TRANSPORT_CONSTRUCTIONS.load(Ordering::SeqCst)
-}
-
-impl ReleaseSource for GithubReleaseSource {
-    async fn latest(&self) -> Result<Release, UpgradeError> {
-        let bytes = self
-            .get(&self.latest_url, self.metadata_limit, self.metadata_timeout)
-            .await?;
-        serde_json::from_slice(&bytes).map_err(|_| {
-            UpgradeError::new(
-                "upgrade_release_invalid",
-                "GitHub returned invalid release metadata.",
-            )
-        })
-    }
-
-    async fn download(
-        &self,
-        asset: &ReleaseAsset,
-        limit: usize,
-        kind: DownloadKind,
-    ) -> Result<Vec<u8>, UpgradeError> {
-        let timeout = match kind {
-            DownloadKind::Metadata => self.metadata_timeout,
-            DownloadKind::Archive => self.archive_timeout,
-        };
-        self.get(&asset.browser_download_url, limit, timeout).await
-    }
-}
-
-fn validate_release(release: &Release, policy: &ReleasePolicy) -> Result<(), UpgradeError> {
-    if !release.immutable || release.draft || release.prerelease {
-        return Err(UpgradeError::new(
-            "upgrade_release_mutable",
-            "The latest canonical release is not an immutable production release.",
-        ));
-    }
-    release_version(&release.tag_name, &policy.tag_prefix)?;
-    Ok(())
-}
-
-fn release_version(tag: &str, tag_prefix: &str) -> Result<Version, UpgradeError> {
-    tag.strip_prefix(tag_prefix)
-        .and_then(|value| Version::parse(value).ok())
-        .filter(|version| version.pre.is_empty() && version.build.is_empty())
-        .ok_or_else(|| {
-            UpgradeError::new(
-                "upgrade_release_invalid",
-                "The release tag is not a canonical stable version.",
-            )
-        })
-}
-
-fn asset<'a>(release: &'a Release, name: &str) -> Result<&'a ReleaseAsset, UpgradeError> {
-    let matches = release
-        .assets
-        .iter()
-        .filter(|asset| asset.name == name)
-        .collect::<Vec<_>>();
-    if matches.len() != 1 {
-        return Err(UpgradeError::new(
-            "upgrade_asset_missing",
-            format!("The immutable release does not contain exactly one {name} asset."),
-        ));
-    }
-    Ok(matches[0])
-}
-
-fn validate_download_url(
-    asset: &ReleaseAsset,
-    tag: &str,
-    policy: &ReleasePolicy,
-) -> Result<(), UpgradeError> {
-    let expected = format!(
-        "https://github.com/{}/releases/download/{tag}/{}",
-        policy.repository, asset.name
-    );
-    if asset.browser_download_url != expected {
-        return Err(UpgradeError::new(
-            "upgrade_asset_identity",
-            "A release asset URL does not match the canonical repository and tag.",
-        ));
-    }
-    Ok(())
-}
-
 fn checksum_entry(bytes: &[u8], archive: &str) -> Result<String, UpgradeError> {
     let text = std::str::from_utf8(bytes).map_err(|_| {
         UpgradeError::new(
@@ -999,70 +723,6 @@ fn executable_from_archive(
     })
 }
 
-struct TargetIdentity {
-    release_target: String,
-    executable_name: String,
-    archive_entries: Vec<String>,
-}
-
-fn current_target(manifest: &ReleaseManifest) -> Result<TargetIdentity, UpgradeError> {
-    let platform = match std::env::consts::OS {
-        "macos" => "darwin",
-        "windows" => "win32",
-        value => value,
-    };
-    let architecture = match std::env::consts::ARCH {
-        "x86_64" => "x64",
-        "aarch64" => "arm64",
-        value => value,
-    };
-    let libc = if cfg!(target_env = "gnu") {
-        Some("glibc")
-    } else {
-        None
-    };
-    manifest
-        .targets
-        .iter()
-        .find(|target| {
-            target.npm_platform == platform
-                && target.npm_arch == architecture
-                && target
-                    .libc
-                    .as_deref()
-                    .is_none_or(|required| Some(required) == libc)
-        })
-        .map(|target| TargetIdentity {
-            release_target: target.package_directory.clone(),
-            executable_name: target.cli_file.clone(),
-            archive_entries: manifest
-                .release
-                .archive_entries
-                .iter()
-                .map(|entry| {
-                    if entry == "{executable}" {
-                        target.cli_file.clone()
-                    } else {
-                        entry.clone()
-                    }
-                })
-                .collect(),
-        })
-        .ok_or_else(|| {
-            UpgradeError::new(
-                "upgrade_target_unsupported",
-                "This platform is not a supported standalone KASB target.",
-            )
-        })
-}
-
-fn archive_name(policy: &ReleasePolicy, version: &Version, target: &str) -> String {
-    format!(
-        "{}-{version}-{target}.{}",
-        policy.archive_prefix, policy.archive_extension
-    )
-}
-
 fn verify_digest(bytes: &[u8], expected: &str, label: &str) -> Result<(), UpgradeError> {
     if hex_digest(bytes) != expected.to_ascii_lowercase() {
         return Err(UpgradeError::new(
@@ -1097,7 +757,17 @@ fn hex_digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+#[cfg(test)]
 fn file_digest(path: &Path, limit: usize) -> Result<String, UpgradeError> {
+    file_digest_deadline(path, limit, None)
+}
+
+fn file_digest_deadline(
+    path: &Path,
+    limit: usize,
+    deadline: Option<&crate::version_check::LocalBudget>,
+) -> Result<String, UpgradeError> {
+    inspection_deadline(deadline)?;
     let mut file = File::open(path).map_err(|_| {
         UpgradeError::new(
             "upgrade_receipt_mismatch",
@@ -1108,6 +778,7 @@ fn file_digest(path: &Path, limit: usize) -> Result<String, UpgradeError> {
     let mut total = 0usize;
     let mut buffer = [0u8; 64 * 1024];
     loop {
+        inspection_deadline(deadline)?;
         let read = file.read(&mut buffer).map_err(|_| {
             UpgradeError::new(
                 "upgrade_receipt_mismatch",
@@ -1984,6 +1655,10 @@ mod tests {
             }
         }
 
+        async fn revalidate(&self, _release: &Release) -> Result<(), UpgradeError> {
+            Ok(())
+        }
+
         async fn download(
             &self,
             asset: &ReleaseAsset,
@@ -2112,6 +1787,10 @@ mod tests {
         FakeSource {
             release: Release {
                 tag_name: tag.clone(),
+                html_url: format!(
+                    "https://github.com/cpaikr/kasb/releases/tag/{}",
+                    tag.clone()
+                ),
                 immutable: true,
                 draft: false,
                 prerelease: false,
@@ -2352,6 +2031,10 @@ mod tests {
         let manifest = manifest();
         let release = Release {
             tag_name: "v1.2.3".to_owned(),
+            html_url: format!(
+                "https://github.com/cpaikr/kasb/releases/tag/{}",
+                "v1.2.3".to_owned()
+            ),
             immutable: true,
             draft: false,
             prerelease: false,

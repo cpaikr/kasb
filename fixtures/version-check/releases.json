@@ -1,0 +1,99 @@
+[
+  {
+    "tag_name": "v0.3.2",
+    "html_url": "https://github.com/cpaikr/kasb/releases/tag/v0.3.2",
+    "immutable": true,
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-09-07T00:00:00Z",
+    "assets": []
+  },
+  {
+    "tag_name": "v0.4.0",
+    "html_url": "https://github.com/cpaikr/kasb/releases/tag/v0.4.0",
+    "immutable": true,
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-09-01T00:00:00Z",
+    "assets": [
+      {
+        "name": "kasb-0.4.0-linux-x64-gnu.tar.gz",
+        "browser_download_url": "https://github.com/cpaikr/kasb/releases/download/v0.4.0/kasb-0.4.0-linux-x64-gnu.tar.gz",
+        "size": 100,
+        "digest": null
+      },
+      {
+        "name": "kasb-0.4.0-linux-arm64-gnu.tar.gz",
+        "browser_download_url": "https://github.com/cpaikr/kasb/releases/download/v0.4.0/kasb-0.4.0-linux-arm64-gnu.tar.gz",
+        "size": 100,
+        "digest": null
+      },
+      {
+        "name": "kasb-0.4.0-darwin-arm64.tar.gz",
+        "browser_download_url": "https://github.com/cpaikr/kasb/releases/download/v0.4.0/kasb-0.4.0-darwin-arm64.tar.gz",
+        "size": 100,
+        "digest": null
+      },
+      {
+        "name": "kasb-0.4.0-win32-x64-msvc.tar.gz",
+        "browser_download_url": "https://github.com/cpaikr/kasb/releases/download/v0.4.0/kasb-0.4.0-win32-x64-msvc.tar.gz",
+        "size": 100,
+        "digest": null
+      },
+      {
+        "name": "SHA256SUMS",
+        "browser_download_url": "https://github.com/cpaikr/kasb/releases/download/v0.4.0/SHA256SUMS",
+        "size": 100,
+        "digest": null
+      },
+      {
+        "name": "install.sh",
+        "browser_download_url": "https://github.com/cpaikr/kasb/releases/download/v0.4.0/install.sh",
+        "size": 100,
+        "digest": null
+      },
+      {
+        "name": "install.ps1",
+        "browser_download_url": "https://github.com/cpaikr/kasb/releases/download/v0.4.0/install.ps1",
+        "size": 100,
+        "digest": null
+      }
+    ]
+  },
+  {
+    "tag_name": "v99.0.0",
+    "html_url": "https://github.com/cpaikr/kasb/releases/tag/v99.0.0",
+    "immutable": true,
+    "draft": true,
+    "prerelease": false,
+    "published_at": "2026-09-08T00:00:00Z",
+    "assets": []
+  },
+  {
+    "tag_name": "v98.0.0-rc.1",
+    "html_url": "https://github.com/cpaikr/kasb/releases/tag/v98.0.0-rc.1",
+    "immutable": true,
+    "draft": false,
+    "prerelease": true,
+    "published_at": "2026-09-08T00:00:00Z",
+    "assets": []
+  },
+  {
+    "tag_name": "other-v99.0.0",
+    "html_url": "https://github.com/cpaikr/kasb/releases/tag/other-v99.0.0",
+    "immutable": true,
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-09-08T00:00:00Z",
+    "assets": []
+  },
+  {
+    "tag_name": "v0.2.1",
+    "html_url": "https://github.com/cpaikr/kasb/releases/tag/v0.2.1",
+    "immutable": true,
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-09-08T00:00:00Z",
+    "assets": []
+  }
+]

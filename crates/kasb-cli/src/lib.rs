@@ -3,8 +3,11 @@
 mod args;
 #[cfg(feature = "conformance-fixtures")]
 pub mod conformance;
+mod release;
 mod render;
 mod upgrade;
+mod version_cache;
+mod version_check;
 
 use std::ffi::OsString;
 
@@ -32,6 +35,10 @@ where
         Ok(invocation) => invocation,
         Err(output) => return output,
     };
+    if invocation.operation == OperationName::VersionCheck {
+        return version_check::run(invocation.version_refresh, invocation.pretty, cancellation)
+            .await;
+    }
     if invocation.operation == OperationName::Upgrade {
         return upgrade::run(invocation.upgrade_check, cancellation).await;
     }
@@ -57,6 +64,10 @@ where
         Ok(invocation) => invocation,
         Err(output) => return output,
     };
+    if invocation.operation == OperationName::VersionCheck {
+        return version_check::run(invocation.version_refresh, invocation.pretty, cancellation)
+            .await;
+    }
     if invocation.operation == OperationName::Upgrade {
         return upgrade::run(invocation.upgrade_check, cancellation).await;
     }
@@ -112,16 +123,37 @@ where
     )
     .await;
     match result {
-        Ok(value) => render::render_success(value, invocation).unwrap_or_else(|_| {
-            render::render_internal_failure(
-                Some(invocation.operation.as_str()),
-                invocation.failure_pretty,
-                "Could not render the KASB operation result.",
-            )
-        }),
+        Ok(value) => complete_success(value, invocation, cancellation).await,
         Err(KasbError::Failure(failure)) => render::render_typed_failure(&failure, invocation),
         Err(KasbError::Cancelled) => ProcessOutput::interrupted(130),
     }
+}
+
+async fn complete_success(
+    value: Value,
+    invocation: &args::Invocation,
+    cancellation: &CancellationToken,
+) -> ProcessOutput {
+    let mut projected =
+        match render::project_success(value, invocation.operation.as_str(), invocation.output) {
+            Ok(value) => value,
+            Err(_) => {
+                return render::render_internal_failure(
+                    Some(invocation.operation.as_str()),
+                    invocation.failure_pretty,
+                    "Could not render the KASB operation result.",
+                );
+            }
+        };
+    if !version_check::opted_out(invocation.no_version_check)
+        && !cancellation.is_cancelled()
+        && let Some(report) =
+            version_check::evaluate(false, version_check::INCIDENTAL_BUDGET, cancellation).await
+        && report.incidental()
+    {
+        projected["advisories"] = serde_json::json!({ "versionCheck": report });
+    }
+    render::render_projected(&projected, invocation.pretty)
 }
 
 async fn execute<T, C>(
@@ -151,7 +183,9 @@ where
         }
         OperationName::SearchQna => serialize(client.execute_search_qna(input, cancellation).await),
         OperationName::GetQna => serialize(client.execute_get_qna(input, cancellation).await),
-        OperationName::Upgrade => unreachable!("upgrade is handled before KASB transport"),
+        OperationName::Upgrade | OperationName::VersionCheck => {
+            unreachable!("upgrade is handled before KASB transport")
+        }
     }
 }
 
@@ -179,8 +213,45 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    async fn cancellation_after_primary_success_preserves_the_result() {
+        let invocation = parse_invocation([
+            "kasb",
+            "get-paragraph",
+            "--std-num",
+            "1116",
+            "--para-num",
+            "23",
+        ])
+        .unwrap();
+        let value = serde_json::json!({"result": {"paragraph": {"paraNum": "23"}}, "metadata": {}, "references": {}, "warnings": []});
+        let cancellation = CancellationToken::new();
+        cancellation.cancel();
+        let output = complete_success(value.clone(), &invocation, &cancellation).await;
+        assert_eq!(output.exit_code, 0);
+        assert_eq!(
+            serde_json::from_str::<Value>(output.stdout.as_deref().unwrap()).unwrap(),
+            value
+        );
+    }
+
+    #[tokio::test]
+    async fn render_failure_skips_incidental_work() {
+        release::reset_release_transport_constructions();
+        let invocation =
+            parse_invocation(["kasb", "search-standards", "--keyword", "leases"]).unwrap();
+        let output = complete_success(
+            serde_json::json!({"result": {}}),
+            &invocation,
+            &CancellationToken::new(),
+        )
+        .await;
+        assert_eq!(output.exit_code, 1);
+        assert_eq!(release::release_transport_constructions(), 0);
+    }
+
+    #[tokio::test]
     async fn ordinary_commands_never_construct_the_release_transport() {
-        upgrade::reset_release_transport_constructions();
+        release::reset_release_transport_constructions();
         for (argv, expected_kasb_transport) in [
             (vec!["kasb", "--help"], false),
             (vec!["kasb", "--version"], false),
@@ -202,14 +273,14 @@ mod tests {
             .await;
 
             assert_eq!(called.get(), expected_kasb_transport);
-            assert_eq!(upgrade::release_transport_constructions(), 0);
+            assert_eq!(release::release_transport_constructions(), 0);
             assert!(output.stdout.is_some());
         }
     }
 
     #[tokio::test]
     async fn unmanaged_upgrade_fails_before_constructing_any_transport() {
-        upgrade::reset_release_transport_constructions();
+        release::reset_release_transport_constructions();
         let kasb_transport_called = Cell::new(false);
         let output = run_with_client_factory(
             ["kasb", "upgrade", "--check"],
@@ -223,7 +294,7 @@ mod tests {
 
         assert_eq!(output.exit_code, 1);
         assert!(!kasb_transport_called.get());
-        assert_eq!(upgrade::release_transport_constructions(), 0);
+        assert_eq!(release::release_transport_constructions(), 0);
         assert!(
             output
                 .stdout
@@ -234,7 +305,7 @@ mod tests {
 
     #[tokio::test]
     async fn cancelled_upgrade_uses_the_process_interruption_contract() {
-        upgrade::reset_release_transport_constructions();
+        release::reset_release_transport_constructions();
         let cancellation = CancellationToken::new();
         cancellation.cancel();
 
@@ -248,6 +319,6 @@ mod tests {
         .await;
 
         assert_eq!(output, ProcessOutput::interrupted(130));
-        assert_eq!(upgrade::release_transport_constructions(), 0);
+        assert_eq!(release::release_transport_constructions(), 0);
     }
 }

@@ -161,18 +161,11 @@ pub(crate) fn render_internal_failure(
     ProcessOutput::failure(render_json(&envelope, pretty))
 }
 
-pub(crate) fn render_success(
-    value: Value,
-    invocation: &Invocation,
-) -> Result<ProcessOutput, &'static str> {
-    let projected = project_success(value, invocation.operation.as_str(), invocation.output)?;
-    Ok(ProcessOutput::success(render_json(
-        &projected,
-        invocation.pretty,
-    )))
+pub(crate) fn render_projected(value: &Value, pretty: bool) -> ProcessOutput {
+    ProcessOutput::success(render_json(value, pretty))
 }
 
-fn project_success(
+pub(crate) fn project_success(
     mut envelope: Value,
     operation: &str,
     output: OutputMode,
@@ -508,18 +501,26 @@ fn concise_clap_message(error: &clap::Error) -> String {
 struct ParseContext<'a> {
     argv: &'a [String],
     operation: Option<&'a str>,
+    command_index: usize,
     pretty: bool,
 }
 
 impl<'a> ParseContext<'a> {
     fn new(argv: &'a [String]) -> Self {
+        let command_index = argv
+            .iter()
+            .enumerate()
+            .skip(1)
+            .find(|(_, value)| value.as_str() != "--no-version-check")
+            .map_or(1, |(index, _)| index);
         let operation = argv
-            .get(1)
+            .get(command_index)
             .map(String::as_str)
             .filter(|value| is_operation(value));
         Self {
             argv,
             operation,
+            command_index,
             pretty: argv.iter().any(|value| value == "--pretty"),
         }
     }
@@ -529,10 +530,14 @@ impl<'a> ParseContext<'a> {
             kind,
             ErrorKind::InvalidSubcommand | ErrorKind::MissingSubcommand
         ) {
-            let command = if self.argv.get(1).is_some_and(|value| value == "help") {
-                self.argv.get(2)
+            let command = if self
+                .argv
+                .get(self.command_index)
+                .is_some_and(|value| value == "help")
+            {
+                self.argv.get(self.command_index + 1)
             } else {
-                self.argv.get(1)
+                self.argv.get(self.command_index)
             }?;
             return Some(format!("Unknown command: \"{command}\"."));
         }
@@ -571,10 +576,14 @@ impl<'a> ParseContext<'a> {
 
     fn unknown_option(&self) -> Option<String> {
         let known = operation_options(self.operation.unwrap_or_default());
-        let mut index = if self.operation.is_some() { 2 } else { 1 };
+        let mut index = if self.operation.is_some() {
+            self.command_index + 1
+        } else {
+            1
+        };
         while let Some(value) = self.argv.get(index) {
             let name = value.split('=').next().unwrap_or(value);
-            if matches!(name, "-h" | "--help" | "--pretty") {
+            if matches!(name, "-h" | "--help" | "--pretty" | "--no-version-check") {
                 index += 1;
             } else if known.iter().any(|known| known == name) {
                 index += if value.contains('=') { 1 } else { 2 };

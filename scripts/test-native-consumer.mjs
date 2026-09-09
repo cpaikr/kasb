@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawn as spawnChild, spawnSync } from "node:child_process";
+import { execFile, execFileSync, spawn as spawnChild, spawnSync } from "node:child_process";
 import { access, chmod, constants, copyFile, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import { promisify } from "node:util";
 import { tmpdir } from "node:os";
 import { delimiter, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -79,11 +81,37 @@ try {
       assert.equal(direct.stdout.trim(), `kasb ${contract.version}`, "direct CLI version must match Cargo identity");
     }
   }
+  await verifyVersionEvidence(installedRoot, installedCli, temporary);
   await verifyLauncherProcessContract(installedRoot, installedCli, directCli, launcher, temporary);
 
   console.log(`clean packed consumer passed ${rustTarget} on Node ${process.versions.node}`);
 } finally {
   await rm(temporary, { recursive: true, force: true });
+}
+
+async function verifyVersionEvidence(installedRoot, installedCli, temporary) {
+  const releases = JSON.parse(await readFile(resolve(repositoryRoot, "fixtures/version-check/releases.json"), "utf8"));
+  const requests = [];
+  const server = createServer((request, response) => {
+    requests.push(request.url);
+    if (request.url !== "/repos/cpaikr/kasb/releases?per_page=100&page=1") { response.writeHead(404).end(); return; }
+    response.setHeader("content-type", "application/json"); response.end(JSON.stringify(releases));
+  });
+  await new Promise((ready, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", ready); });
+  const home = await realpath(temporary);
+  const env = { ...process.env, HOME: home, XDG_CACHE_HOME: home, LOCALAPPDATA: home, CI: "1", KASB_NO_VERSION_CHECK: "1", KASB_UPGRADE_TEST_ALLOW_NONCANONICAL_URLS: "1", KASB_UPGRADE_TEST_LATEST_URL: `http://127.0.0.1:${server.address().port}/repos/cpaikr/kasb/releases/latest` };
+  try {
+    for (const [command, args] of [[installedCli, ["version-check"]], [process.execPath, [resolve(installedRoot, "dist/cli.js"), "version-check", "--pretty"]]]) {
+      const output = await promisify(execFile)(command, args, { env, cwd: temporary, timeout: 10000, windowsHide: true });
+      assert.equal(output.stderr, ""); assert(output.stdout.endsWith("\n"));
+      const report = JSON.parse(output.stdout).result.versionCheck;
+      assert.equal(report.currentVersion, contract.version); assert.equal(report.freshness, "fresh");
+      assert.equal(report.release.version, "0.4.0"); assert.equal(report.release.url, "https://github.com/cpaikr/kasb/releases/tag/v0.4.0");
+      assert.equal(report.installation.owner, "npm"); assert.equal(report.installation.verified, false);
+      assert.equal(report.installation.nextAction, "consultNpmOwner");
+    }
+    assert.deepEqual(requests, ["/repos/cpaikr/kasb/releases?per_page=100&page=1"]);
+  } finally { await new Promise(resolve => server.close(resolve)); }
 }
 
 async function verifyLauncherProcessContract(installedRoot, installedCli, directCli, launcher, cwd) {
