@@ -1,6 +1,6 @@
 ---
 name: kasb
-description: Research public KASB standards and Q&A material with the read-only @sjunepark/kasb CLI. Use when a task requires current, source-backed Korean accounting-standard discovery, K-IFRS or KASB section and paragraph retrieval, or KASB Q&A lookup. Do not use for changing the CLI, researching non-KASB sources, or giving unsourced accounting advice.
+description: Research public KASB standards and Q&A material with the read-only kasb CLI. Use when the user asks to find or cite Korean accounting standards from KASB, retrieve K-IFRS or KASB sections or exact paragraphs, or search or retrieve KASB Q&A, even without naming the CLI or skill. Do not use for changing the CLI, researching non-KASB sources, or giving unsourced accounting advice.
 ---
 
 # KASB
