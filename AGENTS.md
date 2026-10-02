@@ -32,7 +32,8 @@
 
 - Install dependencies: `bun install --frozen-lockfile`
 - Run complete local release verification: `bun run verify`
-- Prepare and push an authorized release: `bun run release`
+- Prepare a release commit on a branch: `bun run release:prepare`
+- Tag the CI-verified `main` commit of an authorized release: `bun run release:tag`
 - Validate contract authorities and fixture freshness: `bun run contracts:check`
 - Run the adversarial public-surface judge: `bun run conformance:judge`
 - Run the native binding and launcher feasibility proof: `bun run native:feasibility`
