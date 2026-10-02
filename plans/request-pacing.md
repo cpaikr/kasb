@@ -55,6 +55,9 @@ record keeps only decisions and validation.
   Rust SDK's explicit option accepts zero. Pacing-state failures surface with
   a fixed message and no operating-system detail, and the title generator pins
   the default interval instead of reading the environment.
+- **Diagnostics.** `kasb request-pacing` reports the effective interval, its
+  source (`flag`, `environment`, or `default`), and the state file, resolved
+  as the SDK resolves it per request and without contacting KASB.
 - **Node option.** `requestIntervalMs` is per call and reuses the shared
   persona's pool, cookies, and gate instead of building a client per interval.
 - **Kept.** `max_in_flight` and enrichment concurrency remain; they still bound
@@ -88,9 +91,6 @@ fixture checksums; they were re-checked out, with no repository change.
 ## Remaining
 
 - Run `bun run verify` on Linux CI, then commit and release on request.
-- The practice asks for the effective interval and its source in diagnostic
-  output. The SDK exposes `PersonaClient::effective_pacing`; no CLI surface
-  reports it yet.
 - Discovery of new standard numbers is manual: pass them to
   `standard_titles --write`. Unknown standards still work through the live
   fallback.

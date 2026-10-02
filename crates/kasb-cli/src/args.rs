@@ -135,6 +135,8 @@ enum Operation {
     Upgrade(UpgradeArgs),
     /// Report cached release evidence for any installation without changing it.
     VersionCheck(VersionCheckArgs),
+    /// Report the effective request interval and where it comes from, without contacting KASB.
+    RequestPacing(RequestPacingArgs),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -147,6 +149,7 @@ pub(crate) enum OperationName {
     GetQna,
     Upgrade,
     VersionCheck,
+    RequestPacing,
 }
 
 impl OperationName {
@@ -160,6 +163,7 @@ impl OperationName {
             Self::GetQna => "get-qna",
             Self::Upgrade => "upgrade",
             Self::VersionCheck => "version-check",
+            Self::RequestPacing => "request-pacing",
         }
     }
 }
@@ -408,6 +412,13 @@ struct VersionCheckArgs {
 }
 
 #[derive(Debug, Args)]
+struct RequestPacingArgs {
+    /// Print indented JSON.
+    #[arg(long)]
+    pretty: bool,
+}
+
+#[derive(Debug, Args)]
 struct UpgradeArgs {
     /// Check the latest immutable release without changing the installation.
     #[arg(long)]
@@ -545,6 +556,13 @@ impl Cli {
                 invocation.version_refresh = args.refresh;
                 invocation
             }
+            Operation::RequestPacing(args) => Invocation::new(
+                OperationName::RequestPacing,
+                Map::new(),
+                None,
+                args.pretty,
+                BTreeMap::new(),
+            ),
             Operation::Upgrade(args) => {
                 let mut invocation = Invocation::new(
                     OperationName::Upgrade,
