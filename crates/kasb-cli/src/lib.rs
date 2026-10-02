@@ -43,6 +43,9 @@ where
     if invocation.operation == OperationName::Upgrade {
         return upgrade::run(invocation.upgrade_check, cancellation).await;
     }
+    if invocation.operation == OperationName::RequestPacing {
+        return request_pacing(&invocation);
+    }
     run_invocation(client, &invocation, cancellation).await
 }
 
@@ -73,6 +76,9 @@ where
     }
     if invocation.operation == OperationName::Upgrade {
         return upgrade::run(invocation.upgrade_check, cancellation).await;
+    }
+    if invocation.operation == OperationName::RequestPacing {
+        return request_pacing(&invocation);
     }
     let client = match client_factory(invocation.request_interval) {
         Ok(client) => client,
@@ -186,9 +192,54 @@ where
         }
         OperationName::SearchQna => serialize(client.execute_search_qna(input, cancellation).await),
         OperationName::GetQna => serialize(client.execute_get_qna(input, cancellation).await),
-        OperationName::Upgrade | OperationName::VersionCheck => {
-            unreachable!("upgrade is handled before KASB transport")
+        OperationName::Upgrade | OperationName::VersionCheck | OperationName::RequestPacing => {
+            unreachable!("local commands are handled before KASB transport")
         }
+    }
+}
+
+/// Reports the pacing policy a content command would use, resolved exactly as
+/// the SDK resolves it per request. Local only: no KASB request, no lock.
+fn request_pacing(invocation: &args::Invocation) -> ProcessOutput {
+    use kasb::http::{PacingError, RequestIntervalSource, resolve_pacing};
+
+    match resolve_pacing(invocation.request_interval, None) {
+        Ok(pacing) => render::render_projected(
+            &serde_json::json!({
+                "result": {"requestPacing": {
+                    "intervalMs": pacing.interval.as_millis(),
+                    "source": match pacing.source {
+                        RequestIntervalSource::Explicit => "flag",
+                        RequestIntervalSource::Environment => "environment",
+                        RequestIntervalSource::Default => "default",
+                    },
+                    // Lossy on purpose: a non-UTF-8 state directory is valid for
+                    // requests and must not break this report.
+                    "stateFile": pacing
+                        .lock_path
+                        .map(|path| path.to_string_lossy().into_owned()),
+                }},
+                "metadata": {"cliTransportVersion": "1", "operation": "request-pacing"},
+                "references": {},
+                "warnings": [],
+            }),
+            invocation.pretty,
+        ),
+        Err(PacingError::InvalidSetting { setting, message }) => render::render_typed_failure(
+            &kasb::KasbFailure {
+                code: kasb::KasbFailureCode::InvalidInput,
+                message,
+                retryable: false,
+                parameter: Some(setting.to_owned()),
+                source_url: None,
+            },
+            invocation,
+        ),
+        Err(PacingError::State(_) | PacingError::LockTimeout) => render::render_internal_failure(
+            Some(invocation.operation.as_str()),
+            invocation.failure_pretty,
+            "The request pacing state directory could not be determined.",
+        ),
     }
 }
 
@@ -345,6 +396,30 @@ mod tests {
             assert_eq!(received.get(), expected);
             assert_ne!(output.exit_code, 0);
         }
+    }
+
+    #[tokio::test]
+    async fn request_pacing_reports_the_flag_without_constructing_a_transport() {
+        let output = run_with_client_factory(
+            ["kasb", "request-pacing", "--request-interval-ms", "1500"],
+            &CancellationToken::new(),
+            |_| -> Result<KasbClient<PersonaClient, SystemClock>, ()> {
+                panic!("request-pacing must not construct the KASB transport")
+            },
+        )
+        .await;
+
+        assert_eq!(output.exit_code, 0);
+        let report: Value = serde_json::from_str(&output.stdout.unwrap()).unwrap();
+        let pacing = &report["result"]["requestPacing"];
+        assert_eq!(pacing["intervalMs"], 1500);
+        assert_eq!(pacing["source"], "flag");
+        assert!(
+            pacing["stateFile"]
+                .as_str()
+                .is_some_and(|path| path.ends_with("request-pacing-v1.lock"))
+        );
+        assert_eq!(report["metadata"]["operation"], "request-pacing");
     }
 
     #[tokio::test]

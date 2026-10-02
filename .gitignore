@@ -9,6 +9,9 @@ target/
 .env.local
 .env.*.local
 
+# Locally packaged skill bundles for manual upload.
+/skills/**/*.zip
+
 # Generated project skill placements and machine-local reconciliation state.
 /.agents/skills/
 /.claude/skills/

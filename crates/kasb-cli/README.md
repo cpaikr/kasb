@@ -44,6 +44,13 @@ file. HTTP 429 is reported as retryable `rate_limited` and lengthens the shared
 cooldown. The [v1 spec](../../docs/specs/kasb-standards-v1.md#request-pacing)
 owns these semantics.
 
+`kasb request-pacing` reports the effective policy without contacting KASB or
+touching the lock. `source` is `flag`, `environment`, or `default`:
+
+```json
+{"result":{"requestPacing":{"intervalMs":500,"source":"default","stateFile":"/home/me/.local/state/kasb/request-pacing-v1.lock"}},"metadata":{"cliTransportVersion":"1","operation":"request-pacing"},"references":{},"warnings":[]}
+```
+
 ## Output and version advisories
 
 Content commands emit one newline-terminated JSON document on stdout in every
