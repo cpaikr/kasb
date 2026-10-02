@@ -126,23 +126,36 @@ that version, and recover with a separately authorized new version after
 correcting the prerequisite. A failed final verification is not a successful
 release or permission to overwrite assets.
 
-## Local release preparation
+## Release preparation and tagging
+
+An operator owns the reviewed version change and the source tag; CI owns
+verification, certification, and publication. The operator's host is not a
+release gate, so preparation works on any supported development host.
 
 Use Bun 1.3.13, Node 24, Rust 1.88, and cargo-about 0.9.2. Install dependencies
 with `bun install --frozen-lockfile` and `cargo fetch --locked` before preparation.
+Before 1.0, a public-contract break advances the minor version and compatible
+changes advance the patch version; assess the contract, not commit prefixes.
 
-After separate publication authorization, run `bun run release` from a clean
-`main` checkout tracking `origin/main`. The `before:init` hook fetches upstream
-and rejects a checkout that differs from the freshly fetched branch. The local
-`release-it` flow selects an increased stable version from Cargo metadata,
-synchronizes Cargo dependencies and lockfile, npm metadata and lockfile,
-installers and notices, and updates `CHANGELOG.md` from conventional commits.
-The `after:bump` hooks check identities and run `bun run verify` before the
-release commit, canonical `v<version>` tag, and push.
+1. On a clean branch at freshly fetched `origin/main`, run
+   `bun run release:prepare -- <version>`. The `before:init` hook rejects
+   `main`, a dirty checkout, and a branch that is not at `origin/main`. The
+   `release-it` flow synchronizes Cargo dependencies and lockfile, npm metadata
+   and lockfile, installers and notices, updates `CHANGELOG.md` from
+   conventional commits, checks release identities, and commits. It never tags
+   or pushes.
+2. Open a pull request, let CI pass, and merge it without squashing.
+3. After separate publication authorization, run `bun run release:tag`. It
+   fetches `origin/main`, derives `v<version>` from that commit's Cargo
+   metadata, requires the tag to be unused on origin, requires successful
+   `Deterministic validation` and no failing or running check on that exact
+   commit, then creates and pushes only that tag.
 
-The local tool does not publish packages or create a GitHub Release directly.
-Pushing the tag starts strict CI publication, so running the complete release
-command requires publication authorization.
+Neither command publishes packages or creates a GitHub Release directly.
+Pushing the tag starts strict CI publication, so `release:tag` requires
+publication authorization. Do not move or reuse a tag. `bun run verify` remains
+the complete local gate for POSIX hosts but is not required to prepare a
+release.
 
 ## CI platform coverage
 

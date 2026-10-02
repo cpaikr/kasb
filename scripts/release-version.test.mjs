@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { bumpWorkspace, releaseVersion, workspaceVersion, syncBunWorkspaceVersions } from "./release-version.mjs";
+import { bumpWorkspace, releaseVersion, tagEvidence, workspaceVersion, syncBunWorkspaceVersions } from "./release-version.mjs";
 import CargoVersion from "./release-it-cargo.mjs";
 
 const source = '[workspace]\nmembers = []\n[workspace.package]\nversion = "0.3.0"\nedition = "2021"\n[dependencies]\nexample = { version = "1.0.0" }\n';
@@ -48,16 +48,57 @@ test("real Git source gate rejects wrong versions, different commits and off-mai
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test("preparation cannot publish locally and verifies before committing", () => {
+test("preparation commits on a branch and cannot tag, push, or publish", () => {
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
   const config = pkg["release-it"];
   assert.equal(config.npm, false);
   assert.equal(config.github.release, false);
   assert.equal(config.git.requireCleanWorkingDir, true);
-  assert.equal(config.git.requireBranch, "main");
-  assert.equal(config.hooks["before:init"], "node scripts/release-version.mjs upstream");
-  assert.deepEqual(config.hooks["after:bump"], ["node scripts/release-version.mjs check", "bun run verify"]);
+  assert.equal(config.git.commit, true);
+  assert.equal(config.git.tag, false);
+  assert.equal(config.git.push, false);
+  assert.equal(config.hooks["before:init"], "node scripts/release-version.mjs prepare");
+  assert.deepEqual(config.hooks["after:bump"], ["node scripts/release-version.mjs check"]);
   assert.equal(Object.keys(config.plugins)[0], "./scripts/release-it-cargo.mjs");
+  assert.equal(pkg.scripts["release:prepare"], "release-it");
+  assert.equal(pkg.scripts["release:tag"], "node scripts/release-version.mjs tag");
+  assert.equal(pkg.scripts.release, undefined);
+});
+
+test("preparation refuses main and a branch that is not at origin/main", () => {
+  const root = mkdtempSync(join(tmpdir(), "kasb-release-prepare-"));
+  const origin = mkdtempSync(join(tmpdir(), "kasb-release-origin-"));
+  const git = (...args) => execFileSync("git", args, { cwd: root, stdio: "pipe" }).toString().trim();
+  try {
+    execFileSync("git", ["init", "--bare", "-b", "main"], { cwd: origin, stdio: "pipe" });
+    git("init", "-b", "main");
+    git("config", "user.email", "fixture@example.invalid");
+    git("config", "user.name", "Release fixture");
+    writeFileSync(join(root, "Cargo.toml"), source);
+    git("add", "."); git("commit", "-m", "fixture");
+    git("remote", "add", "origin", origin);
+    git("push", "origin", "main");
+    assert.throws(() => releaseVersion("prepare", undefined, root), /on a branch, not main/u);
+    git("checkout", "-b", "release/next");
+    releaseVersion("prepare", undefined, root);
+    writeFileSync(join(root, "new.txt"), "ahead of main\n");
+    assert.throws(() => releaseVersion("prepare", undefined, root), /clean checkout/u);
+    git("add", "."); git("commit", "-m", "ahead");
+    assert.throws(() => releaseVersion("prepare", undefined, root), /freshly fetched origin\/main/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(origin, { recursive: true, force: true });
+  }
+});
+
+test("tagging requires successful, complete CI evidence on the exact commit", () => {
+  const gate = { name: "Deterministic validation", status: "completed", conclusion: "success" };
+  assert.equal(tagEvidence([gate, { name: "optional", status: "completed", conclusion: "skipped" }]), true);
+  assert.equal(tagEvidence([]), false);
+  assert.equal(tagEvidence([{ name: "other", status: "completed", conclusion: "success" }]), false);
+  assert.equal(tagEvidence([{ ...gate, conclusion: "failure" }]), false);
+  assert.equal(tagEvidence([gate, { name: "native", status: "in_progress", conclusion: null }]), false);
+  assert.equal(tagEvidence([gate, { name: "native", status: "completed", conclusion: "failure" }]), false);
 });
 
 test("workspace lock synchronization preserves every third-party resolution byte", () => {

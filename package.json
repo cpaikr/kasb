@@ -36,8 +36,9 @@
     "test:release-pipeline": "node scripts/test-release-candidate.mjs && node scripts/test-release-publication.mjs && node scripts/execute-release-publication.mjs --self-test && node scripts/capture-release-publication-state.mjs --self-test && node --test scripts/release-version.test.mjs",
     "licenses:generate": "node scripts/check-third-party-licenses.mjs --write && node scripts/generate-native-packages.mjs",
     "licenses:check": "node scripts/check-third-party-licenses.mjs",
-    "verify": "bun run contracts:check && bun run native:check && bun run licenses:check && bun run typecheck && bun run test && bun run test:release-pipeline && bun run conformance:judge && bun run build && cargo fmt --all --check && cargo clippy --locked --workspace --all-targets -- -D warnings",
-    "release": "release-it"
+    "release:prepare": "release-it",
+    "release:tag": "node scripts/release-version.mjs tag",
+    "verify": "bun run contracts:check && bun run native:check && bun run licenses:check && bun run typecheck && bun run test && bun run test:release-pipeline && bun run conformance:judge && bun run build && cargo fmt --all --check && cargo clippy --locked --workspace --all-targets -- -D warnings"
   },
   "devDependencies": {
     "@release-it/conventional-changelog": "10.0.5",
@@ -50,19 +51,20 @@
   },
   "release-it": {
     "hooks": {
-      "before:init": "node scripts/release-version.mjs upstream",
+      "before:init": "node scripts/release-version.mjs prepare",
       "after:bump": [
-        "node scripts/release-version.mjs check",
-        "bun run verify"
+        "node scripts/release-version.mjs check"
       ]
     },
     "git": {
-      "requireBranch": "main",
-      "requireUpstream": true,
+      "requireUpstream": false,
       "requireCleanWorkingDir": true,
       "addUntrackedFiles": true,
+      "commit": true,
+      "tag": false,
+      "push": false,
       "tagName": "v${version}",
-      "commitMessage": "chore(release): prepare v${version}\n\nSynchronize Cargo and derived distribution identities and changelog.\nLocal verification gates this commit; tagged CI certifies and publishes the exact artifacts."
+      "commitMessage": "chore(release): prepare v${version}\n\nSynchronize Cargo and derived distribution identities and changelog.\nPull-request CI gates this commit; tagged CI certifies and publishes the exact artifacts."
     },
     "github": {
       "release": false

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { Plugin } from "release-it";
 import { workspaceVersion } from "./release-version.mjs";
 
-// Cargo remains the sole authority; release-it owns preparation and Git delivery.
+// Cargo remains the sole authority; release-it owns preparation and its commit.
 export default class CargoVersion extends Plugin {
   getLatestVersion() {
     return workspaceVersion(readFileSync("Cargo.toml", "utf8"));

@@ -36,20 +36,44 @@ export function syncBunWorkspaceVersions(source, packages) {
   return source.replace(section[0], `${section[1]}${serialized},`);
 }
 
+// Exact-commit CI evidence: the deterministic gate succeeded and nothing on
+// the commit is failing or still running.
+export function tagEvidence(checks) {
+  return checks.some(({ name, conclusion }) => name === "Deterministic validation" && conclusion === "success")
+    && checks.every(({ status, conclusion }) => status === "completed" && ["success", "skipped", "neutral"].includes(conclusion));
+}
+
 export function releaseVersion(mode, value, root = process.cwd()) {
   const run = (command, args) => execFileSync(command, args, {
     cwd: root, encoding: "utf8", maxBuffer: 16 * 1024 * 1024,
     stdio: ["ignore", "pipe", "inherit"],
   }).trim();
-  if (mode === "upstream") {
+  if (mode === "prepare") {
+    // Preparation is a reviewed change: it starts from current main on a
+    // branch and reaches main only through a pull request.
     assert.equal(run("git", ["status", "--porcelain"]), "", "release preparation requires a clean checkout");
-    assert.equal(run("git", ["branch", "--show-current"]), "main");
-    assert.equal(run("git", ["rev-parse", "--abbrev-ref", "@{upstream}"]), "origin/main");
+    assert.notEqual(run("git", ["branch", "--show-current"]), "main", "release preparation runs on a branch, not main");
     run("git", ["fetch", "origin", "main"]);
-    assert.equal(run("git", ["rev-parse", "HEAD"]), run("git", ["rev-parse", "origin/main"]), "release preparation requires freshly synchronized origin/main");
+    assert.equal(run("git", ["rev-parse", "HEAD"]), run("git", ["rev-parse", "origin/main"]), "release preparation requires a branch at freshly fetched origin/main");
     return;
   }
-  assert(["sync", "check", "source"].includes(mode), "usage: release-version.mjs upstream | sync <version> | check | source <tag>");
+  if (mode === "tag") {
+    // The operator owns the tag; CI owns certification. Tag only the exact
+    // main commit whose deterministic validation succeeded.
+    run("git", ["fetch", "origin", "main", "--tags"]);
+    const sha = run("git", ["rev-parse", "origin/main"]);
+    const tag = `v${workspaceVersion(run("git", ["show", `${sha}:Cargo.toml`]))}`;
+    // A failed lookup throws; it is never evidence that the tag is unused.
+    assert.equal(run("git", ["ls-remote", "--refs", "origin", `refs/tags/${tag}`]), "", `${tag} already exists on origin`);
+    const { repository } = JSON.parse(run("git", ["show", `${sha}:native-targets.json`])).release;
+    const checks = JSON.parse(run("gh", ["api", `repos/${repository}/commits/${sha}/check-runs?per_page=100`])).check_runs;
+    assert(tagEvidence(checks), `origin/main ${sha} lacks successful CI evidence`);
+    run("git", ["tag", "-a", tag, sha, "-m", `Release ${tag.slice(1)}`]);
+    run("git", ["push", "origin", `refs/tags/${tag}`]);
+    process.stdout.write(`Tagged ${sha} as ${tag}; tag-triggered CI now certifies and publishes\n`);
+    return;
+  }
+  assert(["sync", "check", "source"].includes(mode), "usage: release-version.mjs prepare | sync <version> | check | tag | source <tag>");
   const manifest = resolve(root, "Cargo.toml");
   if (mode === "sync") {
     const bumped = bumpWorkspace(readFileSync(manifest, "utf8"), value);
