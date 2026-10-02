@@ -412,8 +412,17 @@ pub(crate) fn inspect_owner(
     }
     let cargo_home = std::env::var_os("CARGO_HOME")
         .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".cargo")));
-    if cargo_home.is_some_and(|home| parent == home.join("bin")) {
+        .or_else(|| {
+            // Cargo's default home is under USERPROFILE on Windows.
+            std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+                .map(|home| PathBuf::from(home).join(".cargo"))
+        });
+    // The executable path is canonical (verbatim on Windows), so compare it
+    // with the canonical bin directory.
+    if cargo_home
+        .and_then(|home| fs::canonicalize(home.join("bin")).ok())
+        .is_some_and(|bin| parent == bin)
+    {
         return Ok(Owner::Cargo);
     }
     Ok(Owner::Unknown)
