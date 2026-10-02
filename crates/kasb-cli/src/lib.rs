@@ -213,7 +213,11 @@ fn request_pacing(invocation: &args::Invocation) -> ProcessOutput {
                         RequestIntervalSource::Environment => "environment",
                         RequestIntervalSource::Default => "default",
                     },
-                    "stateFile": pacing.lock_path,
+                    // Lossy on purpose: a non-UTF-8 state directory is valid for
+                    // requests and must not break this report.
+                    "stateFile": pacing
+                        .lock_path
+                        .map(|path| path.to_string_lossy().into_owned()),
                 }},
                 "metadata": {"cliTransportVersion": "1", "operation": "request-pacing"},
                 "references": {},
