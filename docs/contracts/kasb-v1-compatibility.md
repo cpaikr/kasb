@@ -48,8 +48,10 @@ The six operation ids and camelCase request fields are frozen by the v1 spec.
 Each success is a closed `{result, metadata, references, warnings}` envelope.
 Failures preserve `code`, `message`, `retryable`, optional `parameter`, and
 optional `sourceUrl`. The allowed capability codes are `invalid_input`,
-`not_found`, `source_unavailable`, `source_changed`, `partial_retrieval`, and
-`internal_failure`.
+`not_found`, `source_unavailable`, `rate_limited`, `source_changed`,
+`partial_retrieval`, and `internal_failure`. `rate_limited` was added with
+request pacing: HTTP 429 previously surfaced as retryable `source_unavailable`,
+and every operation that contacts the source can now return it.
 
 | Operation | Inputs and defaults | Result inventory | Warnings | Failures |
 | --- | --- | --- | --- | --- |

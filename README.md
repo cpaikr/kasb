@@ -89,6 +89,8 @@ output, latency, caching, and opt-outs.
   CLI binary.
 - `contracts/kasb/openapi.yaml` owns supported provider wire facts.
   `docs/specs/kasb-standards-v1.md` owns public semantics.
+- KASB requests are paced across local processes, 500 ms by default. See
+  [request pacing](crates/kasb-cli/README.md#request-pacing).
 - `fixtures/` and `conformance/` provide independent evidence and a
   process-isolated adversarial judge for the Rust SDK, Rust CLI, and Node SDK.
 

@@ -265,6 +265,63 @@ This is implementation validation against captured fixtures and a local test
 server, not a new live-source observation. The public source assumptions remain
 the observed evidence recorded elsewhere in this document.
 
+## Standard Titles
+
+Observed on 2026-09-30:
+
+- No `/api/` endpoint lists standard titles. The site's own bundle carries a
+  static `stdNum` to short-title map (`public/js/data/stds.js`, 197 entries)
+  and resolves titles client-side.
+- `GET /api/standard?searchWord={term}` returns only `key` and `doc_count` per
+  standard. Common keywords match many standards: `리스` 67, `손상` 96,
+  `자산` 154.
+- The site's short titles (`리스`) differ from the structure-derived titles the
+  public contract returns (`기업회계기준서 제1116호 리스`).
+- Withdrawn standards such as 1011 and 1017 answer
+  `/api/standard-indexes/{stdNum}` without a `standardIndexes` array.
+
+Project decision: `crates/kasb/data/standard-titles.json` bundles the
+structure-derived title of each known standard, captured through the SDK at
+default pacing on 2026-10-02 (199 standards, 170 titled). `search-standards`
+ranks and labels from it and fetches structure only for a `stdNum` the table
+does not know. Refresh or check it with `bun run standard-titles:write` or
+`bun run standard-titles:check`; both read KASB live. A renamed standard stays
+stale until the next refresh.
+
+## Request Pacing
+
+- **Unknown:** KASB publishes no rate limit, and no quota or `Retry-After`
+  header has been observed. No 429 was observed during the 199-request title
+  capture at the default interval.
+- **Project decision:** a default 500 millisecond cooldown before each request,
+  shared by Rust SDK, Node SDK, and CLI processes that use the same state
+  directory. The read API is unauthenticated and reached with a browser
+  persona, so the risk being managed is address blocking, not a documented
+  quota. This follows the mytech external-request-pacing practice; the value
+  matches darty and is not presented as an upstream allowance.
+- **Mechanism:** an OS file lock (`request-pacing-v1.lock`) in the per-user
+  state directory is held from the cooldown through the response body. Each
+  caller waits at least its own interval under the lock, including on the
+  first request and independent of the clock, so slow connection setup,
+  cancellation, process death, and wall-clock changes cannot release a burst.
+  The file records the cooldown owed and when it was written; only the part
+  above the caller's interval (a stricter process or a rate-limit back-off)
+  ages with wall time, which is a deliberate difference from darty so a
+  back-off does not delay a request made long after it ended. State errors
+  fail closed, and a lock held by another process for five minutes is reported
+  as a retryable failure instead of an endless wait.
+- **Rate-limit responses:** HTTP 429 is classified separately from connection
+  failures and extends the recorded cooldown for every local process. There is
+  one attempt per request and no automatic retry.
+- **Boundary:** coordination is local to one state directory, not a network
+  address shared across hosts. No burst pool, token bucket, or background
+  crawling is qualified.
+- **Revisit when:** KASB publishes limits, returns quota headers, or live
+  evidence shows the interval is too strict or too loose.
+
+Configuration and public failure semantics are owned by the
+[v1 spec](../specs/kasb-standards-v1.md#request-pacing).
+
 ## Promoted v1 Decisions
 
 Promoted to [../specs/kasb-standards-v1.md](../specs/kasb-standards-v1.md):

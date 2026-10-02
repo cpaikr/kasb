@@ -1,18 +1,20 @@
-# Decide whether authentication or client-side rate limiting is warranted
+# Decide whether authentication is warranted
 
 ## Outcome
 
-The product adopts authentication or request pacing only when provider evidence
-or operational requirements justify a concrete policy.
+The product adopts authentication only when provider evidence or operational
+requirements justify a concrete policy.
 
 ## Current state
 
-The legacy TODO listed authentication and rate limiting without requirements.
-Observed public KASB reads require no authentication, while the Rust pilot
-already bounds concurrency and transport attempts. Neither feature is part of
-the approved read-only v1 product or the rewrite.
+Observed public KASB reads require no authentication, and authentication is
+not part of the approved read-only v1 product.
+
+Client-side rate limiting, formerly tracked here, is resolved:
+[request pacing](../plans/request-pacing.md) adopted a shared default interval
+as a project decision rather than waiting for provider limits.
 
 ## Next action
 
-Collect provider or operational evidence before proposing any public auth,
-quota, retry, or pacing contract.
+Collect provider or operational evidence before proposing any public auth
+contract.

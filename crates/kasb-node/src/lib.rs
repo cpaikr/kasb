@@ -10,6 +10,7 @@ use std::{
     pin::Pin,
     sync::OnceLock,
     task::{Context, Poll},
+    time::Duration,
 };
 
 #[cfg(feature = "feasibility-judge")]
@@ -108,6 +109,7 @@ enum BindingError {
     Internal,
     InvalidJson,
     InvalidOperation,
+    InvalidRequestInterval,
 }
 
 #[napi(js_name = "executeOperation")]
@@ -117,6 +119,7 @@ fn execute_operation(
     input_json: String,
     signal: Option<AbortSignal>,
     pre_aborted: Option<bool>,
+    request_interval_ms: Option<u32>,
 ) -> napi::Result<AsyncBlock<String>> {
     let operation = match operation_name.as_str() {
         "search-standards" => Operation::SearchStandards(input_json),
@@ -131,10 +134,17 @@ fn execute_operation(
                 Operation::Invalid,
                 signal,
                 pre_aborted.unwrap_or(false),
+                None,
             );
         }
     };
-    task(&env, operation, signal, pre_aborted.unwrap_or(false))
+    task(
+        &env,
+        operation,
+        signal,
+        pre_aborted.unwrap_or(false),
+        request_interval_ms,
+    )
 }
 
 #[cfg(feature = "feasibility-judge")]
@@ -179,6 +189,7 @@ fn fixture_get_paragraph(env: Env, input_json: String) -> napi::Result<AsyncBloc
         Operation::FixtureGetParagraph(input_json),
         None,
         false,
+        None,
     )
 }
 
@@ -194,13 +205,14 @@ fn cancellation_probe(
         Operation::CancellationProbe,
         signal,
         pre_aborted.unwrap_or(false),
+        None,
     )
 }
 
 #[cfg(feature = "feasibility-judge")]
 #[napi(js_name = "panicProbe")]
 fn panic_probe(env: Env) -> napi::Result<AsyncBlock<String>> {
-    task(&env, Operation::PanicProbe, None, false)
+    task(&env, Operation::PanicProbe, None, false, None)
 }
 
 fn task(
@@ -208,6 +220,7 @@ fn task(
     operation: Operation,
     signal: Option<AbortSignal>,
     pre_aborted: bool,
+    request_interval_ms: Option<u32>,
 ) -> napi::Result<AsyncBlock<String>> {
     install_sanitizing_panic_hook();
     let cancellation = CancellationToken::new();
@@ -220,9 +233,13 @@ fn task(
     }
 
     let future = async move {
-        let outcome = AssertUnwindSafe(SanitizedPanicFuture::new(execute(operation, cancellation)))
-            .catch_unwind()
-            .await;
+        let outcome = AssertUnwindSafe(SanitizedPanicFuture::new(execute(
+            operation,
+            cancellation,
+            request_interval_ms,
+        )))
+        .catch_unwind()
+        .await;
         let envelope = match outcome {
             Ok(Ok(value)) => json!({ "ok": true, "value": value }),
             Ok(Err(error)) => error_envelope(error),
@@ -298,6 +315,7 @@ impl<F: Future> Future for SanitizedPanicFuture<F> {
 async fn execute(
     operation: Operation,
     cancellation: CancellationToken,
+    request_interval_ms: Option<u32>,
 ) -> Result<Value, BindingError> {
     #[cfg(feature = "feasibility-judge")]
     if operation.is_public() {
@@ -313,32 +331,32 @@ async fn execute(
     match operation {
         Operation::Invalid => Err(BindingError::InvalidOperation),
         Operation::SearchStandards(input_json) => to_value(
-            shared_client()?
+            shared_client(request_interval_ms)?
                 .execute_search_standards(parse_input(&input_json)?, &cancellation)
                 .await,
         ),
         Operation::GetStandardStructure(input_json) => to_value(
-            shared_client()?
+            shared_client(request_interval_ms)?
                 .execute_get_standard_structure(parse_input(&input_json)?, &cancellation)
                 .await,
         ),
         Operation::GetSection(input_json) => to_value(
-            shared_client()?
+            shared_client(request_interval_ms)?
                 .execute_get_section(parse_input(&input_json)?, &cancellation)
                 .await,
         ),
         Operation::GetParagraph(input_json) => to_value(
-            shared_client()?
+            shared_client(request_interval_ms)?
                 .execute_get_paragraph(parse_input(&input_json)?, &cancellation)
                 .await,
         ),
         Operation::SearchQna(input_json) => to_value(
-            shared_client()?
+            shared_client(request_interval_ms)?
                 .execute_search_qna(parse_input(&input_json)?, &cancellation)
                 .await,
         ),
         Operation::GetQna(input_json) => to_value(
-            shared_client()?
+            shared_client(request_interval_ms)?
                 .execute_get_qna(parse_input(&input_json)?, &cancellation)
                 .await,
         ),
@@ -514,12 +532,20 @@ impl HttpTransport for ConfiguredFixtureTransport {
     }
 }
 
-fn shared_client() -> Result<&'static SharedClient, BindingError> {
+/// Returns the process-wide persona, optionally with a per-call explicit
+/// request interval that still shares its pool, cookies, and pacing gate.
+fn shared_client(request_interval_ms: Option<u32>) -> Result<SharedClient, BindingError> {
     static CLIENT: OnceLock<Result<SharedClient, ()>> = OnceLock::new();
-    CLIENT
+    let client = CLIENT
         .get_or_init(|| KasbClient::new(PersonaConfig::default()).map_err(|_| ()))
         .as_ref()
-        .map_err(|_| BindingError::Internal)
+        .map_err(|_| BindingError::Internal)?;
+    match request_interval_ms {
+        None => Ok(client.clone()),
+        Some(milliseconds) => client
+            .with_request_interval(Some(Duration::from_millis(milliseconds.into())))
+            .map_err(|_| BindingError::InvalidRequestInterval),
+    }
 }
 
 impl From<KasbError> for BindingError {
@@ -557,6 +583,15 @@ fn error_envelope(error: BindingError) -> Value {
                 "message": "Native input must be valid JSON.",
                 "retryable": false,
                 "parameter": "input"
+            }
+        }),
+        BindingError::InvalidRequestInterval => json!({
+            "ok": false,
+            "error": {
+                "code": "invalid_input",
+                "message": "requestIntervalMs must be an integer from 0 through 60000.",
+                "retryable": false,
+                "parameter": "requestIntervalMs"
             }
         }),
         BindingError::InvalidOperation => json!({

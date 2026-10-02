@@ -90,10 +90,13 @@ semantics remain in
   decoded-body limit is also non-retryable `source_changed`, regardless of
   whether the concrete transport rejects it while streaming or returns the
   oversized bytes to the shared adapter boundary.
-- HTTP 404 is `not_found`. HTTP 429 and every 5xx response are retryable
-  `source_unavailable`; other non-success statuses are non-retryable
-  `source_unavailable`. Connection and timeout failures are retryable
-  `source_unavailable`.
+- HTTP 404 is `not_found`. HTTP 429 is retryable `rate_limited`. Every 5xx
+  response is retryable `source_unavailable`; other non-success statuses are
+  non-retryable `source_unavailable`. Connection and timeout failures are
+  retryable `source_unavailable`; a reset or timeout does not prove throttling.
+- Requests are paced as the public
+  [request pacing](../../docs/specs/kasb-standards-v1.md#request-pacing)
+  contract describes. The pacing wait precedes the request deadline.
 - Caller cancellation is execution control, not a capability failure. Public
   projections expose it distinctly as transport-local `aborted` behavior.
 

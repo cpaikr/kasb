@@ -1,16 +1,24 @@
 use std::future::Future;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::StreamExt;
-use tokio::sync::Semaphore;
+use tokio::sync::{Mutex, Semaphore};
 use tokio_util::sync::CancellationToken;
-use wreq::header::{ACCEPT, ACCEPT_LANGUAGE as ACCEPT_LANGUAGE_HEADER};
+use wreq::header::{ACCEPT, ACCEPT_LANGUAGE as ACCEPT_LANGUAGE_HEADER, HeaderMap, RETRY_AFTER};
 use wreq_util::Emulation;
+
+use super::pacing::{
+    self, EffectivePacing, MAX_REQUEST_INTERVAL, PacingError, PacingOutcome, PacingPermit,
+};
 
 pub const ACCEPT_LANGUAGE: &str = "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7";
 /// Maximum decoded body size accepted from a successful KASB response.
 pub const MAX_RESPONSE_BYTES: usize = 8 * 1024 * 1024;
+/// Shared cooldown recorded after HTTP 429 when KASB sends no usable
+/// `Retry-After`, so no local process retries a rate limit immediately.
+pub const RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(10);
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PersonaConfig {
@@ -20,6 +28,16 @@ pub struct PersonaConfig {
     pub connect_timeout: Duration,
     pub pool_idle_timeout: Duration,
     pub pool_max_idle_per_host: usize,
+    /// Minimum cooldown before each request, shared by every local process
+    /// using the same pacing state. `None` defers to
+    /// [`REQUEST_INTERVAL_ENV`](super::REQUEST_INTERVAL_ENV), then
+    /// [`DEFAULT_REQUEST_INTERVAL`](super::DEFAULT_REQUEST_INTERVAL). Zero
+    /// disables pacing and is meant only for controlled test origins.
+    pub request_interval: Option<Duration>,
+    /// Absolute pacing state directory. `None` defers to
+    /// [`STATE_DIR_ENV`](super::STATE_DIR_ENV), then the per-user state
+    /// directory.
+    pub state_dir: Option<PathBuf>,
 }
 
 impl Default for PersonaConfig {
@@ -31,6 +49,8 @@ impl Default for PersonaConfig {
             connect_timeout: Duration::from_secs(10),
             pool_idle_timeout: Duration::from_secs(90),
             pool_max_idle_per_host: 8,
+            request_interval: None,
+            state_dir: None,
         }
     }
 }
@@ -39,6 +59,10 @@ impl Default for PersonaConfig {
 pub enum PersonaBuildError {
     #[error("persona max_in_flight must be greater than zero")]
     InvalidConcurrency,
+    #[error("persona request_interval must not exceed 60000 milliseconds")]
+    InvalidRequestInterval,
+    #[error("persona state_dir must be an absolute directory path")]
+    InvalidStateDirectory,
     #[error("could not build the wreq persona client")]
     Wreq(#[source] wreq::Error),
 }
@@ -59,6 +83,8 @@ pub enum TransportError {
     Unavailable(String),
     #[error("successful response body exceeded the {limit}-byte limit")]
     ResponseTooLarge { limit: usize },
+    #[error(transparent)]
+    Pacing(#[from] PacingError),
 }
 
 pub trait HttpTransport: Send + Sync {
@@ -72,17 +98,35 @@ pub trait HttpTransport: Send + Sync {
 }
 
 /// A coherent browser persona. Clone it to reuse the same connection pool,
-/// cookie store, proxy affinity, and concurrency budget.
+/// cookie store, proxy affinity, concurrency budget, and pacing gate.
 #[derive(Clone)]
 pub struct PersonaClient {
     client: wreq::Client,
     permits: Arc<Semaphore>,
+    request_interval: Option<Duration>,
+    state_dir: Option<PathBuf>,
+    // Serializes this persona's paced requests so only one task polls the
+    // shared file lock at a time.
+    pacing_gate: Arc<Mutex<()>>,
 }
 
 impl PersonaClient {
     pub fn new(config: PersonaConfig) -> Result<Self, PersonaBuildError> {
         if config.max_in_flight == 0 {
             return Err(PersonaBuildError::InvalidConcurrency);
+        }
+        if config
+            .request_interval
+            .is_some_and(|interval| interval > MAX_REQUEST_INTERVAL)
+        {
+            return Err(PersonaBuildError::InvalidRequestInterval);
+        }
+        if config
+            .state_dir
+            .as_ref()
+            .is_some_and(|directory| !directory.is_absolute())
+        {
+            return Err(PersonaBuildError::InvalidStateDirectory);
         }
 
         let mut builder = wreq::Client::builder()
@@ -103,7 +147,101 @@ impl PersonaClient {
         Ok(Self {
             client,
             permits: Arc::new(Semaphore::new(config.max_in_flight)),
+            request_interval: config.request_interval,
+            state_dir: config.state_dir,
+            pacing_gate: Arc::new(Mutex::new(())),
         })
+    }
+
+    /// Returns a persona sharing this one's connection pool, cookies,
+    /// concurrency budget, and pacing gate, with a different explicit
+    /// interval. `None` restores environment and default resolution.
+    pub fn with_request_interval(
+        &self,
+        request_interval: Option<Duration>,
+    ) -> Result<Self, PersonaBuildError> {
+        if request_interval.is_some_and(|interval| interval > MAX_REQUEST_INTERVAL) {
+            return Err(PersonaBuildError::InvalidRequestInterval);
+        }
+        Ok(Self {
+            request_interval,
+            ..self.clone()
+        })
+    }
+
+    /// Resolves the pacing policy the next request will use. The environment
+    /// is read per request, so construction never fails on pacing settings.
+    pub fn effective_pacing(&self) -> Result<EffectivePacing, PacingError> {
+        pacing::resolve_pacing(self.request_interval, self.state_dir.as_deref())
+    }
+
+    async fn send(
+        &self,
+        url: &str,
+        cancellation: &CancellationToken,
+        pacing_permit: Option<PacingPermit>,
+    ) -> Result<HttpResponse, TransportError> {
+        let _permit = tokio::select! {
+            biased;
+            _ = cancellation.cancelled() => return Err(TransportError::Cancelled),
+            permit = self.permits.acquire() => permit.map_err(|_| {
+                TransportError::Unavailable("persona concurrency limiter closed".to_owned())
+            })?,
+        };
+
+        let response = tokio::select! {
+            biased;
+            _ = cancellation.cancelled() => return Err(TransportError::Cancelled),
+            response = self.client
+                .get(url)
+                .header(ACCEPT, "application/json")
+                .header(ACCEPT_LANGUAGE_HEADER, ACCEPT_LANGUAGE)
+                .send() => response.map_err(map_wreq_error)?,
+        };
+
+        let status = response.status().as_u16();
+        if !(200..300).contains(&status) {
+            if status == 429
+                && let Some(pacing_permit) = pacing_permit
+            {
+                let cooldown = retry_after(response.headers()).unwrap_or(RATE_LIMIT_COOLDOWN);
+                // Best effort: this request was paced, and a state write
+                // failure must not hide the rate limit from the caller.
+                let _ = pacing_permit.extend_cooldown(cooldown).await;
+            }
+            return Ok(HttpResponse {
+                status,
+                body: Vec::new(),
+            });
+        }
+        if response
+            .content_length()
+            .is_some_and(|length| length > MAX_RESPONSE_BYTES as u64)
+        {
+            return Err(response_too_large());
+        }
+        let mut body = Vec::with_capacity(
+            response
+                .content_length()
+                .unwrap_or_default()
+                .min(MAX_RESPONSE_BYTES as u64) as usize,
+        );
+        let mut chunks = response.bytes_stream();
+        loop {
+            let chunk = tokio::select! {
+                biased;
+                _ = cancellation.cancelled() => return Err(TransportError::Cancelled),
+                chunk = chunks.next() => chunk,
+            };
+            let Some(chunk) = chunk else { break };
+            let chunk = chunk.map_err(map_wreq_error)?;
+            if body.len().saturating_add(chunk.len()) > MAX_RESPONSE_BYTES {
+                return Err(response_too_large());
+            }
+            body.extend_from_slice(&chunk);
+        }
+
+        Ok(HttpResponse { status, body })
     }
 }
 
@@ -128,63 +266,33 @@ impl HttpTransport for PersonaClient {
         cancellation: &'a CancellationToken,
     ) -> impl Future<Output = Result<HttpResponse, TransportError>> + Send + 'a {
         async move {
-            let permit = tokio::select! {
+            let pacing = self.effective_pacing()?;
+            if pacing.lock_path.is_none() {
+                return self.send(url, cancellation, None).await;
+            }
+            let _gate = tokio::select! {
                 biased;
                 _ = cancellation.cancelled() => return Err(TransportError::Cancelled),
-                permit = self.permits.acquire() => permit.map_err(|_| {
-                    TransportError::Unavailable("persona concurrency limiter closed".to_owned())
-                })?,
+                gate = self.pacing_gate.lock() => gate,
             };
-
-            let response = tokio::select! {
-                biased;
-                _ = cancellation.cancelled() => return Err(TransportError::Cancelled),
-                response = self.client
-                    .get(url)
-                    .header(ACCEPT, "application/json")
-                    .header(ACCEPT_LANGUAGE_HEADER, ACCEPT_LANGUAGE)
-                    .send() => response.map_err(map_wreq_error)?,
-            };
-
-            let status = response.status().as_u16();
-            if !(200..300).contains(&status) {
-                drop(permit);
-                return Ok(HttpResponse {
-                    status,
-                    body: Vec::new(),
-                });
+            // Pacing precedes the HTTP deadline, and the permit is held through
+            // the body so the next cooldown starts after this response.
+            match pacing::acquire(&pacing, cancellation).await? {
+                PacingOutcome::Cancelled => Err(TransportError::Cancelled),
+                PacingOutcome::Ready(permit) => self.send(url, cancellation, permit).await,
             }
-            if response
-                .content_length()
-                .is_some_and(|length| length > MAX_RESPONSE_BYTES as u64)
-            {
-                return Err(response_too_large());
-            }
-            let mut body = Vec::with_capacity(
-                response
-                    .content_length()
-                    .unwrap_or_default()
-                    .min(MAX_RESPONSE_BYTES as u64) as usize,
-            );
-            let mut chunks = response.bytes_stream();
-            loop {
-                let chunk = tokio::select! {
-                    biased;
-                    _ = cancellation.cancelled() => return Err(TransportError::Cancelled),
-                    chunk = chunks.next() => chunk,
-                };
-                let Some(chunk) = chunk else { break };
-                let chunk = chunk.map_err(map_wreq_error)?;
-                if body.len().saturating_add(chunk.len()) > MAX_RESPONSE_BYTES {
-                    return Err(response_too_large());
-                }
-                body.extend_from_slice(&chunk);
-            }
-
-            drop(permit);
-            Ok(HttpResponse { status, body })
         }
     }
+}
+
+/// Reads a delta-seconds `Retry-After`. HTTP-date values fall back to the
+/// fixed rate-limit cooldown rather than depending on the local clock.
+fn retry_after(headers: &HeaderMap) -> Option<Duration> {
+    let value = headers.get(RETRY_AFTER)?.to_str().ok()?.trim();
+    if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    value.parse::<u64>().ok().map(Duration::from_secs)
 }
 
 fn response_too_large() -> TransportError {
@@ -212,6 +320,15 @@ mod tests {
 
     use super::*;
 
+    // Request tests use local origins and must not touch the per-user pacing
+    // state.
+    fn unpaced() -> PersonaConfig {
+        PersonaConfig {
+            request_interval: Some(Duration::ZERO),
+            ..PersonaConfig::default()
+        }
+    }
+
     #[test]
     fn defaults_match_the_approved_persona_policy() {
         let config = PersonaConfig::default();
@@ -220,6 +337,12 @@ mod tests {
         assert_eq!(config.connect_timeout, Duration::from_secs(10));
         assert_eq!(config.pool_idle_timeout, Duration::from_secs(90));
         assert_eq!(config.pool_max_idle_per_host, 8);
+        assert_eq!(config.request_interval, None);
+        assert_eq!(config.state_dir, None);
+        assert_eq!(
+            crate::http::DEFAULT_REQUEST_INTERVAL,
+            Duration::from_millis(500)
+        );
         assert_eq!(ACCEPT_LANGUAGE, "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7");
     }
 
@@ -237,6 +360,81 @@ mod tests {
         .err()
         .expect("zero concurrency should fail");
         assert!(matches!(error, PersonaBuildError::InvalidConcurrency));
+    }
+
+    #[test]
+    fn rejects_out_of_range_pacing_settings() {
+        let error = PersonaClient::new(PersonaConfig {
+            request_interval: Some(MAX_REQUEST_INTERVAL + Duration::from_millis(1)),
+            ..PersonaConfig::default()
+        })
+        .err()
+        .expect("an interval above the maximum should fail");
+        assert!(matches!(error, PersonaBuildError::InvalidRequestInterval));
+
+        let error = PersonaClient::new(PersonaConfig {
+            state_dir: Some(PathBuf::from("relative-state")),
+            ..PersonaConfig::default()
+        })
+        .err()
+        .expect("a relative state directory should fail");
+        assert!(matches!(error, PersonaBuildError::InvalidStateDirectory));
+    }
+
+    #[tokio::test]
+    async fn paces_requests_and_shares_a_rate_limit_cooldown() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("test listener should bind");
+        let address = listener
+            .local_addr()
+            .expect("listener should have an address");
+        let server = thread::spawn(move || {
+            let mut arrivals = Vec::new();
+            for head in [
+                "200 OK\r\nContent-Length: 2",
+                "429 Too Many Requests\r\nRetry-After: 1\r\nContent-Length: 0",
+                "200 OK\r\nContent-Length: 2",
+            ] {
+                let (mut stream, _) = listener.accept().expect("test request should connect");
+                arrivals.push(Instant::now());
+                let mut request = Vec::new();
+                let mut buffer = [0_u8; 4096];
+                while !request.windows(4).any(|window| window == b"\r\n\r\n") {
+                    let count = stream
+                        .read(&mut buffer)
+                        .expect("request should be readable");
+                    assert!(count > 0, "request ended before headers completed");
+                    request.extend_from_slice(&buffer[..count]);
+                }
+                let body = if head.starts_with("200") { "{}" } else { "" };
+                write!(stream, "HTTP/1.1 {head}\r\nConnection: close\r\n\r\n{body}")
+                    .expect("response should be writable");
+            }
+            arrivals
+        });
+
+        let state = tempfile::tempdir().expect("state directory should be created");
+        let config = PersonaConfig {
+            request_interval: Some(Duration::from_millis(150)),
+            state_dir: Some(state.path().to_path_buf()),
+            ..PersonaConfig::default()
+        };
+        // Separate personas share only the state directory, as separate
+        // processes would.
+        let first = PersonaClient::new(config.clone()).expect("persona should build");
+        let second = PersonaClient::new(config).expect("persona should build");
+        let cancellation = CancellationToken::new();
+        let url = format!("http://{address}/api");
+        let statuses = [
+            first.get(&url, &cancellation).await,
+            second.get(&url, &cancellation).await,
+            first.get(&url, &cancellation).await,
+        ]
+        .map(|response| response.expect("local request should succeed").status);
+        let arrivals = server.join().expect("test server should finish");
+
+        assert_eq!(statuses, [200, 429, 200]);
+        assert!(arrivals[1] - arrivals[0] >= Duration::from_millis(150));
+        assert!(arrivals[2] - arrivals[1] >= Duration::from_secs(1));
     }
 
     #[tokio::test]
@@ -277,7 +475,7 @@ mod tests {
             requests
         });
 
-        let client = PersonaClient::new(PersonaConfig::default()).expect("persona should build");
+        let client = PersonaClient::new(unpaced()).expect("persona should build");
         let cancellation = CancellationToken::new();
         let url = format!("http://{address}/api");
         for _ in 0..2 {
@@ -333,7 +531,7 @@ mod tests {
         let client = PersonaClient::new(PersonaConfig {
             request_timeout: Duration::from_millis(500),
             connect_timeout: Duration::from_millis(500),
-            ..PersonaConfig::default()
+            ..unpaced()
         })
         .expect("persona should build");
         let response = client
@@ -377,7 +575,7 @@ mod tests {
             .expect("response headers should be writable");
         });
 
-        let client = PersonaClient::new(PersonaConfig::default()).expect("persona should build");
+        let client = PersonaClient::new(unpaced()).expect("persona should build");
         let result = client
             .get(
                 &format!("http://{address}/oversized"),
@@ -417,7 +615,7 @@ mod tests {
             let _ = stream.write_all(b"\r\n0\r\n\r\n");
         });
 
-        let client = PersonaClient::new(PersonaConfig::default()).expect("persona should build");
+        let client = PersonaClient::new(unpaced()).expect("persona should build");
         let result = client
             .get(
                 &format!("http://{address}/chunked"),
@@ -461,7 +659,7 @@ mod tests {
         let client = PersonaClient::new(PersonaConfig {
             request_timeout: Duration::from_secs(1),
             connect_timeout: Duration::from_secs(1),
-            ..PersonaConfig::default()
+            ..unpaced()
         })
         .expect("persona should build");
         let result = client

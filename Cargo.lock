@@ -982,6 +982,7 @@ name = "kasb"
 version = "0.4.3"
 dependencies = [
  "chrono",
+ "fs2",
  "futures-util",
  "icu_collator",
  "icu_locale",
@@ -990,6 +991,7 @@ dependencies = [
  "ryu-js",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
  "tokio",
  "tokio-util",

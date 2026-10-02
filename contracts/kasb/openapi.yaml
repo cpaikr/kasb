@@ -56,6 +56,13 @@ x-kasb-json-profile:
     redirects: bounded-by-client-policy
     automaticRetries: 0
     maxInFlightPerClient: 8
+    requestPacing:
+      scope: local-processes-sharing-state-directory
+      defaultIntervalMilliseconds: 500
+      maximumIntervalMilliseconds: 60000
+      rateLimitedStatus: 429
+      retryAfter: delta-seconds
+      fallbackCooldownMilliseconds: 10000
     cookies: in-memory-per-client
     successStatuses: 200-299
     notFoundStatus: 404

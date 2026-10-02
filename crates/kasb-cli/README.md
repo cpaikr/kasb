@@ -17,6 +17,33 @@ kasb upgrade
 From a checkout, prefix command arguments with
 `cargo run --locked -p kasb-cli --bin kasb --`.
 
+## Request pacing
+
+Every KASB request waits a minimum interval shared by all local `kasb`
+processes and SDK consumers, so concurrent invocations by agents or scripts do
+not burst. The default is 500 milliseconds before each request.
+
+```sh
+kasb search-standards --keyword 리스 --request-interval-ms 1000
+KASB_REQUEST_INTERVAL_MS=1000 kasb search-standards --keyword 리스
+```
+
+The global `--request-interval-ms <MS>` flag overrides
+`KASB_REQUEST_INTERVAL_MS`, which overrides the default. Values are integers
+from 0 through 60000; anything else is an `invalid_input` failure. `0` disables
+pacing and is for controlled tests only: unpaced bursts risk KASB blocking your
+address.
+
+Pacing state is one lock file, `request-pacing-v1.lock`, under
+`%LOCALAPPDATA%\kasb\state`, `~/Library/Application Support/kasb`, or
+`$XDG_STATE_HOME/kasb` (default `~/.local/state/kasb`). Set `KASB_STATE_DIR` to
+an absolute directory to isolate or share it deliberately. If the state cannot
+be read or locked the command fails with `internal_failure` rather than sending
+an unpaced request; stop other `kasb` processes before repairing a damaged
+file. HTTP 429 is reported as retryable `rate_limited` and lengthens the shared
+cooldown. The [v1 spec](../../docs/specs/kasb-standards-v1.md#request-pacing)
+owns these semantics.
+
 ## Output and version advisories
 
 Content commands emit one newline-terminated JSON document on stdout in every

@@ -1,7 +1,7 @@
 use serde_json::Value;
 
 use crate::http::{
-    CancellationToken, HttpResponse, HttpTransport, MAX_RESPONSE_BYTES, TransportError,
+    CancellationToken, HttpResponse, HttpTransport, MAX_RESPONSE_BYTES, PacingError, TransportError,
 };
 use crate::{KasbError, KasbFailure, KasbFailureCode};
 
@@ -34,6 +34,26 @@ pub(crate) async fn fetch_json<T: HttpTransport>(
             )
             .into());
         }
+        Err(TransportError::Pacing(PacingError::InvalidSetting { setting, message })) => {
+            return Err(KasbFailure::invalid(setting, message).into());
+        }
+        // Fail closed: an unreadable, unlockable, or stalled pacing state
+        // never degrades into an unpaced request.
+        Err(TransportError::Pacing(error @ (PacingError::State(_) | PacingError::LockTimeout))) => {
+            return Err(KasbFailure {
+                code: KasbFailureCode::InternalFailure,
+                message: format!(
+                    "{error}. Check {} and its permissions, and stop other KASB processes before repairing a damaged pacing file.",
+                    crate::http::STATE_DIR_ENV
+                ),
+                // A stalled holder may exit; a damaged state will not repair
+                // itself.
+                retryable: error == PacingError::LockTimeout,
+                parameter: None,
+                source_url: None,
+            }
+            .into());
+        }
     };
 
     ensure_success(response, source_url)
@@ -42,10 +62,10 @@ pub(crate) async fn fetch_json<T: HttpTransport>(
 fn ensure_success(response: HttpResponse, source_url: &str) -> Result<Value, KasbError> {
     if !(200..300).contains(&response.status) {
         return Err(KasbFailure::source_failure(
-            if response.status == 404 {
-                KasbFailureCode::NotFound
-            } else {
-                KasbFailureCode::SourceUnavailable
+            match response.status {
+                404 => KasbFailureCode::NotFound,
+                429 => KasbFailureCode::RateLimited,
+                _ => KasbFailureCode::SourceUnavailable,
             },
             format!("KASB API request failed (status={}).", response.status),
             response.status == 429 || response.status >= 500,

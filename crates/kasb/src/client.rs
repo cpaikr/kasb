@@ -207,6 +207,20 @@ impl KasbClient<PersonaClient, SystemClock> {
     }
 }
 
+impl<C: Clock + Clone> KasbClient<PersonaClient, C> {
+    /// Returns a client sharing this one's persona with a different explicit
+    /// request interval. See [`PersonaClient::with_request_interval`].
+    pub fn with_request_interval(
+        &self,
+        request_interval: Option<std::time::Duration>,
+    ) -> Result<Self, PersonaBuildError> {
+        Ok(Self {
+            transport: self.transport.with_request_interval(request_interval)?,
+            clock: self.clock.clone(),
+        })
+    }
+}
+
 impl Default for KasbClient<PersonaClient, SystemClock> {
     /// Builds a KASB client with the default browser persona and system clock.
     ///

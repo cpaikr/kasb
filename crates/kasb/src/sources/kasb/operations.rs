@@ -48,6 +48,7 @@ use super::decode::{
     required_array, required_object, required_object_ref, source_changed, to_string_value,
 };
 use super::normalize::{normalize_kasb_plain_text, strip_html};
+use super::standard_titles::bundled_standard_title;
 use super::structure::{
     SectionEnrichment, enrichment_from_snapshot, fetch_structure_snapshot, infer_standard_kind,
     section_enrichment,
@@ -729,12 +730,17 @@ async fn enrich_standard_items<T: HttpTransport>(
     items: &mut [SearchStandardItem],
     cancellation: &CancellationToken,
 ) -> Result<(), KasbError> {
-    let inputs = items
-        .iter()
-        .enumerate()
-        .map(|(index, item)| (index, item.std_num.clone()))
-        .collect::<Vec<_>>();
-    let enrichments = stream::iter(inputs)
+    // Bundled titles answer most rows without a request; only standards the
+    // table does not know cost a paced structure fetch.
+    let mut bundled = Vec::new();
+    let mut inputs = Vec::new();
+    for (index, item) in items.iter().enumerate() {
+        match bundled_standard_title(&item.std_num) {
+            Some(title) => bundled.push((index, title.map(str::to_owned))),
+            None => inputs.push((index, item.std_num.clone())),
+        }
+    }
+    let mut enrichments = stream::iter(inputs)
         .map(|(index, std_num)| async move {
             match fetch_structure_snapshot(transport, &std_num, cancellation).await {
                 Ok(snapshot) => Ok((
@@ -752,6 +758,7 @@ async fn enrich_standard_items<T: HttpTransport>(
         .buffer_unordered(STANDARD_ENRICHMENT_CONCURRENCY)
         .try_collect::<Vec<_>>()
         .await?;
+    enrichments.extend(bundled);
     for (index, title) in enrichments {
         items[index].standard_title = title;
         items[index].standard_kind = items[index]

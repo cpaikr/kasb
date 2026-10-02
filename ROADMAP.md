@@ -6,7 +6,7 @@
 
 ## Plans
 
-_None._
+[Pace KASB requests across local processes](plans/request-pacing.md)
 
 ## Completed
 
@@ -27,4 +27,4 @@ _None._
 - [Improve comparison and framework filtering](tasks/comparison-and-filtering.md)
 - [Refine structured and human-facing content output](tasks/content-output.md)
 - [Continue search-quality hardening](tasks/search-quality.md)
-- [Decide whether authentication or client-side rate limiting is warranted](tasks/auth-and-rate-limiting.md)
+- [Decide whether authentication is warranted](tasks/auth-and-rate-limiting.md)
