@@ -12,11 +12,17 @@ async fn main() {
         exit_with(output);
     }
 
-    let output =
-        kasb_cli::run_with_client_factory(argv.iter().cloned(), &CancellationToken::new(), || {
-            KasbClient::new(PersonaConfig::default())
-        })
-        .await;
+    let output = kasb_cli::run_with_client_factory(
+        argv.iter().cloned(),
+        &CancellationToken::new(),
+        |request_interval| {
+            KasbClient::new(PersonaConfig {
+                request_interval,
+                ..PersonaConfig::default()
+            })
+        },
+    )
+    .await;
     exit_with(output);
 }
 

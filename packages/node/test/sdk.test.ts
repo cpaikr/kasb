@@ -28,6 +28,28 @@ describe("Rust-backed Node SDK facade", () => {
     }
   });
 
+  test("rejects an invalid request interval before loading a native addon", async () => {
+    for (const requestIntervalMs of [0, -1, 60001, 1.5, Number.NaN, "500", null]) {
+      await expect(
+        getParagraph({ stdNum: "1116", paraNum: "23" }, { requestIntervalMs } as never),
+      ).rejects.toMatchObject({
+        name: "KasbFailure",
+        code: "invalid_input",
+        retryable: false,
+        parameter: "requestIntervalMs",
+      });
+    }
+  });
+
+  test("accepts rate_limited as a public failure code", () => {
+    const failure = new KasbFailure({
+      message: "KASB API request failed (status=429).",
+      code: "rate_limited",
+      retryable: true,
+    });
+    expect(failure).toMatchObject({ code: "rate_limited", retryable: true });
+  });
+
   test("keeps failure projection on the public allowlist", () => {
     const failure = new KasbFailure({
       message: "provider changed",

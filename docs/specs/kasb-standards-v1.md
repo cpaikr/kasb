@@ -170,9 +170,14 @@ Allowed public failure codes:
 - `invalid_input`
 - `not_found`
 - `source_unavailable`
+- `rate_limited`
 - `source_changed`
 - `partial_retrieval`
 - `internal_failure`
+
+`rate_limited` means KASB answered HTTP 429. It is `retryable: true`, but only
+as a new, paced request; see [request pacing](#request-pacing). Every operation
+that contacts the source can return it.
 
 Caller cancellation is execution control, not a public capability failure code.
 Each public projection must expose it distinctly from timeout or source failure;
@@ -208,11 +213,11 @@ Every CLI operation output mode still emits a JSON envelope:
 - `inputs`
   `keyword`, optional `limit`, optional `sort` (`relevance`, `match-count`, `std-num`, `title`; default `relevance`)
 - `output`
-  Matching standards with `stdNum`, match counts, best-effort `standardTitle` / `standardKind`, source references, per-standard transport-neutral `nextActions` for the normal structure lookup follow-up, and broader `suggestedKeywords`.
+  Matching standards with `stdNum`, match counts, best-effort `standardTitle` / `standardKind` (from the release-versioned title table, with live structure lookup only for standards it does not know), source references, per-standard transport-neutral `nextActions` for the normal structure lookup follow-up, and broader `suggestedKeywords`.
 - `warnings`
   `truncated_results`, `source_metadata_incomplete`
 - `failure cases`
-  `invalid_input`, `source_unavailable`, `source_changed`
+  `invalid_input`, `source_unavailable`, `rate_limited`, `source_changed`
 - `safety class`
   read-only
 
@@ -236,7 +241,7 @@ Implementation notes:
 - `warnings`
   `search_filtered_structure`, `source_metadata_incomplete`
 - `failure cases`
-  `invalid_input`, `not_found`, `source_unavailable`, `source_changed`
+  `invalid_input`, `not_found`, `source_unavailable`, `rate_limited`, `source_changed`
 - `safety class`
   read-only
 
@@ -258,7 +263,7 @@ Implementation notes:
 - `warnings`
   `ambiguous_ref_resolved`, `empty_section`, `partial_clause_normalization`
 - `failure cases`
-  `invalid_input`, `not_found`, `source_unavailable`, `source_changed`, `partial_retrieval`
+  `invalid_input`, `not_found`, `source_unavailable`, `rate_limited`, `source_changed`, `partial_retrieval`
 - `safety class`
   read-only
 
@@ -285,7 +290,7 @@ Implementation notes:
 - `warnings`
   `paragraph_metadata_incomplete`
 - `failure cases`
-  `invalid_input`, `not_found`, `source_unavailable`, `source_changed`
+  `invalid_input`, `not_found`, `source_unavailable`, `rate_limited`, `source_changed`
 - `safety class`
   read-only
 
@@ -310,7 +315,7 @@ Implementation notes:
 - `warnings`
   `source_metadata_incomplete`
 - `failure cases`
-  `invalid_input`, `source_unavailable`, `source_changed`
+  `invalid_input`, `source_unavailable`, `rate_limited`, `source_changed`
 - `safety class`
   read-only
 
@@ -335,7 +340,7 @@ Implementation notes:
 - `warnings`
   `source_metadata_incomplete`
 - `failure cases`
-  `invalid_input`, `not_found`, `source_unavailable`, `source_changed`
+  `invalid_input`, `not_found`, `source_unavailable`, `rate_limited`, `source_changed`
 - `safety class`
   read-only
 
@@ -430,9 +435,37 @@ the mapping boundary.
 - no auth required in current evidence
 - no automatic source replay; transient upstream failures are marked
   `retryable: true` so callers can choose a retry policy
+- every source request is paced; see [request pacing](#request-pacing)
 - source-shape drift becomes `source_changed`
 - invalid or stale ids become `not_found` or `invalid_input` depending on whether the input shape was valid
 - log request inputs, source endpoint, and identifier classification decisions when diagnostics are enabled
+
+### Request pacing
+
+Every KASB request waits a minimum interval that is shared by all local
+processes using the same pacing state, whether they are the Rust SDK, the Node
+SDK, or the CLI. The interval is a project decision, not a provider limit; the
+[source map](../research/kasb-standard-source-map.md#request-pacing) owns the
+evidence and the mechanism.
+
+- Default: 500 milliseconds before each request.
+- Precedence: an explicit SDK option or CLI flag, then
+  `KASB_REQUEST_INTERVAL_MS`, then the default.
+- Accepted values are integers from 1 through 60000. Anything else is
+  `invalid_input` naming the setting; it never falls back to the default.
+- The CLI flag, the Node option, and the environment variable cannot disable
+  pacing, because those surfaces always reach KASB. Only the Rust SDK's
+  explicit option accepts zero, for custom transports and local test origins.
+- When concurrent callers use different intervals, the larger one applies.
+- `KASB_STATE_DIR` (absolute) relocates the shared state. Unreadable,
+  unlockable, or damaged state is `internal_failure` with a fixed message that
+  carries no operating-system detail; requests are never sent unpaced. A lock that another process holds for five minutes is a retryable
+  `internal_failure`.
+- After `rate_limited`, the shared cooldown honors `Retry-After` in seconds,
+  capped at 60 seconds, or 10 seconds when KASB sends no usable value. That
+  back-off expires with elapsed time; a caller's own interval always applies.
+- Pacing is local to one state directory. It does not coordinate hosts that
+  share a network address.
 
 ## 10. Evaluation Plan
 

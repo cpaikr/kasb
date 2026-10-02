@@ -24,6 +24,15 @@ export function invalidNodeInput() {
   });
 }
 
+export function invalidRequestInterval() {
+  return new KasbFailure({
+    code: "invalid_input",
+    message: "requestIntervalMs must be an integer from 1 through 60000.",
+    retryable: false,
+    parameter: "requestIntervalMs",
+  });
+}
+
 export function internalNativeFailure() {
   return new KasbFailure(INTERNAL_FAILURE);
 }
@@ -32,6 +41,7 @@ const FAILURE_CODES = new Set([
   "invalid_input",
   "not_found",
   "source_unavailable",
+  "rate_limited",
   "source_changed",
   "partial_retrieval",
   "internal_failure",

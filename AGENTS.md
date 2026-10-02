@@ -44,6 +44,8 @@
 - Run opt-in live checks: `bun run test:live`
 - Check release-derived identities: `bun run release:check`
 - Run deterministic installer tests: `bun run test:installers`
+- Check the bundled standard-title table against live KASB: `bun run standard-titles:check`
+- Refresh the bundled standard-title table from live KASB: `bun run standard-titles:write`
 
 Document only commands that exist in `package.json` or Cargo metadata. Update
 this list when the rewrite changes the repository interface.
@@ -91,5 +93,7 @@ this list when the rewrite changes the repository interface.
 - Do not claim an npm native target until native build and clean packed-consumer
   tests pass for it.
 - Keep live checks separate from deterministic merge validation.
+- Send live KASB requests only through the paced SDK or at its default
+  interval or slower; never disable pacing against the real origin.
 - Do not publish packages, create release tags, or mutate KASB external state
   without explicit authorization.

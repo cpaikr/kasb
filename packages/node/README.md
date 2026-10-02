@@ -34,6 +34,11 @@ validation, native target selection, and transparent process launch. The
 launcher does not download, compile, parse commands, render output, or provide
 a JavaScript fallback.
 
+Requests are paced across local processes at 500 ms by default. Pass
+`{ requestIntervalMs }` in an operation's second argument, or set
+`KASB_REQUEST_INTERVAL_MS`, to change the interval; see
+[request pacing](https://github.com/cpaikr/kasb/blob/main/docs/specs/kasb-standards-v1.md#request-pacing).
+
 Treat `kasb --help` and `kasb help <command>` as the CLI reference. Machine
 invocations emit one newline-terminated JSON document on stdout. The launcher
 forwards the native binary's arguments, environment, working directory,

@@ -11,6 +11,8 @@ use kasb::http::{CancellationToken, HttpResponse, HttpTransport, TransportError}
 use kasb::{Clock, FixedClock, KasbClient, KasbError, KasbFailureCode};
 use serde_json::{Value, json};
 
+/// Start of the standard-number range the bundled title table never contains.
+const UNBUNDLED_STD_NUM: u32 = 900_000;
 const FIXED_TIME: &str = "2026-05-18T00:00:00.000Z";
 
 #[derive(Clone, Debug)]
@@ -63,7 +65,7 @@ impl HttpTransport for EnrichmentTrackingTransport {
             self.calls.fetch_add(1, Ordering::AcqRel);
             if url.contains("/api/standard?searchWord=") {
                 let rows = (1..=16)
-                    .map(|index| json!({"key": index.to_string(), "doc_count": index}))
+                    .map(|index| json!({"key": (UNBUNDLED_STD_NUM + index).to_string(), "doc_count": index}))
                     .collect::<Vec<_>>();
                 return Ok(HttpResponse {
                     status: 200,
@@ -292,11 +294,7 @@ async fn shared_transport_policy_applies_without_retries() {
             false,
         ),
         (response(404, json!({})), KasbFailureCode::NotFound, false),
-        (
-            response(429, json!({})),
-            KasbFailureCode::SourceUnavailable,
-            true,
-        ),
+        (response(429, json!({})), KasbFailureCode::RateLimited, true),
         (
             response(503, json!({})),
             KasbFailureCode::SourceUnavailable,
@@ -354,7 +352,7 @@ async fn partial_standard_rows_are_omitted_and_best_effort_enrichment_is_nonfata
         search_url.to_owned(),
         response(
             200,
-            json!({"standards": {"stdCountArr": [{"key": "1116", "doc_count": 3}, {}], "totalCount": 3}}),
+            json!({"standards": {"stdCountArr": [{"key": "900116", "doc_count": 3}, {}], "totalCount": 3}}),
         ),
     )]);
     let result = client
@@ -377,7 +375,7 @@ async fn partial_standard_rows_are_omitted_and_best_effort_enrichment_is_nonfata
         transport.calls(),
         [
             search_url,
-            "https://db.kasb.or.kr/api/standard-indexes/1116"
+            "https://db.kasb.or.kr/api/standard-indexes/900116"
         ]
     );
 }
@@ -685,26 +683,26 @@ async fn relevance_ranking_uses_nfkc_compatible_title_matching() {
             response(
                 200,
                 json!({"standards": {"stdCountArr": [
-                    {"key": "1", "doc_count": 1},
-                    {"key": "2", "doc_count": 99}
+                    {"key": "900001", "doc_count": 1},
+                    {"key": "900002", "doc_count": 99}
                 ]}}),
             ),
         ),
         (
-            "https://db.kasb.or.kr/api/standard-indexes/1".to_owned(),
+            "https://db.kasb.or.kr/api/standard-indexes/900001".to_owned(),
             response(
                 200,
                 json!({"standardIndexes": [
-                    {"documentId": "one", "stdNum": "1", "title": "ａｂｃ", "level": 1}
+                    {"documentId": "one", "stdNum": "900001", "title": "ａｂｃ", "level": 1}
                 ]}),
             ),
         ),
         (
-            "https://db.kasb.or.kr/api/standard-indexes/2".to_owned(),
+            "https://db.kasb.or.kr/api/standard-indexes/900002".to_owned(),
             response(
                 200,
                 json!({"standardIndexes": [
-                    {"documentId": "two", "stdNum": "2", "title": "ABC 기타", "level": 1}
+                    {"documentId": "two", "stdNum": "900002", "title": "ABC 기타", "level": 1}
                 ]}),
             ),
         ),
@@ -723,20 +721,70 @@ async fn relevance_ranking_uses_nfkc_compatible_title_matching() {
             .iter()
             .map(|item| item.std_num.as_str())
             .collect::<Vec<_>>(),
-        ["1", "2"]
+        ["900001", "900002"]
     );
+}
+
+#[tokio::test]
+async fn bundled_titles_rank_known_standards_without_structure_requests() {
+    let search_url = "https://db.kasb.or.kr/api/standard?searchWord=%EB%A6%AC%EC%8A%A4";
+    let structure_url = "https://db.kasb.or.kr/api/standard-indexes/900001";
+    let (sdk, transport) = client([
+        (
+            search_url.to_owned(),
+            response(
+                200,
+                json!({"standards": {"stdCountArr": [
+                    {"key": "1017", "doc_count": 97},
+                    {"key": "900001", "doc_count": 50},
+                    {"key": "1116", "doc_count": 3}
+                ]}}),
+            ),
+        ),
+        (
+            structure_url.to_owned(),
+            response(
+                200,
+                json!({"standardIndexes": [
+                    {"documentId": "one", "stdNum": "900001", "title": "기타", "level": 1}
+                ]}),
+            ),
+        ),
+    ]);
+    let result = sdk
+        .execute_search_standards(json!({"keyword": "리스"}), &CancellationToken::new())
+        .await
+        .expect("standard search should succeed");
+    let standards = &result.result.standards;
+    assert_eq!(
+        standards
+            .iter()
+            .map(|item| (item.std_num.as_str(), item.standard_title.as_deref()))
+            .collect::<Vec<_>>(),
+        [
+            ("1116", Some("기업회계기준서 제1116호 리스")),
+            ("1017", None),
+            ("900001", Some("기타")),
+        ]
+    );
+    assert_eq!(
+        standards[0].standard_kind.as_deref(),
+        Some("k-ifrs-standard")
+    );
+    // Only the standard the bundled table does not know costs a request.
+    assert_eq!(transport.calls(), [search_url, structure_url]);
 }
 
 #[tokio::test]
 async fn standard_kind_uses_ecmascript_whitespace_semantics() {
     let search_url = "https://db.kasb.or.kr/api/standard?searchWord=x";
-    let structure_url = "https://db.kasb.or.kr/api/standard-indexes/2";
+    let structure_url = "https://db.kasb.or.kr/api/standard-indexes/900002";
     let (sdk, _) = client([
         (
             search_url.to_owned(),
             response(
                 200,
-                json!({"standards": {"stdCountArr": [{"key": "2", "doc_count": 1}]}}),
+                json!({"standards": {"stdCountArr": [{"key": "900002", "doc_count": 1}]}}),
             ),
         ),
         (
@@ -745,7 +793,7 @@ async fn standard_kind_uses_ecmascript_whitespace_semantics() {
                 200,
                 json!({"standardIndexes": [{
                     "documentId": "chapter",
-                    "stdNum": "2",
+                    "stdNum": "900002",
                     "title": "제2장\u{0085}재무제표",
                     "level": 1
                 }]}),
@@ -947,7 +995,7 @@ async fn standard_ranking_enrichment_fails_closed_above_its_request_bound() {
 async fn standard_ranking_enrichment_accepts_its_exact_request_bound() {
     let search_url = "https://db.kasb.or.kr/api/standard?searchWord=x";
     let rows = (0..512)
-        .map(|index| json!({"key": index.to_string(), "doc_count": 1}))
+        .map(|index| json!({"key": (UNBUNDLED_STD_NUM + index).to_string(), "doc_count": 1}))
         .collect::<Vec<_>>();
     let mut routes = vec![(
         search_url.to_owned(),
@@ -955,7 +1003,10 @@ async fn standard_ranking_enrichment_accepts_its_exact_request_bound() {
     )];
     routes.extend((0..512).map(|index| {
         (
-            format!("https://db.kasb.or.kr/api/standard-indexes/{index}"),
+            format!(
+                "https://db.kasb.or.kr/api/standard-indexes/{}",
+                UNBUNDLED_STD_NUM + index
+            ),
             response(200, json!({"standardIndexes": []})),
         )
     }));

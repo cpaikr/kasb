@@ -1,7 +1,12 @@
 import { createRequire } from "node:module";
 import { channel } from "node:diagnostics_channel";
 
-import { capabilityError, internalNativeFailure, invalidNodeInput } from "./error.js";
+import {
+  capabilityError,
+  internalNativeFailure,
+  invalidNodeInput,
+  invalidRequestInterval,
+} from "./error.js";
 import { KasbNativeInstallError, resolveNativeTarget } from "./target.js";
 
 const require = createRequire(import.meta.url);
@@ -22,6 +27,7 @@ function operation(operationName) {
 
 async function invoke(operationName, input, context) {
   const inputJson = encodeInput(input);
+  const requestIntervalMs = requestInterval(context.requestIntervalMs);
   const bridge = bridgeAbortSignal(context.signal);
   try {
     let encoded;
@@ -30,7 +36,8 @@ async function invoke(operationName, input, context) {
         operationName,
         inputJson,
         bridge.signal,
-        bridge.signal?.aborted === true
+        bridge.signal?.aborted === true,
+        requestIntervalMs
       );
     } catch (error) {
       if (error instanceof KasbNativeInstallError) throw error;
@@ -51,6 +58,14 @@ function publishNativeDiagnostic(envelope) {
   if (envelope.ok !== false || envelope.operatorSignal !== "binding_panic") return;
   if (envelope.error?.code !== "internal_failure" || !nativeDiagnostics.hasSubscribers) return;
   nativeDiagnostics.publish(bindingPanicDiagnostic);
+}
+
+// Network-free validation of the per-call pacing override. Omitted means the
+// native SDK resolves KASB_REQUEST_INTERVAL_MS, then its built-in default.
+function requestInterval(value) {
+  if (value === undefined) return undefined;
+  if (!Number.isInteger(value) || value < 1 || value > 60000) throw invalidRequestInterval();
+  return value;
 }
 
 function encodeInput(input) {

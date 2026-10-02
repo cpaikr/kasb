@@ -10,6 +10,7 @@ mod version_cache;
 mod version_check;
 
 use std::ffi::OsString;
+use std::time::Duration;
 
 use args::{Cli, OperationName};
 use clap::Parser;
@@ -48,6 +49,8 @@ where
 /// Parses local CLI behavior before constructing the KASB transport.
 ///
 /// This keeps help and parse failures independent from transport availability.
+/// The factory receives the `--request-interval-ms` value, when given, so the
+/// flag overrides the environment and the built-in pacing default.
 pub async fn run_with_client_factory<T, C, E, F, I, A>(
     argv: I,
     cancellation: &CancellationToken,
@@ -56,7 +59,7 @@ pub async fn run_with_client_factory<T, C, E, F, I, A>(
 where
     T: HttpTransport,
     C: Clock,
-    F: FnOnce() -> Result<KasbClient<T, C>, E>,
+    F: FnOnce(Option<Duration>) -> Result<KasbClient<T, C>, E>,
     I: IntoIterator<Item = A>,
     A: Into<OsString> + Clone,
 {
@@ -71,7 +74,7 @@ where
     if invocation.operation == OperationName::Upgrade {
         return upgrade::run(invocation.upgrade_check, cancellation).await;
     }
-    let client = match client_factory() {
+    let client = match client_factory(invocation.request_interval) {
         Ok(client) => client,
         Err(_) => {
             return render::render_internal_failure(
@@ -265,7 +268,7 @@ mod tests {
             let output = run_with_client_factory(
                 argv,
                 &CancellationToken::new(),
-                || -> Result<KasbClient<PersonaClient, SystemClock>, ()> {
+                |_| -> Result<KasbClient<PersonaClient, SystemClock>, ()> {
                     called.set(true);
                     Err(())
                 },
@@ -279,13 +282,79 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn request_interval_flag_reaches_the_transport_factory_and_is_bounded() {
+        for (argv, expected) in [
+            (vec!["kasb", "get-qna", "--doc-number", "x"], Some(None)),
+            (
+                vec![
+                    "kasb",
+                    "get-qna",
+                    "--doc-number",
+                    "x",
+                    "--request-interval-ms",
+                    "0",
+                ],
+                // The CLI always reaches KASB, so it cannot disable pacing.
+                None,
+            ),
+            (
+                vec![
+                    "kasb",
+                    "--request-interval-ms",
+                    "60000",
+                    "get-qna",
+                    "--doc-number",
+                    "x",
+                ],
+                Some(Some(Duration::from_secs(60))),
+            ),
+            (
+                vec![
+                    "kasb",
+                    "get-qna",
+                    "--doc-number",
+                    "x",
+                    "--request-interval-ms",
+                    "60001",
+                ],
+                None,
+            ),
+            (
+                vec![
+                    "kasb",
+                    "get-qna",
+                    "--doc-number",
+                    "x",
+                    "--request-interval-ms",
+                    "-1",
+                ],
+                None,
+            ),
+        ] {
+            let received = Cell::new(None);
+            let output = run_with_client_factory(
+                argv,
+                &CancellationToken::new(),
+                |request_interval| -> Result<KasbClient<PersonaClient, SystemClock>, ()> {
+                    received.set(Some(request_interval));
+                    Err(())
+                },
+            )
+            .await;
+
+            assert_eq!(received.get(), expected);
+            assert_ne!(output.exit_code, 0);
+        }
+    }
+
+    #[tokio::test]
     async fn unmanaged_upgrade_fails_before_constructing_any_transport() {
         release::reset_release_transport_constructions();
         let kasb_transport_called = Cell::new(false);
         let output = run_with_client_factory(
             ["kasb", "upgrade", "--check"],
             &CancellationToken::new(),
-            || -> Result<KasbClient<PersonaClient, SystemClock>, ()> {
+            |_| -> Result<KasbClient<PersonaClient, SystemClock>, ()> {
                 kasb_transport_called.set(true);
                 Err(())
             },
@@ -312,7 +381,7 @@ mod tests {
         let output = run_with_client_factory(
             ["kasb", "upgrade"],
             &cancellation,
-            || -> Result<KasbClient<PersonaClient, SystemClock>, ()> {
+            |_| -> Result<KasbClient<PersonaClient, SystemClock>, ()> {
                 panic!("upgrade must not construct the KASB transport")
             },
         )

@@ -389,7 +389,7 @@ async fn transport_and_http_failures_have_exact_retry_policy_without_retries() {
         ),
         (
             json_response(429, json!({})),
-            KasbFailureCode::SourceUnavailable,
+            KasbFailureCode::RateLimited,
             true,
         ),
         (

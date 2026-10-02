@@ -130,7 +130,7 @@ fn fixture_failure() -> TransportError {
 /// envelope as a production transport construction failure.
 pub async fn try_run(argv: &[OsString]) -> Option<CliProcessOutput> {
     let config_path = std::env::var_os(CONFIG_ENV)?;
-    let output = run_with_client_factory(argv.iter().cloned(), &CancellationToken::new(), || {
+    let output = run_with_client_factory(argv.iter().cloned(), &CancellationToken::new(), |_| {
         load_transport(Path::new(&config_path))
             .map(|transport| KasbClient::from_parts(transport, FixedClock::new(FIXED_NOW)))
     })

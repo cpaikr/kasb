@@ -170,6 +170,9 @@ canonical input and have freshness checks.
   an exact-version target package and launches without a shell.
 - Provider bytes, retries, concurrency, deadlines, redirects, cookies, proxies,
   and persona rotation are explicit and bounded.
+- Every provider request passes the SDK's cross-process pacing gate; a pacing
+  state failure stops the request instead of sending it unpaced. The CLI flag
+  and Node option only select the interval.
 - Rust and Node agree at the serialized semantic boundary except for explicitly
   permitted runtime metadata.
 - A conformance claim requires deliberate corrupted outcomes to be rejected.

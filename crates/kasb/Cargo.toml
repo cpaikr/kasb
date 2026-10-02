@@ -13,6 +13,8 @@ path = "src/lib.rs"
 
 [dependencies]
 chrono = { version = "0.4.42", default-features = false, features = ["clock"] }
+# MSRV 1.88 predates std file locks; fs2 supplies crash-released OS locks.
+fs2 = "0.4.3"
 futures-util.workspace = true
 icu_collator = "=2.2.0"
 icu_locale = "=2.2.0"
@@ -27,3 +29,6 @@ tokio-util = { version = "0.7.17", features = ["rt"] }
 unicode-normalization = "0.1.24"
 wreq = { workspace = true, features = ["brotli", "cookies", "deflate", "gzip", "stream", "zstd"] }
 wreq-util = "=3.0.0-rc.14"
+
+[dev-dependencies]
+tempfile = "3.23.0"

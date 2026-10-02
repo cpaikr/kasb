@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import { subscribe, unsubscribe } from "node:diagnostics_channel";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const require = createRequire(import.meta.url);
@@ -10,7 +10,7 @@ try {
   const request = JSON.parse(await readStdin());
   if (request.protocolVersion !== 1) throw new Error(`unsupported protocol ${request.protocolVersion}`);
 
-  const { resolveNativeTarget } = await import(resolve(repositoryRoot, "packages/node/dist/target.js"));
+  const { resolveNativeTarget } = await import(pathToFileURL(resolve(repositoryRoot, "packages/node/dist/target.js")).href);
   const addon = require(resolveNativeTarget("addon").addonPath);
   if (
     typeof addon.configureFixture !== "function" ||
@@ -20,7 +20,7 @@ try {
   }
   addon.configureFixture(JSON.stringify({ routes: request.routes }));
 
-  const sdk = await import(resolve(repositoryRoot, "packages/node/dist/index.js"));
+  const sdk = await import(pathToFileURL(resolve(repositoryRoot, "packages/node/dist/index.js")).href);
   const operations = {
     "search-standards": sdk.searchStandards,
     "get-standard-structure": sdk.getStandardStructure,

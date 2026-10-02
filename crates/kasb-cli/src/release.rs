@@ -1,15 +1,19 @@
 use futures_util::StreamExt;
 use semver::Version;
 use serde::{Deserialize, Serialize};
-#[cfg(test)]
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 use wreq::header::{ACCEPT, USER_AGENT};
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 const MANIFEST_JSON: &str = include_str!("../../../native-targets.json");
+// Per-thread so parallel tests cannot disturb each other's count. Every
+// construction site runs inline on the calling task, and each test owns a
+// current-thread runtime.
 #[cfg(test)]
-static RELEASE_TRANSPORT_CONSTRUCTIONS: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    static RELEASE_TRANSPORT_CONSTRUCTIONS: std::cell::Cell<usize> =
+        const { std::cell::Cell::new(0) };
+}
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -142,7 +146,7 @@ pub(crate) struct GithubReleaseSource {
 impl GithubReleaseSource {
     pub(crate) fn new(policy: &ReleasePolicy) -> Result<Self, UpgradeError> {
         #[cfg(test)]
-        RELEASE_TRANSPORT_CONSTRUCTIONS.fetch_add(1, Ordering::SeqCst);
+        RELEASE_TRANSPORT_CONSTRUCTIONS.with(|count| count.set(count.get() + 1));
         let latest_url = test_latest_url(&policy.repository)?.unwrap_or_else(|| {
             format!(
                 "https://api.github.com/repos/{}/releases/latest",
@@ -424,12 +428,12 @@ pub(crate) fn http_status_error(status: u16) -> Option<UpgradeError> {
 
 #[cfg(test)]
 pub(crate) fn reset_release_transport_constructions() {
-    RELEASE_TRANSPORT_CONSTRUCTIONS.store(0, Ordering::SeqCst);
+    RELEASE_TRANSPORT_CONSTRUCTIONS.with(|count| count.set(0));
 }
 
 #[cfg(test)]
 pub(crate) fn release_transport_constructions() -> usize {
-    RELEASE_TRANSPORT_CONSTRUCTIONS.load(Ordering::SeqCst)
+    RELEASE_TRANSPORT_CONSTRUCTIONS.with(std::cell::Cell::get)
 }
 
 impl ReleaseSource for GithubReleaseSource {

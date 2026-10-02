@@ -6,6 +6,8 @@ pub enum KasbFailureCode {
     InvalidInput,
     NotFound,
     SourceUnavailable,
+    /// KASB answered HTTP 429. Retry only as a new, paced request.
+    RateLimited,
     SourceChanged,
     PartialRetrieval,
     InternalFailure,

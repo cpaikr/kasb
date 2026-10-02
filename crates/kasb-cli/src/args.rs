@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::time::Duration;
 
 use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use serde_json::{Map, Number, Value};
@@ -83,6 +84,8 @@ Notes:
 #[derive(Debug, Parser)]
 #[command(
     name = "kasb",
+    // Usage text names the command, not the platform executable (`kasb.exe`).
+    bin_name = "kasb",
     about = "Retrieve KASB standards and Q&A material as tool-friendly JSON.",
     version,
     after_help = ROOT_AFTER_HELP,
@@ -94,6 +97,16 @@ pub(crate) struct Cli {
     /// Skip incidental version inspection, cache access, and fetching.
     #[arg(long, global = true)]
     no_version_check: bool,
+    /// Minimum milliseconds before each KASB request, shared across local
+    /// processes [env: KASB_REQUEST_INTERVAL_MS] [default: 500]. Integer
+    /// from 1 through 60000.
+    #[arg(
+        long,
+        global = true,
+        value_name = "MS",
+        value_parser = clap::value_parser!(u64).range(1..=60_000)
+    )]
+    request_interval_ms: Option<u64>,
     #[command(subcommand)]
     command: Operation,
 }
@@ -412,6 +425,7 @@ pub(crate) struct Invocation {
     pub upgrade_check: bool,
     pub no_version_check: bool,
     pub version_refresh: bool,
+    pub request_interval: Option<Duration>,
 }
 
 impl Cli {
@@ -544,6 +558,7 @@ impl Cli {
             }
         };
         invocation.no_version_check = self.no_version_check;
+        invocation.request_interval = self.request_interval_ms.map(Duration::from_millis);
         invocation
     }
 }
@@ -566,6 +581,7 @@ impl Invocation {
             upgrade_check: false,
             no_version_check: false,
             version_refresh: false,
+            request_interval: None,
         }
     }
 }
