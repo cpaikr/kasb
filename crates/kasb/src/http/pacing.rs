@@ -93,8 +93,12 @@ pub fn resolve_pacing(
     let (interval, source) = match interval {
         Some(interval) => (interval, RequestIntervalSource::Explicit),
         None => match std::env::var(REQUEST_INTERVAL_ENV) {
+            // The environment reaches production CLI and Node clients, which
+            // always target the real origin, so it cannot disable pacing.
             Ok(value) => (
-                parse_request_interval_ms(&value).ok_or_else(invalid_interval_setting)?,
+                parse_request_interval_ms(&value)
+                    .filter(|interval| !interval.is_zero())
+                    .ok_or_else(invalid_interval_setting)?,
                 RequestIntervalSource::Environment,
             ),
             Err(std::env::VarError::NotPresent) => {
@@ -106,8 +110,8 @@ pub fn resolve_pacing(
     if interval > MAX_REQUEST_INTERVAL {
         return Err(invalid_interval_setting());
     }
-    // A zero interval never touches shared state, so controlled runs need no
-    // writable state directory.
+    // Only an explicit SDK option can be zero. It never touches shared state,
+    // so controlled runs against local origins need no state directory.
     let lock_path = if interval.is_zero() {
         None
     } else {
@@ -141,7 +145,7 @@ fn invalid_interval_setting() -> PacingError {
     PacingError::InvalidSetting {
         setting: REQUEST_INTERVAL_ENV,
         message: format!(
-            "{REQUEST_INTERVAL_ENV} must be an integer from 0 through {}; use 0 only for controlled test runs.",
+            "{REQUEST_INTERVAL_ENV} must be an integer from 1 through {}.",
             MAX_REQUEST_INTERVAL.as_millis()
         ),
     }

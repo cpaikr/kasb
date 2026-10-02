@@ -40,15 +40,23 @@ pub(crate) async fn fetch_json<T: HttpTransport>(
         // Fail closed: an unreadable, unlockable, or stalled pacing state
         // never degrades into an unpaced request.
         Err(TransportError::Pacing(error @ (PacingError::State(_) | PacingError::LockTimeout))) => {
+            // The public message is fixed: operating-system error text stays
+            // in the Rust `PacingError` and never reaches a failure envelope.
+            let stalled = error == PacingError::LockTimeout;
             return Err(KasbFailure {
                 code: KasbFailureCode::InternalFailure,
                 message: format!(
-                    "{error}. Check {} and its permissions, and stop other KASB processes before repairing a damaged pacing file.",
+                    "{} Check {} and its permissions, and stop other KASB processes before repairing a damaged pacing file.",
+                    if stalled {
+                        "Another KASB process held the request pacing lock for too long."
+                    } else {
+                        "The request pacing state could not be read or locked."
+                    },
                     crate::http::STATE_DIR_ENV
                 ),
                 // A stalled holder may exit; a damaged state will not repair
                 // itself.
-                retryable: error == PacingError::LockTimeout,
+                retryable: stalled,
                 parameter: None,
                 source_url: None,
             }

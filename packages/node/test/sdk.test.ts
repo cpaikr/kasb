@@ -29,7 +29,7 @@ describe("Rust-backed Node SDK facade", () => {
   });
 
   test("rejects an invalid request interval before loading a native addon", async () => {
-    for (const requestIntervalMs of [-1, 60001, 1.5, Number.NaN, "500", null]) {
+    for (const requestIntervalMs of [0, -1, 60001, 1.5, Number.NaN, "500", null]) {
       await expect(
         getParagraph({ stdNum: "1116", paraNum: "23" }, { requestIntervalMs } as never),
       ).rejects.toMatchObject({

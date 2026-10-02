@@ -98,13 +98,13 @@ pub(crate) struct Cli {
     #[arg(long, global = true)]
     no_version_check: bool,
     /// Minimum milliseconds before each KASB request, shared across local
-    /// processes [env: KASB_REQUEST_INTERVAL_MS] [default: 500]. 0 disables
-    /// pacing; use it only for controlled tests.
+    /// processes [env: KASB_REQUEST_INTERVAL_MS] [default: 500]. Integer
+    /// from 1 through 60000.
     #[arg(
         long,
         global = true,
         value_name = "MS",
-        value_parser = clap::value_parser!(u64).range(0..=60_000)
+        value_parser = clap::value_parser!(u64).range(1..=60_000)
     )]
     request_interval_ms: Option<u64>,
     #[command(subcommand)]

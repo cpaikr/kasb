@@ -542,6 +542,8 @@ fn shared_client(request_interval_ms: Option<u32>) -> Result<SharedClient, Bindi
         .map_err(|_| BindingError::Internal)?;
     match request_interval_ms {
         None => Ok(client.clone()),
+        // This binding always targets the real origin; it cannot disable pacing.
+        Some(0) => Err(BindingError::InvalidRequestInterval),
         Some(milliseconds) => client
             .with_request_interval(Some(Duration::from_millis(milliseconds.into())))
             .map_err(|_| BindingError::InvalidRequestInterval),
@@ -589,7 +591,7 @@ fn error_envelope(error: BindingError) -> Value {
             "ok": false,
             "error": {
                 "code": "invalid_input",
-                "message": "requestIntervalMs must be an integer from 0 through 60000.",
+                "message": "requestIntervalMs must be an integer from 1 through 60000.",
                 "retryable": false,
                 "parameter": "requestIntervalMs"
             }

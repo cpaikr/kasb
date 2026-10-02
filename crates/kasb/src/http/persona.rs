@@ -32,7 +32,8 @@ pub struct PersonaConfig {
     /// using the same pacing state. `None` defers to
     /// [`REQUEST_INTERVAL_ENV`](super::REQUEST_INTERVAL_ENV), then
     /// [`DEFAULT_REQUEST_INTERVAL`](super::DEFAULT_REQUEST_INTERVAL). Zero
-    /// disables pacing and is meant only for controlled test origins.
+    /// disables pacing; it is accepted only here, for custom transports and
+    /// local test origins, never from the environment, CLI, or Node SDK.
     pub request_interval: Option<Duration>,
     /// Absolute pacing state directory. `None` defers to
     /// [`STATE_DIR_ENV`](super::STATE_DIR_ENV), then the per-user state

@@ -294,7 +294,8 @@ mod tests {
                     "--request-interval-ms",
                     "0",
                 ],
-                Some(Some(Duration::ZERO)),
+                // The CLI always reaches KASB, so it cannot disable pacing.
+                None,
             ),
             (
                 vec![

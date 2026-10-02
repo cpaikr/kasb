@@ -27,7 +27,7 @@ export function invalidNodeInput() {
 export function invalidRequestInterval() {
   return new KasbFailure({
     code: "invalid_input",
-    message: "requestIntervalMs must be an integer from 0 through 60000.",
+    message: "requestIntervalMs must be an integer from 1 through 60000.",
     retryable: false,
     parameter: "requestIntervalMs",
   });

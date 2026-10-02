@@ -451,14 +451,15 @@ evidence and the mechanism.
 - Default: 500 milliseconds before each request.
 - Precedence: an explicit SDK option or CLI flag, then
   `KASB_REQUEST_INTERVAL_MS`, then the default.
-- Accepted values are integers from 0 through 60000. Anything else is
+- Accepted values are integers from 1 through 60000. Anything else is
   `invalid_input` naming the setting; it never falls back to the default.
-- `0` disables pacing and shared-state access. It exists for controlled tests
-  against fixture origins and risks address blocking against KASB.
+- The CLI flag, the Node option, and the environment variable cannot disable
+  pacing, because those surfaces always reach KASB. Only the Rust SDK's
+  explicit option accepts zero, for custom transports and local test origins.
 - When concurrent callers use different intervals, the larger one applies.
 - `KASB_STATE_DIR` (absolute) relocates the shared state. Unreadable,
-  unlockable, or damaged state is `internal_failure`; requests are never sent
-  unpaced. A lock that another process holds for five minutes is a retryable
+  unlockable, or damaged state is `internal_failure` with a fixed message that
+  carries no operating-system detail; requests are never sent unpaced. A lock that another process holds for five minutes is a retryable
   `internal_failure`.
 - After `rate_limited`, the shared cooldown honors `Retry-After` in seconds,
   capped at 60 seconds, or 10 seconds when KASB sends no usable value. That

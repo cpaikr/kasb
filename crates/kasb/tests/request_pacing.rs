@@ -107,7 +107,7 @@ fn concurrent_processes_share_one_paced_gate() {
 #[test]
 fn an_invalid_environment_interval_is_rejected_before_any_request() {
     let state = tempfile::tempdir().expect("state directory should be created");
-    for interval in ["abc", "-1", "60001", "1.5"] {
+    for interval in ["abc", "-1", "0", "60001", "1.5"] {
         let status = child("invalid-interval", interval, state.path())
             .status()
             .expect("child process should run");

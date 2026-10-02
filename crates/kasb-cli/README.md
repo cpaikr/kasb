@@ -30,8 +30,8 @@ KASB_REQUEST_INTERVAL_MS=1000 kasb search-standards --keyword 리스
 
 The global `--request-interval-ms <MS>` flag overrides
 `KASB_REQUEST_INTERVAL_MS`, which overrides the default. Values are integers
-from 0 through 60000; anything else is an `invalid_input` failure. `0` disables
-pacing and is for controlled tests only: unpaced bursts risk KASB blocking your
+from 1 through 60000; anything else is an `invalid_input` failure. Pacing
+cannot be disabled from the CLI: unpaced bursts risk KASB blocking your
 address.
 
 Pacing state is one lock file, `request-pacing-v1.lock`, under

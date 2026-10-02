@@ -3,8 +3,8 @@ export type KasbExecutionContext = {
     readonly signal?: AbortSignal;
     /**
      * Minimum milliseconds before each KASB request, shared across local
-     * processes. Integer from 0 through 60000; 0 disables pacing for controlled
-     * tests. Omitted, KASB_REQUEST_INTERVAL_MS applies, then the 500 ms default.
+     * processes. Integer from 1 through 60000. Omitted,
+     * KASB_REQUEST_INTERVAL_MS applies, then the 500 ms default.
      */
     readonly requestIntervalMs?: number;
 };

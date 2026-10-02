@@ -49,6 +49,12 @@ record keeps only decisions and validation.
   the shared cooldown (`Retry-After` seconds, else 10 s, capped at 60 s). No
   automatic retry was added. HTTP-date `Retry-After` uses the fallback to avoid
   depending on the local clock.
+- **No public off switch, from PR review.** The practice allows `0` for
+  controlled tests and fixture origins, but the CLI flag, Node option, and
+  environment variable always reach KASB, so they accept 1-60000. Only the
+  Rust SDK's explicit option accepts zero. Pacing-state failures surface with
+  a fixed message and no operating-system detail, and the title generator pins
+  the default interval instead of reading the environment.
 - **Node option.** `requestIntervalMs` is per call and reuses the shared
   persona's pool, cookies, and gate instead of building a client per interval.
 - **Kept.** `max_in_flight` and enrichment concurrency remain; they still bound

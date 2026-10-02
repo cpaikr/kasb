@@ -2,8 +2,8 @@
 //!
 //! `--write` refreshes `data/standard-titles.json` from live KASB structure
 //! indexes; `--check` reports drift without writing. Further arguments add
-//! standard numbers to the table. Requests use the SDK's default pacing, so a
-//! full pass takes a couple of minutes by design.
+//! standard numbers to the table. Requests always use the SDK's default
+//! pacing, so a full pass takes a couple of minutes by design.
 
 use std::collections::BTreeMap;
 use std::error::Error;
@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use kasb::capabilities::get_standard_structure::GetStandardStructureRequest;
-use kasb::http::CancellationToken;
+use kasb::http::{CancellationToken, DEFAULT_REQUEST_INTERVAL};
 use kasb::{KasbClient, KasbError, KasbFailureCode};
 use serde::{Deserialize, Serialize};
 
@@ -37,7 +37,9 @@ async fn main() -> Result<ExitCode, Box<dyn Error>> {
     std_nums.sort();
     std_nums.dedup();
 
-    let client = KasbClient::default();
+    // Pin the default interval so the environment cannot speed up this
+    // 200-request capture.
+    let client = KasbClient::default().with_request_interval(Some(DEFAULT_REQUEST_INTERVAL))?;
     let cancellation = CancellationToken::new();
     let mut titles = BTreeMap::new();
     for (index, std_num) in std_nums.iter().enumerate() {

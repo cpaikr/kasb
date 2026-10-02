@@ -64,7 +64,7 @@ function publishNativeDiagnostic(envelope) {
 // native SDK resolves KASB_REQUEST_INTERVAL_MS, then its built-in default.
 function requestInterval(value) {
   if (value === undefined) return undefined;
-  if (!Number.isInteger(value) || value < 0 || value > 60000) throw invalidRequestInterval();
+  if (!Number.isInteger(value) || value < 1 || value > 60000) throw invalidRequestInterval();
   return value;
 }
 
