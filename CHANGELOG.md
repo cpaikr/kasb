@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.5.0](https://github.com/cpaikr/kasb/compare/v0.4.3...v0.5.0) (2026-10-05)
+
+### ⚠ BREAKING CHANGES
+
+* HTTP 429 from KASB is now the retryable `rate_limited` failure code instead of `source_unavailable`.
+* Every KASB request waits a shared minimum interval, 500 ms by default, across local processes. Configure it with `--request-interval-ms`, `KASB_REQUEST_INTERVAL_MS`, or the Node `requestIntervalMs` option (1–60000); those surfaces cannot disable pacing.
+
+### Features
+
+* **cli:** report the effective request pacing policy ([f157c28](https://github.com/cpaikr/kasb/commit/f157c283697505cae4603373626057d798a562d1))
+* pace KASB requests across local processes ([5ce6867](https://github.com/cpaikr/kasb/commit/5ce68676d4881ef684abfd901ac969f4a6b87592))
+
+### Bug Fixes
+
+* address review feedback on request pacing ([94a9811](https://github.com/cpaikr/kasb/commit/94a9811bda85b77ea9ce1ef3d28cdbcbf9ba39c6))
+* **cli:** correct Windows Cargo detection and Windows-only test failures ([c9a69e5](https://github.com/cpaikr/kasb/commit/c9a69e54256b9e0b6289e9de42704feb8e18f041))
+* **cli:** report a non-UTF-8 pacing state path without panicking ([0fdc855](https://github.com/cpaikr/kasb/commit/0fdc8553a6c47d2347c0ab1fc79a6a481c40478a))
+* **release:** bind tagging to the reviewed commit and harden its gates ([7f908cb](https://github.com/cpaikr/kasb/commit/7f908cb2ebaad83d558966ef393681ae5bde0fd4))
+* **skills:** explicitly allow implicit KASB invocation ([37c6d9b](https://github.com/cpaikr/kasb/commit/37c6d9b8a5c9b575b51364bffdc250588d2ae507))
+
 ## [0.4.3](https://github.com/cpaikr/kasb/compare/v0.4.2...v0.4.3) (2026-09-09)
 
 ### Bug Fixes
