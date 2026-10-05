@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { bumpWorkspace, releaseVersion, tagEvidence, workspaceVersion, syncBunWorkspaceVersions } from "./release-version.mjs";
+import { bumpWorkspace, hasChangelogEntry, releaseVersion, tagEvidence, workspaceVersion, syncBunWorkspaceVersions } from "./release-version.mjs";
 import CargoVersion from "./release-it-cargo.mjs";
 
 const source = '[workspace]\nmembers = []\n[workspace.package]\nversion = "0.3.0"\nedition = "2021"\n[dependencies]\nexample = { version = "1.0.0" }\n';
@@ -78,7 +78,10 @@ test("preparation refuses main and a branch that is not at origin/main", () => {
     git("add", "."); git("commit", "-m", "fixture");
     git("remote", "add", "origin", origin);
     git("push", "origin", "main");
-    assert.throws(() => releaseVersion("prepare", undefined, root), /on a branch, not main/u);
+    assert.throws(() => releaseVersion("prepare", undefined, root), /named branch/u);
+    git("checkout", "--detach");
+    assert.throws(() => releaseVersion("prepare", undefined, root), /detached HEAD/u);
+    git("checkout", "main");
     git("checkout", "-b", "release/next");
     releaseVersion("prepare", undefined, root);
     writeFileSync(join(root, "new.txt"), "ahead of main\n");
@@ -88,6 +91,21 @@ test("preparation refuses main and a branch that is not at origin/main", () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(origin, { recursive: true, force: true });
+  }
+});
+
+test("tagging requires the version's changelog section", () => {
+  const changelog = "# Changelog\n\n## [0.5.0](https://example.invalid) (2026-10-06)\n\n## [0.4.3](https://example.invalid)\n";
+  assert.equal(hasChangelogEntry(changelog, "0.5.0"), true);
+  assert.equal(hasChangelogEntry(changelog, "0.4.3"), true);
+  assert.equal(hasChangelogEntry(changelog, "0.5"), false);
+  assert.equal(hasChangelogEntry(changelog, "0.5.1"), false);
+  assert.equal(hasChangelogEntry("text ## [0.5.0]", "0.5.0"), false);
+});
+
+test("tagging requires a full release commit SHA", () => {
+  for (const value of [undefined, "", "HEAD", "abc123", "A".repeat(40)]) {
+    assert.throws(() => releaseVersion("tag", value), /full release commit SHA/u);
   }
 });
 

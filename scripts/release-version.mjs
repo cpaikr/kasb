@@ -36,6 +36,11 @@ export function syncBunWorkspaceVersions(source, packages) {
   return source.replace(section[0], `${section[1]}${serialized},`);
 }
 
+// A release-it changelog section starts with `## [<version>](<compare URL>)`.
+export function hasChangelogEntry(changelog, version) {
+  return changelog.split("\n").some((line) => line.startsWith(`## [${version}]`));
+}
+
 // Exact-commit CI evidence: the deterministic gate succeeded and nothing on
 // the commit is failing or still running.
 export function tagEvidence(checks) {
@@ -52,28 +57,46 @@ export function releaseVersion(mode, value, root = process.cwd()) {
     // Preparation is a reviewed change: it starts from current main on a
     // branch and reaches main only through a pull request.
     assert.equal(run("git", ["status", "--porcelain"]), "", "release preparation requires a clean checkout");
-    assert.notEqual(run("git", ["branch", "--show-current"]), "main", "release preparation runs on a branch, not main");
+    const branch = run("git", ["branch", "--show-current"]);
+    // An empty name is a detached HEAD, which leaves no branch for the PR.
+    assert(branch !== "" && branch !== "main", "release preparation runs on a named branch, not main or a detached HEAD");
     run("git", ["fetch", "origin", "main"]);
     assert.equal(run("git", ["rev-parse", "HEAD"]), run("git", ["rev-parse", "origin/main"]), "release preparation requires a branch at freshly fetched origin/main");
     return;
   }
   if (mode === "tag") {
-    // The operator owns the tag; CI owns certification. Tag only the exact
-    // main commit whose deterministic validation succeeded.
+    // The operator owns the tag; CI owns certification. The operator names the
+    // reviewed release commit, so later work on main can never be published
+    // under that version.
+    assert.match(value ?? "", /^[0-9a-f]{40}$/u, "usage: release-version.mjs tag <full release commit SHA>");
     run("git", ["fetch", "origin", "main", "--tags"]);
-    const sha = run("git", ["rev-parse", "origin/main"]);
-    const tag = `v${workspaceVersion(run("git", ["show", `${sha}:Cargo.toml`]))}`;
+    const sha = value;
+    run("git", ["merge-base", "--is-ancestor", sha, "origin/main"]);
+    const version = workspaceVersion(run("git", ["show", `${sha}:Cargo.toml`]));
+    const tag = `v${version}`;
+    assert(hasChangelogEntry(run("git", ["show", `${sha}:CHANGELOG.md`]), version), `${sha} has no ${version} changelog entry; tag the merged release preparation`);
     // A failed lookup throws; it is never evidence that the tag is unused.
     assert.equal(run("git", ["ls-remote", "--refs", "origin", `refs/tags/${tag}`]), "", `${tag} already exists on origin`);
     const { repository } = JSON.parse(run("git", ["show", `${sha}:native-targets.json`])).release;
-    const checks = JSON.parse(run("gh", ["api", `repos/${repository}/commits/${sha}/check-runs?per_page=100`])).check_runs;
-    assert(tagEvidence(checks), `origin/main ${sha} lacks successful CI evidence`);
-    run("git", ["tag", "-a", tag, sha, "-m", `Release ${tag.slice(1)}`]);
+    const pages = run("gh", ["api", "--paginate", `repos/${repository}/commits/${sha}/check-runs?per_page=100`,
+      "--jq", "{total: .total_count, runs: [.check_runs[] | {name, status, conclusion}]}"]);
+    const parsed = pages.split("\n").filter(Boolean).map((line) => JSON.parse(line));
+    const checks = parsed.flatMap(({ runs }) => runs);
+    // Never judge a partial listing.
+    assert(parsed.length > 0 && checks.length === parsed[0].total, `incomplete check-run listing for ${sha}`);
+    assert(tagEvidence(checks), `${sha} lacks successful CI evidence`);
+    // Reuse a local tag left by a failed push only if it names this commit.
+    const local = run("git", ["tag", "--list", tag]);
+    if (local === "") {
+      run("git", ["tag", "-a", tag, sha, "-m", `Release ${version}`]);
+    } else {
+      assert.equal(run("git", ["rev-parse", `refs/tags/${tag}^{commit}`]), sha, `local ${tag} names another commit; inspect and delete it before retrying`);
+    }
     run("git", ["push", "origin", `refs/tags/${tag}`]);
     process.stdout.write(`Tagged ${sha} as ${tag}; tag-triggered CI now certifies and publishes\n`);
     return;
   }
-  assert(["sync", "check", "source"].includes(mode), "usage: release-version.mjs prepare | sync <version> | check | tag | source <tag>");
+  assert(["sync", "check", "source"].includes(mode), "usage: release-version.mjs prepare | sync <version> | check | tag <sha> | source <tag>");
   const manifest = resolve(root, "Cargo.toml");
   if (mode === "sync") {
     const bumped = bumpWorkspace(readFileSync(manifest, "utf8"), value);

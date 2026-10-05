@@ -145,11 +145,16 @@ changes advance the patch version; assess the contract, not commit prefixes.
    conventional commits, checks release identities, and commits. It never tags
    or pushes.
 2. Open a pull request, let CI pass, and merge it without squashing.
-3. After separate publication authorization, run `bun run release:tag`. It
-   fetches `origin/main`, derives `v<version>` from that commit's Cargo
-   metadata, requires the tag to be unused on origin, requires successful
-   `Deterministic validation` and no failing or running check on that exact
-   commit, then creates and pushes only that tag.
+3. After separate publication authorization, run
+   `bun run release:tag -- <sha>` with the full SHA of the merged release
+   preparation commit on `main`. It requires that commit to be in
+   `origin/main` and to carry the version's changelog entry, derives
+   `v<version>` from its Cargo metadata, requires the tag to be unused on
+   origin, and requires successful `Deterministic validation` with no failing
+   or running check across the complete check-run listing for that exact
+   commit. It then creates and pushes only that tag. Later commits on `main`
+   are never included. A retry after a failed push reuses a local tag only if
+   it names the same commit.
 
 Neither command publishes packages or creates a GitHub Release directly.
 Pushing the tag starts strict CI publication, so `release:tag` requires
