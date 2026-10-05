@@ -46,6 +46,8 @@ jobs:
         env:
           KASB_REQUIRE_POWERSHELL_TESTS: "1"
         run: bun run test
+      - name: Test release preparation, tagging, and publication scripts
+        run: bun run test:release-pipeline
       - name: Run adversarial public-surface judge
         run: bun run conformance:judge
       - name: Build Rust and Node products
