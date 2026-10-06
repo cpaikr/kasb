@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::future::Future;
-use std::io::{Read, Write};
+use std::io::{IsTerminal, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -40,8 +40,48 @@ pub(crate) struct ManagedInstallation {
     receipt_path: PathBuf,
 }
 
+/// Stage lines for a person watching an upgrade in a terminal.
+///
+/// stdout carries only the JSON result, so stages go to stderr, and only when
+/// stderr is interactive: pipes, CI, and agents keep an empty stderr.
+struct Progress {
+    sink: Option<Box<dyn Write + Send>>,
+}
+
+impl Progress {
+    fn for_stderr() -> Self {
+        let stderr = std::io::stderr();
+        Self {
+            sink: stderr
+                .is_terminal()
+                .then(|| Box::new(stderr) as Box<dyn Write + Send>),
+        }
+    }
+
+    #[cfg(test)]
+    fn silent() -> Self {
+        Self { sink: None }
+    }
+
+    fn stage(&mut self, message: std::fmt::Arguments<'_>) {
+        if let Some(sink) = &mut self.sink {
+            // Progress is advisory; a closed terminal must not fail the upgrade.
+            let _ = writeln!(sink, "{message}").and_then(|()| sink.flush());
+        }
+    }
+}
+
+fn display_size(bytes: u64) -> String {
+    if bytes >= 1_000_000 {
+        format!("{:.1} MB", bytes as f64 / 1_000_000.0)
+    } else {
+        format!("{:.1} kB", bytes as f64 / 1_000.0)
+    }
+}
+
 pub(crate) async fn run(check_only: bool, cancellation: &CancellationToken) -> ProcessOutput {
-    match run_inner(check_only, cancellation).await {
+    let mut progress = Progress::for_stderr();
+    match run_inner(check_only, cancellation, &mut progress).await {
         Ok(value) => ProcessOutput::success(value.to_string()),
         Err(error) if error.code == UPGRADE_CANCELLED => ProcessOutput::interrupted(130),
         Err(error) => failure(error),
@@ -51,6 +91,7 @@ pub(crate) async fn run(check_only: bool, cancellation: &CancellationToken) -> P
 async fn run_inner(
     check_only: bool,
     cancellation: &CancellationToken,
+    progress: &mut Progress,
 ) -> Result<serde_json::Value, UpgradeError> {
     check_cancellation(cancellation)?;
     let manifest = release_manifest()?;
@@ -71,6 +112,7 @@ async fn run_inner(
         &installation,
         &source,
         cancellation,
+        progress,
     )
     .await
 }
@@ -109,6 +151,7 @@ async fn execute_upgrade_cancellable<S: ReleaseSource>(
     installation: &ManagedInstallation,
     source: &S,
     cancellation: &CancellationToken,
+    progress: &mut Progress,
 ) -> Result<serde_json::Value, UpgradeError> {
     let operation = if check_only {
         "upgrade-check"
@@ -116,6 +159,7 @@ async fn execute_upgrade_cancellable<S: ReleaseSource>(
         "upgrade"
     };
     check_cancellation(cancellation)?;
+    progress.stage(format_args!("Checking for the latest kasb release..."));
     let release = cancellable(cancellation, source.latest()).await?;
     if !check_only {
         cancellable(cancellation, source.revalidate(&release)).await?;
@@ -132,6 +176,7 @@ async fn execute_upgrade_cancellable<S: ReleaseSource>(
     let available = latest > current;
     check_cancellation(cancellation)?;
     if !available {
+        progress.stage(format_args!("kasb {VERSION} is up to date."));
         return Ok(success(json!({
             "operation": operation,
             "managed": true,
@@ -165,6 +210,9 @@ async fn execute_upgrade_cancellable<S: ReleaseSource>(
     }
     check_cancellation(cancellation)?;
     if check_only {
+        progress.stage(format_args!(
+            "kasb {latest} is available (installed: {VERSION}). Run `kasb upgrade` to install it."
+        ));
         return Ok(success(json!({
             "operation": operation,
             "managed": true,
@@ -177,6 +225,10 @@ async fn execute_upgrade_cancellable<S: ReleaseSource>(
         })));
     }
     check_cancellation(cancellation)?;
+    progress.stage(format_args!(
+        "Downloading kasb {latest} ({archive_name}, {})...",
+        display_size(archive_asset.size)
+    ));
     let checksums = cancellable(
         cancellation,
         source.download(
@@ -210,6 +262,7 @@ async fn execute_upgrade_cancellable<S: ReleaseSource>(
             "The downloaded archive size differs from immutable release metadata.",
         ));
     }
+    progress.stage(format_args!("Verifying the release archive..."));
     verify_digest(&archive, &expected_archive, "archive")?;
     verify_metadata_digest(&archive, archive_asset.digest.as_deref(), "GitHub asset")?;
     verify_metadata_digest(
@@ -238,7 +291,15 @@ async fn execute_upgrade_cancellable<S: ReleaseSource>(
     check_cancellation(cancellation)?;
     // Cancellation stops at this commit boundary. Once replacement begins it
     // must run through publication or rollback to keep the installation valid.
+    progress.stage(format_args!("Installing kasb {latest}..."));
     let replacement = install_replacement(installation, &executable, &receipt)?;
+    if replacement.updated {
+        progress.stage(format_args!("Upgraded kasb {VERSION} to {latest}."));
+    } else {
+        progress.stage(format_args!(
+            "kasb {latest} is scheduled to replace {VERSION} after this process exits."
+        ));
+    }
     Ok(success(json!({
         "operation": operation,
         "managed": true,
@@ -267,6 +328,7 @@ async fn execute_upgrade<S: ReleaseSource>(
         installation,
         source,
         &CancellationToken::new(),
+        &mut Progress::silent(),
     )
     .await
 }
@@ -2358,6 +2420,7 @@ mod tests {
             &installation,
             &source,
             &cancellation,
+            &mut Progress::silent(),
         )
         .await
         .unwrap_err();
@@ -2372,6 +2435,136 @@ mod tests {
             fs::read(&installation.receipt_path).unwrap(),
             b"old receipt\n"
         );
+    }
+
+    #[derive(Clone, Default)]
+    struct RecordedStages(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+    impl Write for RecordedStages {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    impl RecordedStages {
+        fn progress(&self) -> Progress {
+            Progress {
+                sink: Some(Box::new(self.clone())),
+            }
+        }
+
+        fn lines(&self) -> Vec<String> {
+            String::from_utf8(self.0.lock().unwrap().clone())
+                .unwrap()
+                .lines()
+                .map(str::to_owned)
+                .collect()
+        }
+    }
+
+    async fn upgrade_with_stages<S: ReleaseSource>(
+        check_only: bool,
+        installation: &ManagedInstallation,
+        source: &S,
+        cancellation: &CancellationToken,
+    ) -> (Result<serde_json::Value, UpgradeError>, Vec<String>) {
+        let stages = RecordedStages::default();
+        let result = execute_upgrade_cancellable(
+            check_only,
+            &manifest(),
+            test_target(),
+            installation,
+            source,
+            cancellation,
+            &mut stages.progress(),
+        )
+        .await;
+        (result, stages.lines())
+    }
+
+    #[tokio::test]
+    async fn progress_reports_each_reached_stage() {
+        let directory = tempfile::tempdir().unwrap();
+        let installation = test_installation(&directory);
+        let latest = newer_version();
+
+        let (result, lines) = upgrade_with_stages(
+            false,
+            &installation,
+            &fake_source(VERSION),
+            &CancellationToken::new(),
+        )
+        .await;
+        assert_eq!(result.unwrap()["result"]["updateAvailable"], false);
+        assert_eq!(
+            lines,
+            [
+                "Checking for the latest kasb release...".to_owned(),
+                format!("kasb {VERSION} is up to date."),
+            ]
+        );
+
+        let (result, lines) = upgrade_with_stages(
+            true,
+            &installation,
+            &fake_source(&latest),
+            &CancellationToken::new(),
+        )
+        .await;
+        assert_eq!(result.unwrap()["result"]["updateAvailable"], true);
+        assert_eq!(
+            lines[1],
+            format!(
+                "kasb {latest} is available (installed: {VERSION}). Run `kasb upgrade` to install it."
+            )
+        );
+
+        let cancellation = CancellationToken::new();
+        let mut source = fake_source(&latest);
+        source.cancel_after = Some((cancellation.clone(), DownloadKind::Metadata));
+        let (result, lines) =
+            upgrade_with_stages(false, &installation, &source, &cancellation).await;
+        assert_eq!(result.unwrap_err().code, UPGRADE_CANCELLED);
+        assert_eq!(lines.len(), 2);
+        assert!(
+            lines[1].starts_with(&format!("Downloading kasb {latest} (kasb-{latest}-")),
+            "{lines:?}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn progress_reports_an_applied_upgrade() {
+        let directory = tempfile::tempdir().unwrap();
+        let installation = test_installation(&directory);
+        let latest = newer_version();
+        let (result, lines) = upgrade_with_stages(
+            false,
+            &installation,
+            &fake_source(&latest),
+            &CancellationToken::new(),
+        )
+        .await;
+        assert_eq!(result.unwrap()["result"]["updated"], true);
+        assert_eq!(
+            lines[2..],
+            [
+                "Verifying the release archive...".to_owned(),
+                format!("Installing kasb {latest}..."),
+                format!("Upgraded kasb {VERSION} to {latest}."),
+            ]
+        );
+    }
+
+    #[test]
+    fn progress_sizes_are_short_decimal_units() {
+        assert_eq!(display_size(5_325_754), "5.3 MB");
+        assert_eq!(display_size(631), "0.6 kB");
     }
 
     #[cfg(unix)]

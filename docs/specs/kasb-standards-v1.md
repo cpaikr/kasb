@@ -367,6 +367,7 @@ The CLI should:
 - write success envelopes to `stdout` with exit code `0`
 - write failure envelopes to `stdout` with a nonzero exit code
 - do not mix human-readable diagnostics into operation output; any diagnostic mode must stay parseable, such as JSON lines on `stderr` or a separate diagnostic file
+- the CLI-local `upgrade` command is the one exception: it may write human-readable stage lines to `stderr` only while `stderr` is an interactive terminal, leaving `stdout` unchanged
 - keep help text, examples, and output presentation outside capability contracts
 - make `kasb help <command>` and `<command> --help` both exit successfully without JSON failure envelopes
 
