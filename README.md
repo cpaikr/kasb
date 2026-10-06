@@ -67,7 +67,8 @@ kasb upgrade
 ```
 
 `upgrade --check` checks a managed installation; `upgrade` starts its upgrade.
-On Windows, replacement finishes after the command exits. See
+In a terminal, both print each stage as it runs. On Windows, replacement
+finishes after the command exits. See
 [release posture](docs/release.md#standalone-ownership-and-trust) for ownership
 and verification details.
 

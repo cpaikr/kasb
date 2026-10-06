@@ -189,6 +189,11 @@ archive/checksum, executable identity, staging, replacement, and rollback checks
 Windows replacement is scheduled after process exit and is not reported as
 already applied. Reports never reconcile or clean up deferred-upgrade state.
 
+When stderr is an interactive terminal, both commands also write plain-text
+stage lines there (checking, downloading with the archive size, verifying,
+installing, and the outcome). Otherwise stderr stays empty. Either way, stdout
+carries the same single JSON document.
+
 See [release posture](../../docs/release.md) for distribution ownership and
 publication status. The npm launcher only forwards the Rust process contract;
 the SDK, toolset, and Node binding perform no release checks.
