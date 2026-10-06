@@ -6,9 +6,11 @@
 
 ## Plans
 
-[Pace KASB requests across local processes](plans/request-pacing.md)
+_None._
 
 ## Completed
+
+[Pace KASB requests across local processes](plans/request-pacing.md)
 
 [Add cached CLI version advisories](plans/cli-version-checking.md)
 
