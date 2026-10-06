@@ -5,12 +5,14 @@ from the public canonical repository `cpaikr/kasb`. The first Rust/Node product
 release is [v0.3.3](https://github.com/cpaikr/kasb/releases/tag/v0.3.3).
 [The completed first-release task](../tasks/perform-first-rust-node-release.md)
 records its publication and validation evidence. The current release is
-[v0.4.3](https://github.com/cpaikr/kasb/releases/tag/v0.4.3), which delivers
-Windows installation visibility diagnostics and PATH recovery guidance. Its
+[v0.5.0](https://github.com/cpaikr/kasb/releases/tag/v0.5.0), which delivers
+cross-process [request pacing](../plans/request-pacing.md) and the
+`rate_limited` failure code. It is the first release prepared through a pull
+request and tagged with `bun run release:tag`. Windows installation visibility
+diagnostics and PATH recovery shipped in v0.4.3; its
 [implementation and release record](../tasks/windows-installation-visibility.md)
-contains native platform and publication evidence and the remaining independent
-Windows terminal verification gap. CLI version checking shipped in
-[v0.4.2](../tasks/release-cli-version-checking.md).
+contains the remaining independent Windows terminal verification gap. CLI
+version checking shipped in [v0.4.2](../tasks/release-cli-version-checking.md).
 
 ## Identity authorities
 

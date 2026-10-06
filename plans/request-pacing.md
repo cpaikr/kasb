@@ -1,7 +1,10 @@
 # Pace KASB requests across local processes
 
-Status: implemented on the working tree (2026-10-02); not committed, not
-released. Linux CI and the items under [Remaining](#remaining) are open.
+Status: complete. Released in
+[v0.5.0](https://github.com/cpaikr/kasb/releases/tag/v0.5.0) on 2026-10-06
+through PRs #31 and #32, prepared in #34 and tagged at `ca9343d`. The tag
+workflow verified all four targets and clean consumers on Node 20.18.1-26 and
+published an immutable release.
 
 ## Outcome and decision
 
@@ -90,7 +93,6 @@ fixture checksums; they were re-checked out, with no repository change.
 
 ## Remaining
 
-- Run `bun run verify` on Linux CI, then commit and release on request.
 - Discovery of new standard numbers is manual: pass them to
   `standard_titles --write`. Unknown standards still work through the live
   fallback.
