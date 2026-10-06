@@ -979,7 +979,7 @@ dependencies = [
 
 [[package]]
 name = "kasb"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "chrono",
  "fs2",
@@ -1002,7 +1002,7 @@ dependencies = [
 
 [[package]]
 name = "kasb-cli"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "clap",
  "flate2",
@@ -1022,7 +1022,7 @@ dependencies = [
 
 [[package]]
 name = "kasb-node"
-version = "0.4.3"
+version = "0.5.0"
 dependencies = [
  "futures-util",
  "kasb",
