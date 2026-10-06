@@ -89,7 +89,10 @@ the Node conformance runner imported an absolute path instead of a file URL;
 and a process-wide test counter raced across parallel CLI tests (now
 per-thread). Eighteen tracked files had stale CRLF working copies that broke
 fixture checksums; they were re-checked out, with no repository change.
-`bun run verify` as a whole has not been run; Linux CI must confirm it.
+The combined `bun run verify` command was not run locally. Linux CI ran each
+of its steps separately: Deterministic validation passed for #34 and on
+`main` at the release merge (`032d388`), and the tag workflow then passed
+all four targets.
 
 ## Remaining
 
