@@ -73,7 +73,7 @@ export const SectionClauseSchema = Schema.Struct({
     examples: ["목적"],
   })),
   uniqueKey: Schema.optional(Schema.String.annotations({
-    description: "Derived paragraph key in {stdNum}-{paraNum} form, when available.",
+    description: "Opaque source paragraph key, usually in {stdNum}-{paraNum} form, when available.",
     examples: ["1116-23"],
   })),
   stdNum: StdNumSchema,

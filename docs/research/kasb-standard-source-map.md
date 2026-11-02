@@ -55,7 +55,7 @@ Observed:
 - `paraNum`
   Stable paragraph reference inside a standard. Examples: `23`, `한2.1`, `B3`, `BC240A`.
 - `uniqueKey`
-  Paragraph key returned by the API as `{stdNum}-{paraNum}`. Example: `1116-23`.
+  Opaque paragraph key returned by the API, usually `{stdNum}-{paraNum}` (`1116-23`) and sometimes suffixed (`1118-132-133`).
 - `titleDocumentId`
   Route-facing document id returned by `/api/title/{stdNum}` and `/api/standard/{stdNum}/first-document-id`.
 - `indexDocumentId`
@@ -238,6 +238,11 @@ Observed:
   Returned one paragraph with `uniqueKey: "1116-B3"` and `documentId: "M12hre"`.
 - `GET /api/paragraphs/content/1116/BC240A`
   Returned one paragraph with `uniqueKey: "1116-BC240A"` and `documentId: "ITKVjD"`.
+- `GET /api/paragraphs/content/1118/132` and `GET /api/paragraphs/content/1118/한132.2`
+  Returned one exactly matching paragraph each, with suffixed keys
+  `uniqueKey: "1118-132-133"` and `"1118-한132.2-135"` (reported in issue #27,
+  confirmed 2026-11-02). `uniqueKey` is therefore an opaque source key, not
+  always `{stdNum}-{paraNum}`.
 - `GET /api/paragraphs/1116/ZB2hJW`
   Returned the `목적` section with paragraphs `1` and `2`.
 
