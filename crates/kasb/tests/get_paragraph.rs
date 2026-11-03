@@ -337,6 +337,8 @@ async fn multiple_rows_changed_fields_and_wrong_identity_are_source_drift() {
     let mut wrong_identity = valid_row.clone();
     wrong_identity["paraNum"] = json!("24");
     wrong_identity["uniqueKey"] = json!("1116-24");
+    let mut wrong_standard = valid_row.clone();
+    wrong_standard["stdNum"] = json!(1117);
     let mut empty_unique_key = valid_row.clone();
     empty_unique_key["uniqueKey"] = json!("");
     let mut missing_unique_key = valid_row.clone();
@@ -345,6 +347,7 @@ async fn multiple_rows_changed_fields_and_wrong_identity_are_source_drift() {
         .expect("test row should be an object")
         .remove("uniqueKey");
     let cases = [
+        json!({"paraContents": [wrong_standard]}),
         json!({"paraContents": [empty_unique_key]}),
         json!({"paraContents": [missing_unique_key]}),
         json!({"paraContents": [valid_row.clone(), valid_row.clone()]}),
