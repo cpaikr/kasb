@@ -86,7 +86,7 @@ Out of scope:
 ### Derived Or Internal Identifiers
 
 - `uniqueKey`
-  Derived paragraph key in the form `{stdNum}-{paraNum}`. Return it when available, but do not require it as input.
+  Opaque source paragraph key, usually `{stdNum}-{paraNum}` but sometimes carrying an extra source suffix such as `1118-132-133`. Return it when available, but do not require it as input or use it to verify paragraph identity.
 - `titleDocumentId`
   Browser-route-facing id. Keep it internal in v1.
 - `bigSeq`, `midSeq`, `smallSeq`, `littleSeq`

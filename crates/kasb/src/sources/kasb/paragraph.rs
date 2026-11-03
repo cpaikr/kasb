@@ -55,13 +55,20 @@ pub(crate) async fn get_paragraph<T: HttpTransport, F: FnOnce() -> String>(
     }
 
     let mut paragraph = normalize_paragraph(&paragraphs[0], &source_url)?;
-    if paragraph.std_num != request.std_num()
-        || paragraph.para_num != request.para_num()
-        || paragraph.unique_key != format!("{}-{}", request.std_num(), request.para_num())
-    {
+    // `uniqueKey` is an opaque source key: KASB appends a numeric suffix to
+    // some paragraphs (`1118-132-133`), so identity rests on `stdNum` and
+    // `paraNum` alone.
+    if paragraph.std_num != request.std_num() || paragraph.para_num != request.para_num() {
         return Err(source_changed(
             &source_url,
-            "Paragraph response identifiers do not match the request.",
+            format!(
+                "Paragraph response identifiers do not match the request: requested stdNum {:?}, paraNum {:?}; received stdNum {:?}, paraNum {:?}, uniqueKey {:?}.",
+                request.std_num(),
+                request.para_num(),
+                paragraph.std_num,
+                paragraph.para_num,
+                paragraph.unique_key,
+            ),
         )
         .into());
     }

@@ -40,8 +40,9 @@ semantics remain in
   follow-up URL. Search rows follow the partial-data policy; exact or
   identity-bearing responses fail as `source_changed`. No dot-segment value may
   reach path encoding or URL assembly.
-- A paragraph response must match the requested `stdNum` and `paraNum`, and its
-  `uniqueKey` must equal `{stdNum}-{paraNum}`.
+- A paragraph response must match the requested `stdNum` and `paraNum`. Its
+  `uniqueKey` is required but opaque: it is usually `{stdNum}-{paraNum}`, and
+  KASB appends a numeric suffix for some paragraphs (`1118-132-133`).
 - Every base-structure row that supplies both a source `documentId` and
   `stdNum` must match the requested `stdNum`; a mismatch is `source_changed`.
 - Every section clause with an explicit `stdNum` must match the requested

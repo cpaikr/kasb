@@ -170,7 +170,7 @@ describe("capability JSON Schema exports", () => {
     expect(propertyAt(searchStandardsResult, ["result", "standards"]).description).toContain("get-standard-structure");
     expect(propertyAt(getStructureResult, ["result", "sections"]).description).toContain("indexDocumentId");
     expect(propertyAt(getSectionResult, ["references", "indexDocumentId"]).description).toContain("Retrieval-facing section id");
-    expect(propertyAt(getParagraphResult, ["references", "uniqueKey"]).description).toContain("{stdNum}-{paraNum}");
+    expect(propertyAt(getParagraphResult, ["references", "uniqueKey"]).description).toContain("Opaque source paragraph key");
     expect(propertyAt(searchQnaResult, ["result", "items"]).description).toContain("docNumber");
     expect(propertyAt(searchQnaResult, ["result", "suggestedKeywords"]).description).toContain("empty or too narrow");
   });

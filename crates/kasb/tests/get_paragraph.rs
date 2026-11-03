@@ -337,7 +337,19 @@ async fn multiple_rows_changed_fields_and_wrong_identity_are_source_drift() {
     let mut wrong_identity = valid_row.clone();
     wrong_identity["paraNum"] = json!("24");
     wrong_identity["uniqueKey"] = json!("1116-24");
+    let mut wrong_standard = valid_row.clone();
+    wrong_standard["stdNum"] = json!(1117);
+    let mut empty_unique_key = valid_row.clone();
+    empty_unique_key["uniqueKey"] = json!("");
+    let mut missing_unique_key = valid_row.clone();
+    missing_unique_key
+        .as_object_mut()
+        .expect("test row should be an object")
+        .remove("uniqueKey");
     let cases = [
+        json!({"paraContents": [wrong_standard]}),
+        json!({"paraContents": [empty_unique_key]}),
+        json!({"paraContents": [missing_unique_key]}),
         json!({"paraContents": [valid_row.clone(), valid_row.clone()]}),
         json!({"paraContents": [{"stdNum": 1116}]}),
         json!({"paraContents": [{
@@ -362,6 +374,79 @@ async fn multiple_rows_changed_fields_and_wrong_identity_are_source_drift() {
         assert_eq!(error.code, KasbFailureCode::SourceChanged);
         assert!(!error.retryable);
     }
+}
+
+#[tokio::test]
+async fn suffixed_unique_key_is_an_opaque_source_identifier() {
+    // Observed for standard 1118 (issue #27): KASB appends a numeric suffix to
+    // `uniqueKey` while `stdNum` and `paraNum` still match the request exactly.
+    let cases = [
+        ("132", "132", "1118-132-133"),
+        ("한132.2", "%ED%95%9C132.2", "1118-한132.2-135"),
+    ];
+
+    for (para_num, encoded, unique_key) in cases {
+        let url = format!("https://db.kasb.or.kr/api/paragraphs/content/1118/{encoded}");
+        let transport = FixtureTransport::new([(
+            url.clone(),
+            json_response(
+                200,
+                json!({"paraContents": [{
+                    "stdNum": 1118,
+                    "paraNum": para_num,
+                    "uniqueKey": unique_key,
+                    "documentId": "py4D4c",
+                    "paraContent": "<div class=\"para\">content</div>",
+                    "fullContent": "content"
+                }]}),
+            ),
+        )]);
+        let client = KasbClient::from_parts(transport, FixedClock::new(FIXED_TIME));
+        let result = execute(&client, json!({"stdNum": "1118", "paraNum": para_num}))
+            .await
+            .expect("a suffixed uniqueKey should not reject a matching paragraph");
+
+        assert_eq!(result.result.paragraph.para_num, para_num);
+        assert_eq!(result.result.paragraph.unique_key, unique_key);
+        assert_eq!(result.references.unique_key, unique_key);
+        assert_eq!(result.metadata.source.endpoint, url);
+    }
+}
+
+#[tokio::test]
+async fn identifier_mismatch_reports_requested_and_received_identifiers() {
+    let transport = FixtureTransport::new([(
+        paragraph_url("23"),
+        json_response(
+            200,
+            json!({"paraContents": [{
+                "stdNum": 1116,
+                "paraNum": "24",
+                "uniqueKey": "1116-24",
+                "documentId": "bdbwhT",
+                "paraContent": "<b>content</b>",
+                "fullContent": "content"
+            }]}),
+        ),
+    )]);
+    let client = KasbClient::from_parts(transport, FixedClock::new(FIXED_TIME));
+    let error = failure(
+        execute(&client, json!({"stdNum": "1116", "paraNum": "23"}))
+            .await
+            .expect_err("a different paragraph should fail"),
+    );
+
+    assert_eq!(error.code, KasbFailureCode::SourceChanged);
+    assert!(
+        error
+            .message
+            .contains(r#"requested stdNum "1116", paraNum "23""#)
+    );
+    assert!(
+        error
+            .message
+            .contains(r#"received stdNum "1116", paraNum "24", uniqueKey "1116-24""#)
+    );
 }
 
 #[tokio::test]

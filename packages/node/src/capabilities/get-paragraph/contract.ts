@@ -70,7 +70,7 @@ export const ParagraphSchema = Schema.Struct({
   stdNum: StdNumSchema,
   paraNum: ParaNumSchema,
   uniqueKey: Schema.String.annotations({
-    description: "Derived paragraph key in {stdNum}-{paraNum} form.",
+    description: "Opaque source paragraph key, usually in {stdNum}-{paraNum} form; KASB may append a suffix such as 1118-132-133.",
     examples: ["1116-23"],
   }),
   indexDocumentId: IndexDocumentIdSchema.annotations({
@@ -124,7 +124,7 @@ export const GetParagraphResultSchema = Schema.Struct({
     stdNum: StdNumSchema,
     paraNum: ParaNumSchema,
     uniqueKey: Schema.String.annotations({
-      description: "Derived paragraph key in {stdNum}-{paraNum} form.",
+      description: "Opaque source paragraph key, usually in {stdNum}-{paraNum} form; KASB may append a suffix such as 1118-132-133.",
       examples: ["1116-23"],
     }),
     indexDocumentId: IndexDocumentIdSchema,
