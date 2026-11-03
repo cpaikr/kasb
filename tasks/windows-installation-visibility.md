@@ -86,8 +86,11 @@ PowerShell 7 process that the desktop shell launched. The check was handed to
 the existing `explorer.exe`, so the process chain was
 `pwsh.exe` → `cmd.exe` → `explorer.exe` and contained no agent or packaged-app
 process. `GetCurrentPackageFullName` reported no package identity. The process
-ran with `-NoProfile` and made no PATH changes, so command discovery relied
-only on the persistent user PATH that the desktop shell inherited.
+ran with `-NoProfile` and made no PATH changes. In that process, both the
+User-scope PATH (`[Environment]::GetEnvironmentVariable('Path', 'User')`) and
+the inherited `$env:Path` contained the installation directory. Command
+discovery therefore relied on persistent registration, which a new sign-in
+rebuilds from the same User-scope value.
 
 In that process:
 
