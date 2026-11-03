@@ -896,6 +896,7 @@ fn install_replacement(
         )
     })?;
     let nonce = std::process::id();
+    reclaim_abandoned_staging(parent);
     let staged = parent.join(format!(".kasb.new.{nonce}"));
     let staged_receipt = parent.join(format!(".kasb.receipt.new.{nonce}"));
     write_staged(&staged, bytes)?;
@@ -929,6 +930,49 @@ fn install_replacement(
             status: Some(status),
         })
     }
+}
+
+/// Removes staged replacements left by earlier upgrade processes.
+///
+/// Staged names carry the staging process id, so a process that was killed
+/// mid-staging (or whose best-effort cleanup lost a race with a scanner holding
+/// the new executable) leaves a full-size orphan that no later run would ever
+/// reuse. A stage under this process's own id is also stale, because nothing
+/// has been staged yet: it comes from an earlier process with a reused id and
+/// would otherwise make `write_staged` fail.
+///
+/// Stages are never recovery evidence: Windows rollback and manual recovery
+/// use only the backups, which are outside these names, and reconciliation has
+/// already refused to continue past a pending or failed status. Upgrades are
+/// not serialized across processes, so a concurrent upgrade that loses its
+/// stage here aborts into its own rollback (a Windows helper then records
+/// `rolledBack`) instead of publishing. Removal stays best-effort: a stage that
+/// is still locked is retried by the next upgrade and never blocks this one.
+fn reclaim_abandoned_staging(parent: &Path) {
+    let Ok(entries) = fs::read_dir(parent) else {
+        return;
+    };
+    for entry in entries.filter_map(Result::ok) {
+        let name = entry.file_name();
+        if !name.to_str().is_some_and(is_staging_name)
+            || !entry.file_type().is_ok_and(|kind| kind.is_file())
+        {
+            continue;
+        }
+        let _ = fs::remove_file(entry.path());
+    }
+}
+
+/// Matches only the exact `.kasb.new.<pid>` and `.kasb.receipt.new.<pid>`
+/// names that `install_replacement` creates.
+fn is_staging_name(name: &str) -> bool {
+    name.strip_prefix(".kasb.new.")
+        .or_else(|| name.strip_prefix(".kasb.receipt.new."))
+        .is_some_and(|nonce| {
+            !nonce.is_empty()
+                && nonce.bytes().all(|byte| byte.is_ascii_digit())
+                && nonce.parse::<u32>().is_ok()
+        })
 }
 
 fn write_staged(path: &Path, bytes: &[u8]) -> Result<(), UpgradeError> {
@@ -983,12 +1027,19 @@ fn verify_staged_version(path: &Path, version: &str) -> Result<(), UpgradeError>
                 "The staged executable could not report its identity.",
             )
         })?;
-    let stdout = child.stdout.take().ok_or_else(|| {
-        UpgradeError::new(
-            "upgrade_executable_invalid",
+    // Every failure below stops the identity process first: Windows cannot
+    // delete a staged executable while its image is still running.
+    let abandon = |mut child: std::process::Child, message: &'static str| {
+        let _ = child.kill();
+        let _ = child.wait();
+        UpgradeError::new("upgrade_executable_invalid", message)
+    };
+    let Some(stdout) = child.stdout.take() else {
+        return Err(abandon(
+            child,
             "The staged executable version output could not be captured.",
-        )
-    })?;
+        ));
+    };
     let (output_sender, output_receiver) = std::sync::mpsc::sync_channel(1);
     std::thread::spawn(move || {
         let mut output = Vec::new();
@@ -1003,8 +1054,8 @@ fn verify_staged_version(path: &Path, version: &str) -> Result<(), UpgradeError>
             match child.try_wait() {
                 Ok(status) => exit_status = status,
                 Err(_) => {
-                    return Err(UpgradeError::new(
-                        "upgrade_executable_invalid",
+                    return Err(abandon(
+                        child,
                         "The staged executable identity process could not be observed.",
                     ));
                 }
@@ -1014,8 +1065,8 @@ fn verify_staged_version(path: &Path, version: &str) -> Result<(), UpgradeError>
             match output_receiver.try_recv() {
                 Ok(Ok(output)) => stdout = Some(output),
                 Ok(Err(_)) | Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    return Err(UpgradeError::new(
-                        "upgrade_executable_invalid",
+                    return Err(abandon(
+                        child,
                         "The staged executable version output could not be read.",
                     ));
                 }
@@ -1035,10 +1086,8 @@ fn verify_staged_version(path: &Path, version: &str) -> Result<(), UpgradeError>
             return Ok(());
         }
         if Instant::now() >= deadline {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(UpgradeError::new(
-                "upgrade_executable_invalid",
+            return Err(abandon(
+                child,
                 "The staged executable did not close its bounded version output within five seconds.",
             ));
         }
@@ -2716,6 +2765,94 @@ mod tests {
             "upgrade_receipt_write_failure"
         );
         assert_eq!(fs::read(existing).unwrap(), b"occupied");
+    }
+
+    fn staging_names(directory: &Path) -> Vec<String> {
+        let mut names = fs::read_dir(directory)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with(".kasb.new.") || name.starts_with(".kasb.receipt.new."))
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn reclaiming_staging_removes_only_abandoned_process_stages() {
+        let directory = tempfile::tempdir().unwrap();
+        let current = std::process::id();
+        let other = current.wrapping_add(1);
+        for name in [
+            format!(".kasb.new.{other}"),
+            format!(".kasb.receipt.new.{other}"),
+            format!(".kasb.new.{current}"),
+            ".kasb.new.12ab".to_owned(),
+            ".kasb.new.+7".to_owned(),
+            ".kasb.new.99999999999".to_owned(),
+            ".kasb-receipt.json".to_owned(),
+            ".kasb-upgrade-7.status.json".to_owned(),
+        ] {
+            fs::write(directory.path().join(name), b"keep?").unwrap();
+        }
+        fs::create_dir(directory.path().join(".kasb.receipt.new.7")).unwrap();
+
+        reclaim_abandoned_staging(directory.path());
+
+        let mut kept = vec![
+            ".kasb.new.+7".to_owned(),
+            ".kasb.new.12ab".to_owned(),
+            ".kasb.new.99999999999".to_owned(),
+            ".kasb.receipt.new.7".to_owned(),
+        ];
+        kept.sort();
+        assert_eq!(staging_names(directory.path()), kept);
+        assert!(directory.path().join(".kasb-receipt.json").exists());
+        assert!(
+            directory
+                .path()
+                .join(".kasb-upgrade-7.status.json")
+                .exists()
+        );
+    }
+
+    #[test]
+    fn failed_staging_leaves_no_staged_files_including_abandoned_ones() {
+        // Prior upgrade processes that died after staging (observed on Windows
+        // as a full-size `.kasb.new.<pid>` beside a later successful upgrade),
+        // including one whose process id this process has reused.
+        let directory = tempfile::tempdir().unwrap();
+        let installation = test_installation(&directory);
+        for nonce in [std::process::id().wrapping_add(1), std::process::id()] {
+            fs::write(
+                directory.path().join(format!(".kasb.new.{nonce}")),
+                b"abandoned replacement",
+            )
+            .unwrap();
+        }
+        let receipt = Receipt {
+            schema_version: 1,
+            manager: "standalone".to_owned(),
+            version: "0.1.1".to_owned(),
+            target: "linux-x64-gnu".to_owned(),
+            executable: installation.executable.clone(),
+            release_repository: "cpaikr/kasb".to_owned(),
+            release_tag: "v0.1.1".to_owned(),
+            asset_name: "unused".to_owned(),
+            sha256: hex_digest(b"not an executable"),
+        };
+
+        let error = install_replacement(&installation, b"not an executable", &receipt).unwrap_err();
+
+        assert_eq!(error.code, "upgrade_executable_invalid");
+        assert_eq!(staging_names(directory.path()), Vec::<String>::new());
+        assert_eq!(
+            fs::read(&installation.executable).unwrap(),
+            executable_script(VERSION)
+        );
+        assert_eq!(
+            fs::read(&installation.receipt_path).unwrap(),
+            b"old receipt\n"
+        );
     }
 
     #[cfg(unix)]

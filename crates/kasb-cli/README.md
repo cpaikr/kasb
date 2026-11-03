@@ -188,6 +188,9 @@ Actual upgrades revalidate the exact selected release before download and retain
 archive/checksum, executable identity, staging, replacement, and rollback checks.
 Windows replacement is scheduled after process exit and is not reported as
 already applied. Reports never reconcile or clean up deferred-upgrade state.
+Before staging, an actual upgrade removes `.kasb.new.<pid>` and
+`.kasb.receipt.new.<pid>` replacements abandoned by earlier, interrupted
+upgrade processes.
 
 When stderr is an interactive terminal, both commands also write plain-text
 stage lines there (checking, downloading with the archive size, verifying,
