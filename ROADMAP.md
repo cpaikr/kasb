@@ -2,13 +2,15 @@
 
 ## Current
 
-[Verify Windows installation from an independent ordinary terminal](tasks/windows-installation-visibility.md)
+_None._
 
 ## Plans
 
 _None._
 
 ## Completed
+
+[Verify Windows installation from an independent ordinary terminal](tasks/windows-installation-visibility.md)
 
 [Pace KASB requests across local processes](plans/request-pacing.md)
 

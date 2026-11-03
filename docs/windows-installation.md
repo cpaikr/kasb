@@ -102,4 +102,4 @@ ordinary-user visibility. Automated verification must cross the relevant
 launch/filesystem boundary; otherwise record its context and the remaining gap.
 
 The [implementation and validation record](../tasks/windows-installation-visibility.md)
-tracks the diagnostic's release status and independent Windows verification gap.
+tracks the diagnostic's release status and independent Windows terminal verification.

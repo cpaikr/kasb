@@ -11,7 +11,7 @@ cross-process [request pacing](../plans/request-pacing.md) and the
 request and tagged with `bun run release:tag`. Windows installation visibility
 diagnostics and PATH recovery shipped in v0.4.3; its
 [implementation and release record](../tasks/windows-installation-visibility.md)
-contains the remaining independent Windows terminal verification gap. CLI
+contains its independent Windows terminal verification. CLI
 version checking shipped in [v0.4.2](../tasks/release-cli-version-checking.md).
 
 ## Identity authorities
@@ -71,11 +71,12 @@ release does not establish npm registry availability. This capability shipped in
 
 The v0.4.3 release includes Windows physical-path diagnostics, validated by
 native Windows installer tests and current/new-shell candidate consumer checks.
-Those runner checks do not establish visibility from an ordinary terminal
-outside a packaged installer's filesystem context.
+Those runner checks alone do not establish visibility from an ordinary
+terminal outside a packaged installer's filesystem context; the
+[implementation record](../tasks/windows-installation-visibility.md) owns that
+independent-terminal evidence and the incident record.
 [Windows installation and recovery](windows-installation.md) owns consumer
-setup; the [implementation record](../tasks/windows-installation-visibility.md)
-owns incident evidence and the remaining validation gap.
+setup.
 
 ## Required evidence before publication
 
