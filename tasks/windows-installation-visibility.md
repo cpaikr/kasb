@@ -1,6 +1,6 @@
 # Windows installation visibility and PATH setup
 
-Status: released in v0.4.3; native Windows CI passed; independent ordinary-terminal validation pending (2026-09-09).
+Status: released in v0.4.3; native Windows CI passed; independent ordinary-terminal validation passed (2026-11-03).
 
 [Issue #30](https://github.com/cpaikr/kasb/issues/30) owns the request.
 [Windows installation and recovery](../docs/windows-installation.md) owns the
@@ -78,12 +78,28 @@ Windows runner tests validate native behavior within the runner context. They
 do not cross the packaged installer's filesystem boundary or verify persistent
 user PATH from an independently launched ordinary terminal.
 
-## Remaining evidence
+## Independent terminal validation
 
-Install the published Windows release and verify the selected full path,
-receipt ownership, `--version`, `--help`, and command discovery from an ordinary
-terminal opened independently of the packaged installer. Repeat in a
-newly opened ordinary terminal without the session PATH update to verify
-persistent registration. Automation is acceptable only if it crosses that
-launch/filesystem boundary. Runner child-shell success alone does not close
-this gap.
+On 2026-11-03, on Windows x64 with PowerShell 7.6.9, the published v0.5.0
+standalone installation in `%USERPROFILE%\.local\bin` was checked from a new
+PowerShell 7 process that the desktop shell launched. The check was handed to
+the existing `explorer.exe`, so the process chain was
+`pwsh.exe` → `cmd.exe` → `explorer.exe` and contained no agent or packaged-app
+process. `GetCurrentPackageFullName` reported no package identity. The process
+ran with `-NoProfile` and made no PATH changes, so command discovery relied
+only on the persistent user PATH that the desktop shell inherited.
+
+In that process:
+
+- `Test-Path` found the full executable path.
+- Full-path `--version` (`kasb 0.5.0`) and `--help` (exit 0) passed.
+- `Get-Command` resolved only this installation, and name-based `--version`
+  and `--help` passed.
+- The adjacent receipt named the executable and matched its SHA-256 digest.
+- `upgrade --check` reported managed ownership at v0.5.0.
+
+This crosses the launch boundary that runner child shells do not. A process
+started by the Claude desktop app, which launched the check, also reported no
+package identity. This run therefore did not reproduce the original
+packaged-Codex redirection with the v0.4.3+ installer. That incident's recovery
+remains the independently confirmed Darty evidence above.
