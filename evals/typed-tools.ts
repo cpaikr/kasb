@@ -1,5 +1,6 @@
 import {
   defaultGetParagraphOperation,
+  defaultGetParagraphRangeOperation,
   defaultGetQnaOperation,
   defaultGetSectionOperation,
   defaultGetStandardStructureOperation,
@@ -12,6 +13,7 @@ export const kasbTypedEvalToolNames = [
   "kasb_get_standard_structure",
   "kasb_get_section",
   "kasb_get_paragraph",
+  "kasb_get_paragraph_range",
   "kasb_search_qna",
   "kasb_get_qna",
 ] as const;
@@ -30,6 +32,7 @@ export type KasbAppOperations = {
   readonly getStandardStructure: KasbAppOperation;
   readonly getSection: KasbAppOperation;
   readonly getParagraph: KasbAppOperation;
+  readonly getParagraphRange: KasbAppOperation;
   readonly searchQna: KasbAppOperation;
   readonly getQna: KasbAppOperation;
 };
@@ -56,6 +59,7 @@ export const defaultKasbAppOperations: KasbAppOperations = {
   getStandardStructure: defaultGetStandardStructureOperation,
   getSection: defaultGetSectionOperation,
   getParagraph: defaultGetParagraphOperation,
+  getParagraphRange: defaultGetParagraphRangeOperation,
   searchQna: defaultSearchQnaOperation,
   getQna: defaultGetQnaOperation,
 };
@@ -103,6 +107,11 @@ export const createKasbTypedEvalTools = (
     name: "kasb_get_paragraph",
     description: "Retrieve one exact KASB standard paragraph. Typed JSON fields are stdNum and paraNum; retrieve paragraph ranges with kasb_get_section ref.",
     operation: operations.getParagraph,
+  }),
+  createTool({
+    name: "kasb_get_paragraph_range",
+    description: "Retrieve an inclusive KASB paragraph range across indexed sections. Typed JSON fields are stdNum, from, and to; both boundaries must share a namespace such as body, B, or BC.",
+    operation: operations.getParagraphRange,
   }),
   createTool({
     name: "kasb_search_qna",

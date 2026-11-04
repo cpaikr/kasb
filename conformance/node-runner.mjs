@@ -26,6 +26,7 @@ try {
     "get-standard-structure": sdk.getStandardStructure,
     "get-section": sdk.getSection,
     "get-paragraph": sdk.getParagraph,
+    "get-paragraph-range": sdk.getParagraphRange,
     "search-qna": sdk.searchQna,
     "get-qna": sdk.getQna,
   };

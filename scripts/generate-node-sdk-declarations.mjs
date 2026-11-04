@@ -24,6 +24,7 @@ const declarations = [
   ["get-standard-structure", "GetStandardStructureRawInput", "GetStandardStructureInput", "GetStandardStructureResult"],
   ["get-section", "GetSectionRawInput", "GetSectionInput", "GetSectionResult"],
   ["get-paragraph", "GetParagraphRawInput", "GetParagraphInput", "GetParagraphResult"],
+  ["get-paragraph-range", "GetParagraphRangeRawInput", "GetParagraphRangeInput", "GetParagraphRangeResult"],
   ["search-qna", "SearchQnaRawInput", "SearchQnaInput", "SearchQnaResult"],
   ["get-qna", "GetQnaRawInput", "GetQnaInput", "GetQnaResult"],
 ];
@@ -80,6 +81,7 @@ lines.push(
   "export declare function getStandardStructure(input: GetStandardStructureInput, context?: KasbExecutionContext): Promise<GetStandardStructureResult>;",
   "export declare function getSection(input: GetSectionInput, context?: KasbExecutionContext): Promise<GetSectionResult>;",
   "export declare function getParagraph(input: GetParagraphInput, context?: KasbExecutionContext): Promise<GetParagraphResult>;",
+  "export declare function getParagraphRange(input: GetParagraphRangeInput, context?: KasbExecutionContext): Promise<GetParagraphRangeResult>;",
   "export declare function searchQna(input: SearchQnaInput, context?: KasbExecutionContext): Promise<SearchQnaResult>;",
   "export declare function getQna(input: GetQnaInput, context?: KasbExecutionContext): Promise<GetQnaResult>;",
   "",

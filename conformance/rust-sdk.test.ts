@@ -27,7 +27,7 @@ const runner = {
 describe("public Rust SDK conformance runner", () => {
   test("covers success and typed invalid input for every approved operation", () => {
     const byOperation = Map.groupBy(manifest.cases, (testCase) => testCase.operation);
-    expect(byOperation.size).toBe(6);
+    expect(byOperation.size).toBe(7);
     for (const cases of byOperation.values()) {
       expect(cases.some((testCase) => testCase.id.endsWith("-success"))).toBe(true);
       expect(cases.some((testCase) => testCase.id.endsWith("-invalid-input"))).toBe(true);

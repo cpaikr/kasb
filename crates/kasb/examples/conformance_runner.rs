@@ -123,6 +123,11 @@ async fn run() -> Result<(), Box<dyn Error>> {
                 .execute_get_paragraph(request.input, &cancellation)
                 .await,
         )?,
+        "get-paragraph-range" => to_value(
+            client
+                .execute_get_paragraph_range(request.input, &cancellation)
+                .await,
+        )?,
         "search-qna" => to_value(
             client
                 .execute_search_qna(request.input, &cancellation)

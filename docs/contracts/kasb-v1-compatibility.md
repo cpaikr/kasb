@@ -44,7 +44,8 @@ transport behavior.
 
 ## Capability surface
 
-The six operation ids and camelCase request fields are frozen by the v1 spec.
+The original six operation ids and camelCase request fields are frozen by the v1 spec;
+`get-paragraph-range` was added later without changing them.
 Each success is a closed `{result, metadata, references, warnings}` envelope.
 Failures preserve `code`, `message`, `retryable`, optional `parameter`, and
 optional `sourceUrl`. The allowed capability codes are `invalid_input`,
@@ -59,6 +60,7 @@ and every operation that contacts the source can now return it.
 | `get-standard-structure` | `stdNum`; optional `keyword` | normalized request; ordered sections with `indexDocumentId`, `stdNum`, title, ref, level, optional document type, parent ids, optional sort; returned count; structure reference | `search_filtered_structure`, `source_metadata_incomplete` | `invalid_input`, `not_found`, `source_unavailable`, `rate_limited`, `source_changed` |
 | `get-section` | `stdNum`; exactly one of `indexDocumentId`/`ref`; optional `keyword` | normalized request; resolved section identity/context; ordered title/paragraph/unknown clauses with content and citation fields; section reference | `ambiguous_ref_resolved`, `empty_section`, `partial_clause_normalization` | `invalid_input`, `not_found`, `source_unavailable`, `rate_limited`, `source_changed`, `partial_retrieval` |
 | `get-paragraph` | `stdNum`, exact `paraNum` | normalized request; paragraph identity, parent `indexDocumentId`, best-effort standard/section context, HTML/plain content, optional sort/FAQ metadata; paragraph reference | `paragraph_metadata_incomplete` | `invalid_input`, `not_found`, `source_unavailable`, `rate_limited`, `source_changed` |
+| `get-paragraph-range` | `stdNum`, exact `from` and `to` in one paragraph namespace | normalized request; fetched sections in structure order (at most 20); ordered `get-section`-shaped clauses from `from` through `to`, each paragraph once; range reference with section ids and structure URL | `partial_clause_normalization`, `source_metadata_incomplete` | `invalid_input`, `not_found`, `source_unavailable`, `rate_limited`, `source_changed` |
 | `search-qna` | `keyword`; `page` 1–1000 default 1; `rows` 1–50 default 10; optional normalized numeric `types`; optional `sortDate`, inclusive `from`/`to` | normalized request; Q&A items with identity/type/label/title/snippet/tags/deprecation/link/date/reference; returned/total/page counts, next-page state, pagination status, counts/labels by type, suggested keywords | `source_metadata_incomplete` | `invalid_input`, `source_unavailable`, `rate_limited`, `source_changed` |
 | `get-qna` | nonnumeric `docNumber`; optional `keyword` | normalized request; Q&A identity/type/label/title/reference/full text; optional HTML, related standards, links, dates, adjacent ids; tags/deprecation; Q&A reference | `source_metadata_incomplete` | `invalid_input`, `not_found`, `source_unavailable`, `rate_limited`, `source_changed` |
 
@@ -80,7 +82,7 @@ fixture path emits no warning.
 
 ## CLI process surface
 
-- Preserve all six kebab-case commands, `kasb help <command>`, and
+- Preserve all seven kebab-case commands, `kasb help <command>`, and
   `<command> --help`.
 - Preserve the current flags: `--keyword`, `--limit`, `--sort`, `--std-num`,
   `--index-document-id`, `--ref`, `--para-num`, `--page`, `--rows`, `--types`,
@@ -125,6 +127,7 @@ The exact command/flag matrix is:
 | `get-standard-structure` | `--std-num`, `--keyword`, `--output summary\|structured\|raw`, `--pretty` |
 | `get-section` | `--std-num`, `--index-document-id`, `--ref`, `--keyword`, `--output summary\|structured\|raw`, `--pretty` |
 | `get-paragraph` | `--std-num`, `--para-num`, `--pretty` |
+| `get-paragraph-range` | `--std-num`, `--from`, `--to`, `--output summary\|structured\|raw`, `--pretty` |
 | `search-qna` | `--keyword`, `--page`, `--rows`, `--limit`, `--types`, `--sort-date`, `--from`, `--to`, `--output summary\|structured\|raw`, `--pretty` |
 | `get-qna` | `--doc-number`, `--keyword`, `--output summary\|structured\|raw`, `--pretty` |
 

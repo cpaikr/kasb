@@ -288,35 +288,19 @@ pub(crate) async fn get_section<T: HttpTransport, F: FnOnce() -> String>(
     fetched_at: F,
 ) -> Result<GetSectionResult, KasbError> {
     let lookup = resolve_section_lookup(transport, request, cancellation).await?;
-    let source_url = paragraphs_url(
+    let SectionContent {
+        source_url,
+        payload,
+        clauses,
+        incomplete,
+    } = fetch_section_content(
+        transport,
         request.std_num(),
         &lookup.index_document_id,
         request.keyword(),
-    );
-    let payload = required_object(
-        fetch_json(transport, &source_url, cancellation).await?,
-        &source_url,
-        "paragraphs",
-    )?;
-    let source_clauses = required_array(payload.get("clauses"), &source_url, "clauses")?;
-    let mut clauses = Vec::new();
-    for source_clause in source_clauses {
-        if let Some(clause) = normalize_section_clause(
-            source_clause,
-            &source_url,
-            request.std_num(),
-            &lookup.index_document_id,
-        )? {
-            clauses.push(clause);
-        }
-    }
-    assert_any_normalized(
-        source_clauses,
-        &clauses,
-        &source_url,
-        "Section paragraph row fields changed.",
-    )?;
-    let incomplete = clauses.len() != source_clauses.len();
+        cancellation,
+    )
+    .await?;
     let (enrichment, enrichment_failure) = if lookup.enrichment.is_some() {
         (lookup.enrichment, None)
     } else {
@@ -569,6 +553,51 @@ async fn search_qna_recency<T: HttpTransport, F: FnOnce() -> String>(
             search_url: source_url,
         },
         warnings,
+    })
+}
+
+pub(crate) struct SectionContent {
+    pub(crate) source_url: String,
+    pub(crate) payload: serde_json::Map<String, Value>,
+    pub(crate) clauses: Vec<SectionClause>,
+    /// Some source rows could not be normalized and were omitted.
+    pub(crate) incomplete: bool,
+}
+
+pub(crate) async fn fetch_section_content<T: HttpTransport>(
+    transport: &T,
+    std_num: &str,
+    index_document_id: &str,
+    keyword: Option<&str>,
+    cancellation: &CancellationToken,
+) -> Result<SectionContent, KasbError> {
+    let source_url = paragraphs_url(std_num, index_document_id, keyword);
+    let payload = required_object(
+        fetch_json(transport, &source_url, cancellation).await?,
+        &source_url,
+        "paragraphs",
+    )?;
+    let source_clauses = required_array(payload.get("clauses"), &source_url, "clauses")?;
+    let mut clauses = Vec::new();
+    for source_clause in source_clauses {
+        if let Some(clause) =
+            normalize_section_clause(source_clause, &source_url, std_num, index_document_id)?
+        {
+            clauses.push(clause);
+        }
+    }
+    assert_any_normalized(
+        source_clauses,
+        &clauses,
+        &source_url,
+        "Section paragraph row fields changed.",
+    )?;
+    let incomplete = clauses.len() != source_clauses.len();
+    Ok(SectionContent {
+        source_url,
+        payload,
+        clauses,
+        incomplete,
     })
 }
 

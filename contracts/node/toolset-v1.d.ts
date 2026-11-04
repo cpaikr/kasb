@@ -1,4 +1,4 @@
-export declare const kasbOperationNames: readonly ["search-standards", "get-standard-structure", "get-section", "get-paragraph", "search-qna", "get-qna"];
+export declare const kasbOperationNames: readonly ["search-standards", "get-standard-structure", "get-section", "get-paragraph", "get-paragraph-range", "search-qna", "get-qna"];
 export type KasbOperationName = (typeof kasbOperationNames)[number];
 export declare const kasbSingleToolActions: readonly ["help", "command_help", "validate", "run"];
 export type KasbSingleToolAction = (typeof kasbSingleToolActions)[number];

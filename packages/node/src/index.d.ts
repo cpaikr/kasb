@@ -243,14 +243,78 @@ export type GetParagraphResult = {
         readonly message: string;
     }[];
 };
+export type GetParagraphRangeInput = {
+    readonly from: string;
+    readonly stdNum: string;
+    readonly to: string;
+};
+export type GetParagraphRangeResult = {
+    readonly references: {
+        readonly from: string;
+        readonly stdNum: string;
+        readonly standardTitle?: string | undefined;
+        readonly standardKind?: string | undefined;
+        readonly structureUrl: string;
+        readonly to: string;
+        readonly indexDocumentIds: readonly string[];
+    };
+    readonly result: {
+        readonly request: {
+            readonly from: string;
+            readonly stdNum: string;
+            readonly to: string;
+        };
+        readonly sections: readonly {
+            readonly indexDocumentId: string;
+            readonly title: string;
+            readonly ref?: string | undefined;
+            readonly level: number;
+            readonly sectionUrl: string;
+        }[];
+        readonly clauses: readonly {
+            readonly sort?: number | undefined;
+            readonly indexDocumentId: string;
+            readonly title?: string | undefined;
+            readonly stdNum: string;
+            readonly kind: "title" | "paragraph" | "unknown";
+            readonly uniqueKey?: string | undefined;
+            readonly paraNum?: string | undefined;
+            readonly paraContent?: string | undefined;
+            readonly fullContent?: string | undefined;
+            readonly faqDocNumbers?: string | undefined;
+            readonly faqCount?: number | undefined;
+        }[];
+    };
+    readonly metadata: {
+        readonly fetchedAt: string;
+        readonly source: {
+            readonly system: "kasb";
+            readonly endpoint: string;
+        };
+        readonly sourceBehavior: {
+            readonly observationStatus: "observed";
+            readonly apiBase: "https://db.kasb.or.kr/api";
+        };
+        readonly completeness: "complete" | "partial";
+        readonly content?: {
+            readonly htmlFields?: readonly string[] | undefined;
+            readonly textFields?: readonly string[] | undefined;
+            readonly notes?: readonly string[] | undefined;
+        } | undefined;
+    };
+    readonly warnings: readonly {
+        readonly code: "source_metadata_incomplete" | "partial_clause_normalization";
+        readonly message: string;
+    }[];
+};
 export type SearchQnaInput = {
     readonly keyword: string;
     readonly rows?: number | undefined;
     readonly from?: string | undefined;
+    readonly to?: string | undefined;
     readonly page?: number | undefined;
     readonly types?: string | undefined;
     readonly sortDate?: "asc" | "desc" | undefined;
-    readonly to?: string | undefined;
 };
 export type SearchQnaResult = {
     readonly references: {
@@ -261,10 +325,10 @@ export type SearchQnaResult = {
             readonly rows: number;
             readonly keyword: string;
             readonly from?: string | undefined;
+            readonly to?: string | undefined;
             readonly page: number;
             readonly types?: string | undefined;
             readonly sortDate?: "asc" | "desc" | undefined;
-            readonly to?: string | undefined;
         };
         readonly returnedCount: number;
         readonly suggestedKeywords: readonly string[];
@@ -390,5 +454,6 @@ export declare function searchStandards(input: SearchStandardsInput, context?: K
 export declare function getStandardStructure(input: GetStandardStructureInput, context?: KasbExecutionContext): Promise<GetStandardStructureResult>;
 export declare function getSection(input: GetSectionInput, context?: KasbExecutionContext): Promise<GetSectionResult>;
 export declare function getParagraph(input: GetParagraphInput, context?: KasbExecutionContext): Promise<GetParagraphResult>;
+export declare function getParagraphRange(input: GetParagraphRangeInput, context?: KasbExecutionContext): Promise<GetParagraphRangeResult>;
 export declare function searchQna(input: SearchQnaInput, context?: KasbExecutionContext): Promise<SearchQnaResult>;
 export declare function getQna(input: GetQnaInput, context?: KasbExecutionContext): Promise<GetQnaResult>;

@@ -18,6 +18,7 @@ export const searchStandards = operation("search-standards");
 export const getStandardStructure = operation("get-standard-structure");
 export const getSection = operation("get-section");
 export const getParagraph = operation("get-paragraph");
+export const getParagraphRange = operation("get-paragraph-range");
 export const searchQna = operation("search-qna");
 export const getQna = operation("get-qna");
 

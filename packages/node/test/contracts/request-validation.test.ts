@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { resolveGetParagraphRequest } from "../../src/capabilities/get-paragraph/contract.ts";
+import { resolveGetParagraphRangeRequest } from "../../src/capabilities/get-paragraph-range/contract.ts";
 import { resolveGetQnaRequest } from "../../src/capabilities/get-qna/contract.ts";
 import { resolveGetSectionRequest } from "../../src/capabilities/get-section/contract.ts";
 import { resolveGetStandardStructureRequest } from "../../src/capabilities/get-standard-structure/contract.ts";
@@ -75,6 +76,7 @@ describe("capability request validation", () => {
     { name: "search-standards", resolver: resolveSearchStandardsRequest as Resolver<unknown>, parameter: "keyword" },
     { name: "get-standard-structure", resolver: resolveGetStandardStructureRequest as Resolver<unknown>, parameter: "stdNum" },
     { name: "get-paragraph", resolver: resolveGetParagraphRequest as Resolver<unknown>, parameter: "paraNum", base: { stdNum: "1116" } },
+    { name: "get-paragraph-range", resolver: resolveGetParagraphRangeRequest as Resolver<unknown>, parameter: "from", base: { stdNum: "1102", to: "BC346" } },
     { name: "search-qna", resolver: resolveSearchQnaRequest as Resolver<unknown>, parameter: "keyword" },
     { name: "get-qna", resolver: resolveGetQnaRequest as Resolver<unknown>, parameter: "docNumber" },
   ];
@@ -87,6 +89,19 @@ describe("capability request validation", () => {
       );
     });
   }
+
+  test("get-paragraph-range mirrors the Rust boundary rules", () => {
+    expect(resolveGetParagraphRangeRequest({ stdNum: " 1118 ", from: "130", to: "한132.5" }))
+      .toEqual({ stdNum: "1118", from: "130", to: "한132.5" });
+    expectInvalid(
+      () => resolveGetParagraphRangeRequest({ stdNum: "1102", from: "60", to: "B3" }),
+      { parameter: "to", messageIncludes: "same paragraph namespace" },
+    );
+    expectInvalid(
+      () => resolveGetParagraphRangeRequest({ stdNum: "1102", from: "BC339~BC345", to: "BC346" }),
+      { parameter: "from", messageIncludes: "not a range" },
+    );
+  });
 
   test("requires get-section to receive exactly one section locator", () => {
     expectInvalid(

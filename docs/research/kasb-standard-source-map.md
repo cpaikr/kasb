@@ -245,6 +245,16 @@ Observed:
   always `{stdNum}-{paraNum}`.
 - `GET /api/paragraphs/1116/ZB2hJW`
   Returned the `목적` section with paragraphs `1` and `2`.
+- `GET /api/standard-indexes/1102` (2026-11-04)
+  Listed adjacent sections `BC339~BC345` (`pzAnbe`) and `BC346` (`oOUOtw`), so
+  no single structure ref covers `BC339~BC346` and `get-section --ref` returns
+  `not_found` for it (issue #28). Exact lookups for `BC339` and `BC346` named
+  those two sections, and their contents together held `BC339` through
+  `BC346` in source order without title rows.
+- `GET /api/paragraphs/1116/peSxIr` (2026-11-04)
+  The `9~17` ancestor section returned paragraphs `9` through `17` with three
+  title rows, so it repeats its descendants `12~17` (`iZT5iG`) and below. An
+  ancestor section's content includes its children's paragraphs.
 
 Observed implication:
 

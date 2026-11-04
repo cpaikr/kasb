@@ -55,6 +55,7 @@ enum Operation {
     GetStandardStructure(String),
     GetSection(String),
     GetParagraph(String),
+    GetParagraphRange(String),
     SearchQna(String),
     GetQna(String),
     #[cfg(feature = "feasibility-judge")]
@@ -126,6 +127,7 @@ fn execute_operation(
         "get-standard-structure" => Operation::GetStandardStructure(input_json),
         "get-section" => Operation::GetSection(input_json),
         "get-paragraph" => Operation::GetParagraph(input_json),
+        "get-paragraph-range" => Operation::GetParagraphRange(input_json),
         "search-qna" => Operation::SearchQna(input_json),
         "get-qna" => Operation::GetQna(input_json),
         _ => {
@@ -350,6 +352,11 @@ async fn execute(
                 .execute_get_paragraph(parse_input(&input_json)?, &cancellation)
                 .await,
         ),
+        Operation::GetParagraphRange(input_json) => to_value(
+            shared_client(request_interval_ms)?
+                .execute_get_paragraph_range(parse_input(&input_json)?, &cancellation)
+                .await,
+        ),
         Operation::SearchQna(input_json) => to_value(
             shared_client(request_interval_ms)?
                 .execute_search_qna(parse_input(&input_json)?, &cancellation)
@@ -391,6 +398,7 @@ impl Operation {
                 | Self::GetStandardStructure(_)
                 | Self::GetSection(_)
                 | Self::GetParagraph(_)
+                | Self::GetParagraphRange(_)
                 | Self::SearchQna(_)
                 | Self::GetQna(_)
         )
@@ -436,6 +444,11 @@ async fn execute_fixture(
         Operation::GetParagraph(input) => to_value(
             client
                 .execute_get_paragraph(parse_input(&input)?, &cancellation)
+                .await,
+        ),
+        Operation::GetParagraphRange(input) => to_value(
+            client
+                .execute_get_paragraph_range(parse_input(&input)?, &cancellation)
                 .await,
         ),
         Operation::SearchQna(input) => to_value(
@@ -600,7 +613,7 @@ fn error_envelope(error: BindingError) -> Value {
             "ok": false,
             "error": {
                 "code": "invalid_input",
-                "message": "Native operation must be one of the six KASB v1 operation names.",
+                "message": "Native operation must be one of the seven KASB v1 operation names.",
                 "retryable": false,
                 "parameter": "operationName"
             }

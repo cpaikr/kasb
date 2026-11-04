@@ -80,7 +80,7 @@ output, latency, caching, and opt-outs.
 ## System shape
 
 - [`crates/kasb`](crates/kasb/README.md) is the public Rust SDK and sole KASB
-  conformer for all six v1 operations.
+  conformer for all seven v1 operations.
 - [`crates/kasb-cli`](crates/kasb-cli) is the Rust `clap` CLI over that SDK.
 - [`crates/kasb-node`](crates/kasb-node) and
   [`packages/node`](packages/node/README.md) provide the asynchronous Node-API

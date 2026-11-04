@@ -1,4 +1,5 @@
 pub mod get_paragraph;
+pub mod get_paragraph_range;
 pub mod get_qna;
 pub mod get_section;
 pub mod get_standard_structure;

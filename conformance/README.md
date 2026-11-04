@@ -7,7 +7,7 @@ committed expected outcomes. It contains no imports from a conformer.
 The conformer-neutral judge in `judge.ts` materializes fixture payloads and
 executes each public surface in a separate process. It does not import a
 conformer or give a runner the expected outcome. It independently exercises the
-public Rust SDK, Rust CLI, and Rust-backed Node SDK for all six v1 operations.
+public Rust SDK, Rust CLI, and Rust-backed Node SDK for all seven v1 operations.
 The CLI gate builds the real Rust binary twice: a fixture-enabled binary for
 black-box operation checks and a production binary proving that fixture support
 is absent. Direct and npm-launched CLI equivalence is exercised by the native

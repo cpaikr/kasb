@@ -233,6 +233,11 @@ async fn cancellation_is_execution_control_for_every_new_primary_operation() {
             json!({"stdNum": "1116", "indexDocumentId": "section"}),
         ),
         (
+            "https://db.kasb.or.kr/api/paragraphs/content/1116/23",
+            "get-paragraph-range",
+            json!({"stdNum": "1116", "from": "23", "to": "24"}),
+        ),
+        (
             "https://db.kasb.or.kr/api/qnas/v2?types=11%2C12%2C13%2C14%2C15%2C24%2C25&searchWord=x&page=1&rows=10",
             "search-qna",
             json!({"keyword": "x"}),
@@ -259,6 +264,10 @@ async fn cancellation_is_execution_control_for_every_new_primary_operation() {
                     .map(|_| ()),
                 "get-section" => client
                     .execute_get_section(input, &cancellation)
+                    .await
+                    .map(|_| ()),
+                "get-paragraph-range" => client
+                    .execute_get_paragraph_range(input, &cancellation)
                     .await
                     .map(|_| ()),
                 "search-qna" => client

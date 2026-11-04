@@ -19,6 +19,11 @@ import {
   getParagraphResultJsonSchema,
 } from "./capabilities/get-paragraph/spec.ts";
 import {
+  getParagraphRangeInputJsonSchema,
+  getParagraphRangeOperationName,
+  getParagraphRangeResultJsonSchema,
+} from "./capabilities/get-paragraph-range/spec.ts";
+import {
   searchQnaInputJsonSchema,
   searchQnaOperationName,
   searchQnaResultJsonSchema,
@@ -31,6 +36,7 @@ import {
 
 import {
   getParagraph,
+  getParagraphRange,
   getQna,
   getSection,
   getStandardStructure,
@@ -44,6 +50,7 @@ type NodeToolsetOperation = {
     | "get-standard-structure"
     | "get-section"
     | "get-paragraph"
+    | "get-paragraph-range"
     | "search-qna"
     | "get-qna";
   readonly inputJsonSchema: unknown;
@@ -80,6 +87,13 @@ export const defaultGetParagraphOperation: NodeToolsetOperation = {
   inputJsonSchema: getParagraphInputJsonSchema,
   resultJsonSchema: getParagraphResultJsonSchema,
   execute: getParagraph as NodeToolsetOperation["execute"],
+};
+
+export const defaultGetParagraphRangeOperation: NodeToolsetOperation = {
+  name: getParagraphRangeOperationName,
+  inputJsonSchema: getParagraphRangeInputJsonSchema,
+  resultJsonSchema: getParagraphRangeResultJsonSchema,
+  execute: getParagraphRange as NodeToolsetOperation["execute"],
 };
 
 export const defaultSearchQnaOperation: NodeToolsetOperation = {

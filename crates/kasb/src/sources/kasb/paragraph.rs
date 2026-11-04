@@ -28,50 +28,8 @@ pub(crate) async fn get_paragraph<T: HttpTransport, F: FnOnce() -> String>(
     cancellation: &CancellationToken,
     fetched_at: F,
 ) -> Result<GetParagraphResult, KasbError> {
-    let source_url = paragraph_content_url(request.std_num(), request.para_num());
-    let payload = fetch_json(transport, &source_url, cancellation).await?;
-    let payload = required_object(payload, &source_url, "paragraph content")?;
-    let paragraphs = required_array(payload.get("paraContents"), &source_url, "paraContents")?;
-
-    if paragraphs.is_empty() {
-        return Err(KasbFailure::source_failure(
-            KasbFailureCode::NotFound,
-            format!(
-                "Could not find paragraph {}-{}.",
-                request.std_num(),
-                request.para_num()
-            ),
-            false,
-            &source_url,
-        )
-        .into());
-    }
-    if paragraphs.len() != 1 {
-        return Err(source_changed(
-            &source_url,
-            "Exact paragraph lookup returned multiple rows.",
-        )
-        .into());
-    }
-
-    let mut paragraph = normalize_paragraph(&paragraphs[0], &source_url)?;
-    // `uniqueKey` is an opaque source key: KASB appends a numeric suffix to
-    // some paragraphs (`1118-132-133`), so identity rests on `stdNum` and
-    // `paraNum` alone.
-    if paragraph.std_num != request.std_num() || paragraph.para_num != request.para_num() {
-        return Err(source_changed(
-            &source_url,
-            format!(
-                "Paragraph response identifiers do not match the request: requested stdNum {:?}, paraNum {:?}; received stdNum {:?}, paraNum {:?}, uniqueKey {:?}.",
-                request.std_num(),
-                request.para_num(),
-                paragraph.std_num,
-                paragraph.para_num,
-                paragraph.unique_key,
-            ),
-        )
-        .into());
-    }
+    let (mut paragraph, source_url) =
+        fetch_exact_paragraph(transport, request, cancellation).await?;
 
     let enrichment = optional_section_enrichment(
         transport,
@@ -137,6 +95,60 @@ pub(crate) async fn get_paragraph<T: HttpTransport, F: FnOnce() -> String>(
         references,
         warnings,
     })
+}
+
+/// Fetches and validates one exact paragraph row without structure enrichment.
+/// Returns the normalized paragraph and its absolute source URL.
+pub(crate) async fn fetch_exact_paragraph<T: HttpTransport>(
+    transport: &T,
+    request: &GetParagraphRequest,
+    cancellation: &CancellationToken,
+) -> Result<(Paragraph, String), KasbError> {
+    let source_url = paragraph_content_url(request.std_num(), request.para_num());
+    let payload = fetch_json(transport, &source_url, cancellation).await?;
+    let payload = required_object(payload, &source_url, "paragraph content")?;
+    let paragraphs = required_array(payload.get("paraContents"), &source_url, "paraContents")?;
+
+    if paragraphs.is_empty() {
+        return Err(KasbFailure::source_failure(
+            KasbFailureCode::NotFound,
+            format!(
+                "Could not find paragraph {}-{}.",
+                request.std_num(),
+                request.para_num()
+            ),
+            false,
+            &source_url,
+        )
+        .into());
+    }
+    if paragraphs.len() != 1 {
+        return Err(source_changed(
+            &source_url,
+            "Exact paragraph lookup returned multiple rows.",
+        )
+        .into());
+    }
+
+    let paragraph = normalize_paragraph(&paragraphs[0], &source_url)?;
+    // `uniqueKey` is an opaque source key: KASB appends a numeric suffix to
+    // some paragraphs (`1118-132-133`), so identity rests on `stdNum` and
+    // `paraNum` alone.
+    if paragraph.std_num != request.std_num() || paragraph.para_num != request.para_num() {
+        return Err(source_changed(
+            &source_url,
+            format!(
+                "Paragraph response identifiers do not match the request: requested stdNum {:?}, paraNum {:?}; received stdNum {:?}, paraNum {:?}, uniqueKey {:?}.",
+                request.std_num(),
+                request.para_num(),
+                paragraph.std_num,
+                paragraph.para_num,
+                paragraph.unique_key,
+            ),
+        )
+        .into());
+    }
+    Ok((paragraph, source_url))
 }
 
 fn normalize_paragraph(value: &Value, source_url: &str) -> Result<Paragraph, KasbError> {

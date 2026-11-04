@@ -13,12 +13,15 @@ const ROOT_AFTER_HELP: &str = r#"Workflows:
   # Retrieve one exact paragraph directly
   kasb get-paragraph --std-num 1116 --para-num 23
 
+  # Retrieve an inclusive paragraph range across indexed sections
+  kasb get-paragraph-range --std-num 1102 --from BC339 --to BC346 --output summary
+
   # Search Q&A -> retrieve document
   kasb search-qna --keyword 리스 --limit 5 --output summary
   kasb get-qna --doc-number SSI-35629 --output summary
 
 Cautions:
-  - The six KASB content commands perform read-only retrieval from public material.
+  - The seven KASB content commands perform read-only retrieval from public material.
   - upgrade changes only a receipt-managed standalone CLI installation.
   - It does not provide accounting, legal, investment, or tax advice.
   - Results are structured data for source verification."#;
@@ -56,6 +59,7 @@ Notes:
   - One of --index-document-id or --ref is required.
   - Use the indexDocumentId returned by get-standard-structure, not a browser-route titleDocumentId.
   - Retrieve ref ranges with get-section --ref; retrieve single paragraphs with get-paragraph --para-num.
+  - A ref must match one indexed section; for a range across sections, use get-paragraph-range.
   - When sections share a ref, the most specific child is selected and a warning is returned."#;
 
 const PARAGRAPH_AFTER_HELP: &str = r#"Examples:
@@ -63,7 +67,18 @@ const PARAGRAPH_AFTER_HELP: &str = r#"Examples:
   kasb get-paragraph --std-num 1116 --para-num 9
 
 Notes:
-  - Retrieve paragraph ranges (for example, 9~17 or 22~30) with get-section --ref, not --para-num."#;
+  - Retrieve paragraph ranges (for example, 9~17 or 22~30) with get-section --ref, not --para-num.
+  - For a range that spans indexed sections, use get-paragraph-range --from --to."#;
+
+const PARAGRAPH_RANGE_AFTER_HELP: &str = r#"Examples:
+  kasb get-paragraph-range --std-num 1102 --from BC339 --to BC346 --output summary
+  kasb get-paragraph-range --std-num 1118 --from 130 --to 한132.5
+
+Notes:
+  - --from and --to are exact paragraph numbers; the range is inclusive and follows KASB source order.
+  - Both boundaries must share a namespace (body, B, BC, IE, ...); Korean-added 한 paragraphs belong to the body.
+  - A range may combine at most 20 indexed sections; result.sections lists the sections that were fetched.
+  - Use get-section --ref when the range is exactly one indexed section."#;
 
 const SEARCH_QNA_AFTER_HELP: &str = r#"Examples:
   kasb search-qna --keyword 리스 --limit 5
@@ -125,6 +140,9 @@ enum Operation {
     /// Retrieve a standard paragraph directly by stdNum + paraNum.
     #[command(after_help = PARAGRAPH_AFTER_HELP)]
     GetParagraph(GetParagraphArgs),
+    /// Retrieve an inclusive paragraph range by stdNum + from + to, across sections.
+    #[command(after_help = PARAGRAPH_RANGE_AFTER_HELP)]
+    GetParagraphRange(GetParagraphRangeArgs),
     /// Search KASB Q&A material by keyword.
     #[command(after_help = SEARCH_QNA_AFTER_HELP)]
     SearchQna(Box<SearchQnaArgs>),
@@ -145,6 +163,7 @@ pub(crate) enum OperationName {
     GetStandardStructure,
     GetSection,
     GetParagraph,
+    GetParagraphRange,
     SearchQna,
     GetQna,
     Upgrade,
@@ -159,6 +178,7 @@ impl OperationName {
             Self::GetStandardStructure => "get-standard-structure",
             Self::GetSection => "get-section",
             Self::GetParagraph => "get-paragraph",
+            Self::GetParagraphRange => "get-paragraph-range",
             Self::SearchQna => "search-qna",
             Self::GetQna => "get-qna",
             Self::Upgrade => "upgrade",
@@ -294,6 +314,42 @@ struct GetParagraphArgs {
         help = "[required] Paragraph number. Examples: 23, 한2.1, B3, BC240A"
     )]
     para_num: Option<String>,
+    #[arg(long, help = "Print indented JSON for human reading.")]
+    pretty: bool,
+}
+
+#[derive(Debug, Args)]
+#[command(arg_required_else_help = true)]
+struct GetParagraphRangeArgs {
+    #[arg(
+        long,
+        value_name = "text",
+        allow_hyphen_values = true,
+        help = "[required] Standard number. Example: 1102"
+    )]
+    std_num: Option<String>,
+    #[arg(
+        long,
+        value_name = "text",
+        allow_hyphen_values = true,
+        help = "[required] First paragraph number, inclusive. Example: BC339"
+    )]
+    from: Option<String>,
+    #[arg(
+        long,
+        value_name = "text",
+        allow_hyphen_values = true,
+        help = "[required] Last paragraph number, inclusive. Example: BC346"
+    )]
+    to: Option<String>,
+    #[arg(
+        long,
+        value_name = "mode",
+        value_enum,
+        allow_hyphen_values = true,
+        help = output_help()
+    )]
+    output: Option<OutputMode>,
     #[arg(long, help = "Print indented JSON for human reading.")]
     pretty: bool,
 }
@@ -502,6 +558,20 @@ impl Cli {
                     args.para_num,
                 );
                 Invocation::new(OperationName::GetParagraph, input, None, args.pretty, used)
+            }
+            Operation::GetParagraphRange(args) => {
+                let mut input = Map::new();
+                let mut used = BTreeMap::new();
+                insert_string(&mut input, &mut used, "stdNum", "--std-num", args.std_num);
+                insert_string(&mut input, &mut used, "from", "--from", args.from);
+                insert_string(&mut input, &mut used, "to", "--to", args.to);
+                Invocation::new(
+                    OperationName::GetParagraphRange,
+                    input,
+                    args.output,
+                    args.pretty,
+                    used,
+                )
             }
             Operation::SearchQna(args) => {
                 let args = *args;

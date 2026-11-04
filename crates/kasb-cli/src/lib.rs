@@ -190,6 +190,11 @@ where
         OperationName::GetParagraph => {
             serialize(client.execute_get_paragraph(input, cancellation).await)
         }
+        OperationName::GetParagraphRange => serialize(
+            client
+                .execute_get_paragraph_range(input, cancellation)
+                .await,
+        ),
         OperationName::SearchQna => serialize(client.execute_search_qna(input, cancellation).await),
         OperationName::GetQna => serialize(client.execute_get_qna(input, cancellation).await),
         OperationName::Upgrade | OperationName::VersionCheck | OperationName::RequestPacing => {

@@ -182,6 +182,7 @@ pub(crate) fn project_success(
     let summary = match operation {
         "get-standard-structure" => summarize_structure(result)?,
         "get-section" => summarize_section(result)?,
+        "get-paragraph-range" => summarize_paragraph_range(result)?,
         "search-qna" => summarize_qna_search(result)?,
         "get-qna" => summarize_qna(result)?,
         _ => return Ok(envelope),
@@ -261,6 +262,27 @@ fn summarize_section(result: &Value) -> Result<Value, &'static str> {
     Ok(json!({
         "request": field(result, "request")?,
         "section": field(result, "section")?,
+        "clauses": clauses,
+    }))
+}
+
+fn summarize_paragraph_range(result: &Value) -> Result<Value, &'static str> {
+    let sections = array(result, "sections")?
+        .iter()
+        .map(|section| select(section, &["indexDocumentId", "title", "ref"]))
+        .collect::<Result<Vec<_>, _>>()?;
+    let clauses = array(result, "clauses")?
+        .iter()
+        .map(|clause| {
+            select(
+                clause,
+                &["kind", "title", "paraNum", "uniqueKey", "fullContent"],
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(json!({
+        "request": field(result, "request")?,
+        "sections": sections,
         "clauses": clauses,
     }))
 }
@@ -449,6 +471,7 @@ fn cli_names(operation: &str) -> &'static [(&'static str, &'static str)] {
             ("keyword", "--keyword"),
         ],
         "get-paragraph" => &[("stdNum", "--std-num"), ("paraNum", "--para-num")],
+        "get-paragraph-range" => &[("stdNum", "--std-num"), ("from", "--from"), ("to", "--to")],
         "search-qna" => &[
             ("keyword", "--keyword"),
             ("page", "--page"),

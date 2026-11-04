@@ -9,7 +9,7 @@ Releases and has no npm registry publisher.
 
 The package provides:
 
-- six asynchronous SDK operations through Node-API;
+- seven asynchronous SDK operations through Node-API;
 - `@sjunepark/kasb/toolset` for network-free discovery, schemas, validation,
   execution, error serialization, structured recovery metadata, and
   `AbortSignal` cancellation; and

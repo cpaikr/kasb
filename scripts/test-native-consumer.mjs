@@ -56,8 +56,8 @@ try {
     consumerSource(rootPackage.name),
   ], temporary);
   assert.deepEqual(JSON.parse(sdkInspection.stdout), {
-    operations: ["search-standards", "get-standard-structure", "get-section", "get-paragraph", "search-qna", "get-qna"],
-    invalidCodes: ["invalid_input", "invalid_input", "invalid_input", "invalid_input", "invalid_input", "invalid_input"],
+    operations: ["search-standards", "get-standard-structure", "get-section", "get-paragraph", "get-paragraph-range", "search-qna", "get-qna"],
+    invalidCodes: ["invalid_input", "invalid_input", "invalid_input", "invalid_input", "invalid_input", "invalid_input", "invalid_input"],
     toolsetInvalid: "invalid_input",
     toolsetNativeFailure: { code: "invalid_input", sdkClass: true },
     cancelled: "aborted",
@@ -389,6 +389,7 @@ function consumerSource(packageName) {
       [sdk.getStandardStructure, {}],
       [sdk.getSection, {}],
       [sdk.getParagraph, {}],
+      [sdk.getParagraphRange, {}],
       [sdk.searchQna, {}],
       [sdk.getQna, {}],
     ];
