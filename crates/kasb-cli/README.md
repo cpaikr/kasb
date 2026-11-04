@@ -188,6 +188,15 @@ Actual upgrades revalidate the exact selected release before download and retain
 archive/checksum, executable identity, staging, replacement, and rollback checks.
 Windows replacement is scheduled after process exit and is not reported as
 already applied. Reports never reconcile or clean up deferred-upgrade state.
+Actual upgrades of one installation are serialized by an exclusive lock on
+`.kasb-upgrade.lock` beside the executable, which is kept between upgrades.
+The lock covers reclamation, staging, and replacement or rollback (POSIX) or
+helper scheduling (Windows). A second upgrade fails with
+`upgrade_in_progress`, without changing any file, while the lock is held or
+while another process's Windows replacement status is present. While holding
+the lock, an upgrade first removes, as best-effort, `.kasb.new.<pid>` and
+`.kasb.receipt.new.<pid>` replacements abandoned by earlier, interrupted
+upgrades. Files that can't be read or removed are left for a later upgrade.
 
 When stderr is an interactive terminal, both commands also write plain-text
 stage lines there (checking, downloading with the archive size, verifying,

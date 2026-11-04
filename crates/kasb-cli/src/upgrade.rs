@@ -7,6 +7,7 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use flate2::read::GzDecoder;
+use fs2::FileExt;
 use kasb::http::CancellationToken;
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -552,9 +553,7 @@ fn reconcile_deferred_status(policy: &ReleasePolicy) -> Result<Vec<PathBuf>, Upg
         .filter(|path| {
             path.file_name()
                 .and_then(|name| name.to_str())
-                .is_some_and(|name| {
-                    name.starts_with(".kasb-upgrade-") && name.ends_with(".status.json")
-                })
+                .is_some_and(is_windows_status_name)
         })
         .collect::<Vec<_>>();
     statuses.sort();
@@ -895,7 +894,11 @@ fn install_replacement(
             "The executable has no installation directory.",
         )
     })?;
+    // Held until this function returns: through POSIX replacement or rollback,
+    // and on Windows until the helper's pending status is durable.
+    let lock = lock_installation(parent)?;
     let nonce = std::process::id();
+    reclaim_abandoned_staging(&lock, parent);
     let staged = parent.join(format!(".kasb.new.{nonce}"));
     let staged_receipt = parent.join(format!(".kasb.receipt.new.{nonce}"));
     write_staged(&staged, bytes)?;
@@ -929,6 +932,113 @@ fn install_replacement(
             status: Some(status),
         })
     }
+}
+
+const UPGRADE_LOCK: &str = ".kasb-upgrade.lock";
+
+/// Exclusive, crash-released lock that serializes upgrades of one
+/// installation directory. The lock file itself is kept: it is neither a stage
+/// nor recovery evidence.
+struct InstallationLock {
+    _file: File,
+}
+
+fn lock_installation(parent: &Path) -> Result<InstallationLock, UpgradeError> {
+    let path = parent.join(UPGRADE_LOCK);
+    let failure = || {
+        UpgradeError::new(
+            "upgrade_staging_failure",
+            "Could not lock the installation directory for upgrade.",
+        )
+    };
+    if fs::symlink_metadata(&path).is_ok_and(|metadata| !metadata.is_file()) {
+        return Err(failure());
+    }
+    let file = File::options()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&path)
+        .map_err(|_| failure())?;
+    match FileExt::try_lock_exclusive(&file) {
+        Ok(()) => {}
+        Err(error) if error.raw_os_error() == fs2::lock_contended_error().raw_os_error() => {
+            return Err(in_progress());
+        }
+        Err(_) => return Err(failure()),
+    }
+    // Reconciliation ran before this process downloaded its release and
+    // cleared every terminal status. A status present now was written by a
+    // concurrent upgrade whose Windows helper may still own its stages and the
+    // installed files, so nothing here may touch them.
+    let scheduled = fs::read_dir(parent).map_err(|_| failure())?.any(|entry| {
+        entry.is_ok_and(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .is_some_and(is_windows_status_name)
+        })
+    });
+    if scheduled {
+        return Err(in_progress());
+    }
+    Ok(InstallationLock { _file: file })
+}
+
+fn in_progress() -> UpgradeError {
+    UpgradeError::new(
+        "upgrade_in_progress",
+        "Another upgrade of this installation is in progress; no file was changed.",
+    )
+    .recovery("Run `kasb upgrade` again after the other upgrade finishes.")
+}
+
+fn is_windows_status_name(name: &str) -> bool {
+    name.starts_with(".kasb-upgrade-") && name.ends_with(".status.json")
+}
+
+/// Removes staged replacements left by earlier upgrade processes.
+///
+/// Staged names carry the staging process id, so a process that was killed
+/// mid-staging (or whose best-effort cleanup lost a race with a scanner holding
+/// the new executable) leaves a full-size orphan that no later run would ever
+/// reuse. A stage under this process's own id is also stale, because nothing
+/// has been staged yet: it comes from an earlier process with a reused id and
+/// would otherwise make `write_staged` fail.
+///
+/// The installation lock proves that no other upgrade is staging or replacing
+/// in this directory, and that no Windows helper still has a pending status,
+/// so every stage present belongs to an ended upgrade. Stages are never
+/// recovery evidence: rollback and manual recovery use only the backups,
+/// which are outside these names. Removal is best-effort: read or removal
+/// failures are ignored, and a file that cannot be removed now (for example,
+/// one a scanner still holds) is retried by the next upgrade.
+fn reclaim_abandoned_staging(_lock: &InstallationLock, parent: &Path) {
+    let Ok(entries) = fs::read_dir(parent) else {
+        return;
+    };
+    for entry in entries.filter_map(Result::ok) {
+        let name = entry.file_name();
+        if !name.to_str().is_some_and(is_staging_name)
+            || !entry.file_type().is_ok_and(|kind| kind.is_file())
+        {
+            continue;
+        }
+        let _ = fs::remove_file(entry.path());
+    }
+}
+
+/// Matches only the exact `.kasb.new.<pid>` and `.kasb.receipt.new.<pid>`
+/// names that `install_replacement` creates.
+fn is_staging_name(name: &str) -> bool {
+    name.strip_prefix(".kasb.new.")
+        .or_else(|| name.strip_prefix(".kasb.receipt.new."))
+        .is_some_and(|nonce| {
+            !nonce.is_empty()
+                && nonce.bytes().all(|byte| byte.is_ascii_digit())
+                && nonce.parse::<u32>().is_ok()
+        })
 }
 
 fn write_staged(path: &Path, bytes: &[u8]) -> Result<(), UpgradeError> {
@@ -983,12 +1093,19 @@ fn verify_staged_version(path: &Path, version: &str) -> Result<(), UpgradeError>
                 "The staged executable could not report its identity.",
             )
         })?;
-    let stdout = child.stdout.take().ok_or_else(|| {
-        UpgradeError::new(
-            "upgrade_executable_invalid",
+    // Every failure below stops the identity process first: Windows cannot
+    // delete a staged executable while its image is still running.
+    let abandon = |mut child: std::process::Child, message: &'static str| {
+        let _ = child.kill();
+        let _ = child.wait();
+        UpgradeError::new("upgrade_executable_invalid", message)
+    };
+    let Some(stdout) = child.stdout.take() else {
+        return Err(abandon(
+            child,
             "The staged executable version output could not be captured.",
-        )
-    })?;
+        ));
+    };
     let (output_sender, output_receiver) = std::sync::mpsc::sync_channel(1);
     std::thread::spawn(move || {
         let mut output = Vec::new();
@@ -1003,8 +1120,8 @@ fn verify_staged_version(path: &Path, version: &str) -> Result<(), UpgradeError>
             match child.try_wait() {
                 Ok(status) => exit_status = status,
                 Err(_) => {
-                    return Err(UpgradeError::new(
-                        "upgrade_executable_invalid",
+                    return Err(abandon(
+                        child,
                         "The staged executable identity process could not be observed.",
                     ));
                 }
@@ -1014,8 +1131,8 @@ fn verify_staged_version(path: &Path, version: &str) -> Result<(), UpgradeError>
             match output_receiver.try_recv() {
                 Ok(Ok(output)) => stdout = Some(output),
                 Ok(Err(_)) | Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    return Err(UpgradeError::new(
-                        "upgrade_executable_invalid",
+                    return Err(abandon(
+                        child,
                         "The staged executable version output could not be read.",
                     ));
                 }
@@ -1035,10 +1152,8 @@ fn verify_staged_version(path: &Path, version: &str) -> Result<(), UpgradeError>
             return Ok(());
         }
         if Instant::now() >= deadline {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(UpgradeError::new(
-                "upgrade_executable_invalid",
+            return Err(abandon(
+                child,
                 "The staged executable did not close its bounded version output within five seconds.",
             ));
         }
@@ -2716,6 +2831,158 @@ mod tests {
             "upgrade_receipt_write_failure"
         );
         assert_eq!(fs::read(existing).unwrap(), b"occupied");
+    }
+
+    fn staging_names(directory: &Path) -> Vec<String> {
+        let mut names = fs::read_dir(directory)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with(".kasb.new.") || name.starts_with(".kasb.receipt.new."))
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn reclaiming_staging_removes_only_abandoned_process_stages() {
+        let directory = tempfile::tempdir().unwrap();
+        let lock = lock_installation(directory.path()).unwrap();
+        let current = std::process::id();
+        let other = current.wrapping_add(1);
+        for name in [
+            format!(".kasb.new.{other}"),
+            format!(".kasb.receipt.new.{other}"),
+            format!(".kasb.new.{current}"),
+            ".kasb.new.12ab".to_owned(),
+            ".kasb.new.+7".to_owned(),
+            ".kasb.new.99999999999".to_owned(),
+            ".kasb-receipt.json".to_owned(),
+            ".kasb-upgrade-7.status.json".to_owned(),
+        ] {
+            fs::write(directory.path().join(name), b"keep?").unwrap();
+        }
+        fs::create_dir(directory.path().join(".kasb.receipt.new.7")).unwrap();
+
+        reclaim_abandoned_staging(&lock, directory.path());
+
+        let mut kept = vec![
+            ".kasb.new.+7".to_owned(),
+            ".kasb.new.12ab".to_owned(),
+            ".kasb.new.99999999999".to_owned(),
+            ".kasb.receipt.new.7".to_owned(),
+        ];
+        kept.sort();
+        assert_eq!(staging_names(directory.path()), kept);
+        assert!(directory.path().join(".kasb-receipt.json").exists());
+        assert!(
+            directory
+                .path()
+                .join(".kasb-upgrade-7.status.json")
+                .exists()
+        );
+        assert!(directory.path().join(UPGRADE_LOCK).is_file());
+    }
+
+    fn unused_receipt(installation: &ManagedInstallation) -> Receipt {
+        Receipt {
+            schema_version: 1,
+            manager: "standalone".to_owned(),
+            version: "0.1.1".to_owned(),
+            target: "linux-x64-gnu".to_owned(),
+            executable: installation.executable.clone(),
+            release_repository: "cpaikr/kasb".to_owned(),
+            release_tag: "v0.1.1".to_owned(),
+            asset_name: "unused".to_owned(),
+            sha256: hex_digest(b"not an executable"),
+        }
+    }
+
+    fn stage_invalid_replacement(installation: &ManagedInstallation) -> UpgradeError {
+        install_replacement(
+            installation,
+            b"not an executable",
+            &unused_receipt(installation),
+        )
+        .unwrap_err()
+    }
+
+    fn assert_installation_unchanged(installation: &ManagedInstallation) {
+        assert_eq!(
+            fs::read(&installation.executable).unwrap(),
+            executable_script(VERSION)
+        );
+        assert_eq!(
+            fs::read(&installation.receipt_path).unwrap(),
+            b"old receipt\n"
+        );
+    }
+
+    #[test]
+    fn held_installation_lock_blocks_a_second_upgrade_before_any_file_change() {
+        let directory = tempfile::tempdir().unwrap();
+        let installation = test_installation(&directory);
+        let live_stage = directory.path().join(format!(
+            ".kasb.receipt.new.{}",
+            std::process::id().wrapping_add(1)
+        ));
+        fs::write(&live_stage, b"stage of the upgrade holding the lock").unwrap();
+        let held = lock_installation(directory.path()).unwrap();
+
+        let error = stage_invalid_replacement(&installation);
+
+        assert_eq!(error.code, "upgrade_in_progress");
+        assert!(live_stage.exists());
+        assert_installation_unchanged(&installation);
+
+        // Once the other upgrade releases the lock, its leftovers are reclaimed.
+        drop(held);
+        let error = stage_invalid_replacement(&installation);
+        assert_eq!(error.code, "upgrade_executable_invalid");
+        assert!(!live_stage.exists());
+        assert!(directory.path().join(UPGRADE_LOCK).is_file());
+        assert_installation_unchanged(&installation);
+    }
+
+    #[test]
+    fn concurrently_scheduled_windows_replacement_blocks_staging() {
+        // A concurrent upgrade scheduled its helper after this process
+        // reconciled; that helper may still need its stages.
+        let directory = tempfile::tempdir().unwrap();
+        let installation = test_installation(&directory);
+        let pending_stage = directory.path().join(".kasb.new.7");
+        fs::write(&pending_stage, b"stage awaiting its helper").unwrap();
+        fs::write(
+            directory.path().join(".kasb-upgrade-7.status.json"),
+            b"{\"status\":\"pending\",\"phase\":\"staged\"}\n",
+        )
+        .unwrap();
+
+        let error = stage_invalid_replacement(&installation);
+
+        assert_eq!(error.code, "upgrade_in_progress");
+        assert!(pending_stage.exists());
+        assert_installation_unchanged(&installation);
+    }
+
+    #[test]
+    fn failed_staging_leaves_no_staged_files_including_abandoned_ones() {
+        // Prior upgrade processes that died after staging (observed on Windows
+        // as a full-size `.kasb.new.<pid>` beside a later successful upgrade),
+        // including one whose process id this process has reused.
+        let directory = tempfile::tempdir().unwrap();
+        let installation = test_installation(&directory);
+        for nonce in [std::process::id().wrapping_add(1), std::process::id()] {
+            fs::write(
+                directory.path().join(format!(".kasb.new.{nonce}")),
+                b"abandoned replacement",
+            )
+            .unwrap();
+        }
+        let error = stage_invalid_replacement(&installation);
+
+        assert_eq!(error.code, "upgrade_executable_invalid");
+        assert_eq!(staging_names(directory.path()), Vec::<String>::new());
+        assert_installation_unchanged(&installation);
     }
 
     #[cfg(unix)]
