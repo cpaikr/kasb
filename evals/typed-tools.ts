@@ -105,7 +105,7 @@ export const createKasbTypedEvalTools = (
   }),
   createTool({
     name: "kasb_get_paragraph",
-    description: "Retrieve one exact KASB standard paragraph. Typed JSON fields are stdNum and paraNum; retrieve paragraph ranges with kasb_get_section ref.",
+    description: "Retrieve one exact KASB standard paragraph. Typed JSON fields are stdNum and paraNum; retrieve one indexed section's range with kasb_get_section ref, or a range across sections with kasb_get_paragraph_range.",
     operation: operations.getParagraph,
   }),
   createTool({

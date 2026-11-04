@@ -69,7 +69,7 @@ optional strings, and rejects unknown keys with camelCase recovery hints.
 Default standard search uses title relevance and match count rather than source
 order. Section ref ambiguity resolves to the deepest stable candidate. Exact
 paragraph forms include `23`, `한2.1`, `B3`, and `BC240A`; ranges direct callers
-to section retrieval. Q&A date controls are bounded client-side behavior, and
+to section retrieval, and `get-paragraph-range` covers ranges across sections. Q&A date controls are bounded client-side behavior, and
 the CLI keeps `--limit` as the `rows` alias.
 
 Caller cancellation is distinct execution control. The Node SDK/toolset

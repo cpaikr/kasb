@@ -289,7 +289,7 @@ const defaultOperationDefinitions = [
     prepareInput: (input) => resolveGetParagraphRequest(input as Record<string, unknown>),
     examples: [{ stdNum: "1116", paraNum: "23" }, { stdNum: "1116", paraNum: "B3" }],
     limitations: [
-      "paraNum must identify one exact paragraph, not a paragraph range. Use get-section with ref for ranges.",
+      "paraNum must identify one exact paragraph, not a paragraph range. Use get-section with ref for one indexed section, or get-paragraph-range for a range across indexed sections.",
       "Parent-section metadata is best-effort when the structure index can be checked.",
     ],
     resultSummary: "Returns one paragraph with uniqueKey, source HTML/plain text, parent indexDocumentId, references, metadata, and warnings.",
