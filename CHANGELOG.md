@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.1](https://github.com/cpaikr/kasb/compare/v0.5.0...v0.5.1) (2026-11-04)
+
+### Features
+
+* add get-paragraph-range for inclusive ranges across sections ([e4a6957](https://github.com/cpaikr/kasb/commit/e4a6957360fa5c9d361895c14c316276389dbe9d)), closes [#28](https://github.com/cpaikr/kasb/issues/28)
+* **cli:** report upgrade stages on an interactive stderr ([a3cc899](https://github.com/cpaikr/kasb/commit/a3cc8994abc130c47fc489e3d5e9fc23abcb85fa))
+
+### Bug Fixes
+
+* **cli:** reclaim staged replacements abandoned by earlier upgrades ([1535241](https://github.com/cpaikr/kasb/commit/15352417a7924783a6813e561c6adca8900321e7))
+* **cli:** serialize upgrades before reclaiming staged replacements ([2fefc8b](https://github.com/cpaikr/kasb/commit/2fefc8b0d2c23ea6e46ff2c3be24c2560e004140))
+* **sdk:** treat paragraph uniqueKey as an opaque source key ([7e32b77](https://github.com/cpaikr/kasb/commit/7e32b77e3964669d432d750006f3f0fac18197bb)), closes [#27](https://github.com/cpaikr/kasb/issues/27)
+
 ## [0.5.0](https://github.com/cpaikr/kasb/compare/v0.4.3...v0.5.0) (2026-10-05)
 
 ### ⚠ BREAKING CHANGES
