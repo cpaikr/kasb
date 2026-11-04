@@ -5,9 +5,15 @@ from the public canonical repository `cpaikr/kasb`. The first Rust/Node product
 release is [v0.3.3](https://github.com/cpaikr/kasb/releases/tag/v0.3.3).
 [The completed first-release task](../tasks/perform-first-rust-node-release.md)
 records its publication and validation evidence. The current release is
-[v0.5.0](https://github.com/cpaikr/kasb/releases/tag/v0.5.0), which delivers
+[v0.5.1](https://github.com/cpaikr/kasb/releases/tag/v0.5.1), which adds the
+`get-paragraph-range` operation, accepts suffixed paragraph `uniqueKey` values,
+and serializes standalone upgrades per installation while reclaiming abandoned
+staged files. It was prepared through a pull request, tagged at the reviewed
+commit with `bun run release:tag`, and published as an immutable release after
+all four targets, clean consumers, and sealed installer/upgrade candidates
+passed. [v0.5.0](https://github.com/cpaikr/kasb/releases/tag/v0.5.0) delivered
 cross-process [request pacing](../plans/request-pacing.md) and the
-`rate_limited` failure code. It is the first release prepared through a pull
+`rate_limited` failure code; it was the first release prepared through a pull
 request and tagged with `bun run release:tag`. Windows installation visibility
 diagnostics and PATH recovery shipped in v0.4.3; its
 [implementation and release record](../tasks/windows-installation-visibility.md)
