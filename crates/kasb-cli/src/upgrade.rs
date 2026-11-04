@@ -7,6 +7,7 @@ use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
 use flate2::read::GzDecoder;
+use fs2::FileExt;
 use kasb::http::CancellationToken;
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -552,9 +553,7 @@ fn reconcile_deferred_status(policy: &ReleasePolicy) -> Result<Vec<PathBuf>, Upg
         .filter(|path| {
             path.file_name()
                 .and_then(|name| name.to_str())
-                .is_some_and(|name| {
-                    name.starts_with(".kasb-upgrade-") && name.ends_with(".status.json")
-                })
+                .is_some_and(is_windows_status_name)
         })
         .collect::<Vec<_>>();
     statuses.sort();
@@ -895,8 +894,11 @@ fn install_replacement(
             "The executable has no installation directory.",
         )
     })?;
+    // Held until this function returns: through POSIX replacement or rollback,
+    // and on Windows until the helper's pending status is durable.
+    let lock = lock_installation(parent)?;
     let nonce = std::process::id();
-    reclaim_abandoned_staging(parent);
+    reclaim_abandoned_staging(&lock, parent);
     let staged = parent.join(format!(".kasb.new.{nonce}"));
     let staged_receipt = parent.join(format!(".kasb.receipt.new.{nonce}"));
     write_staged(&staged, bytes)?;
@@ -932,6 +934,70 @@ fn install_replacement(
     }
 }
 
+const UPGRADE_LOCK: &str = ".kasb-upgrade.lock";
+
+/// Exclusive, crash-released lock that serializes upgrades of one
+/// installation directory. The lock file itself is kept: it is neither a stage
+/// nor recovery evidence.
+struct InstallationLock {
+    _file: File,
+}
+
+fn lock_installation(parent: &Path) -> Result<InstallationLock, UpgradeError> {
+    let path = parent.join(UPGRADE_LOCK);
+    let failure = || {
+        UpgradeError::new(
+            "upgrade_staging_failure",
+            "Could not lock the installation directory for upgrade.",
+        )
+    };
+    if fs::symlink_metadata(&path).is_ok_and(|metadata| !metadata.is_file()) {
+        return Err(failure());
+    }
+    let file = File::options()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(&path)
+        .map_err(|_| failure())?;
+    match FileExt::try_lock_exclusive(&file) {
+        Ok(()) => {}
+        Err(error) if error.raw_os_error() == fs2::lock_contended_error().raw_os_error() => {
+            return Err(in_progress());
+        }
+        Err(_) => return Err(failure()),
+    }
+    // Reconciliation ran before this process downloaded its release and
+    // cleared every terminal status. A status present now was written by a
+    // concurrent upgrade whose Windows helper may still own its stages and the
+    // installed files, so nothing here may touch them.
+    let scheduled = fs::read_dir(parent).map_err(|_| failure())?.any(|entry| {
+        entry.is_ok_and(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .is_some_and(is_windows_status_name)
+        })
+    });
+    if scheduled {
+        return Err(in_progress());
+    }
+    Ok(InstallationLock { _file: file })
+}
+
+fn in_progress() -> UpgradeError {
+    UpgradeError::new(
+        "upgrade_in_progress",
+        "Another upgrade of this installation is in progress; no file was changed.",
+    )
+    .recovery("Run `kasb upgrade` again after the other upgrade finishes.")
+}
+
+fn is_windows_status_name(name: &str) -> bool {
+    name.starts_with(".kasb-upgrade-") && name.ends_with(".status.json")
+}
+
 /// Removes staged replacements left by earlier upgrade processes.
 ///
 /// Staged names carry the staging process id, so a process that was killed
@@ -941,14 +1007,14 @@ fn install_replacement(
 /// has been staged yet: it comes from an earlier process with a reused id and
 /// would otherwise make `write_staged` fail.
 ///
-/// Stages are never recovery evidence: Windows rollback and manual recovery
-/// use only the backups, which are outside these names, and reconciliation has
-/// already refused to continue past a pending or failed status. Upgrades are
-/// not serialized across processes, so a concurrent upgrade that loses its
-/// stage here aborts into its own rollback (a Windows helper then records
-/// `rolledBack`) instead of publishing. Removal stays best-effort: a stage that
-/// is still locked is retried by the next upgrade and never blocks this one.
-fn reclaim_abandoned_staging(parent: &Path) {
+/// The installation lock proves that no other upgrade is staging or replacing
+/// in this directory, and that no Windows helper still has a pending status,
+/// so every stage present belongs to an ended upgrade. Stages are never
+/// recovery evidence: rollback and manual recovery use only the backups,
+/// which are outside these names. Removal is best-effort: read or removal
+/// failures are ignored, and a file that cannot be removed now (for example,
+/// one a scanner still holds) is retried by the next upgrade.
+fn reclaim_abandoned_staging(_lock: &InstallationLock, parent: &Path) {
     let Ok(entries) = fs::read_dir(parent) else {
         return;
     };
@@ -2780,6 +2846,7 @@ mod tests {
     #[test]
     fn reclaiming_staging_removes_only_abandoned_process_stages() {
         let directory = tempfile::tempdir().unwrap();
+        let lock = lock_installation(directory.path()).unwrap();
         let current = std::process::id();
         let other = current.wrapping_add(1);
         for name in [
@@ -2796,7 +2863,7 @@ mod tests {
         }
         fs::create_dir(directory.path().join(".kasb.receipt.new.7")).unwrap();
 
-        reclaim_abandoned_staging(directory.path());
+        reclaim_abandoned_staging(&lock, directory.path());
 
         let mut kept = vec![
             ".kasb.new.+7".to_owned(),
@@ -2813,6 +2880,88 @@ mod tests {
                 .join(".kasb-upgrade-7.status.json")
                 .exists()
         );
+        assert!(directory.path().join(UPGRADE_LOCK).is_file());
+    }
+
+    fn unused_receipt(installation: &ManagedInstallation) -> Receipt {
+        Receipt {
+            schema_version: 1,
+            manager: "standalone".to_owned(),
+            version: "0.1.1".to_owned(),
+            target: "linux-x64-gnu".to_owned(),
+            executable: installation.executable.clone(),
+            release_repository: "cpaikr/kasb".to_owned(),
+            release_tag: "v0.1.1".to_owned(),
+            asset_name: "unused".to_owned(),
+            sha256: hex_digest(b"not an executable"),
+        }
+    }
+
+    fn stage_invalid_replacement(installation: &ManagedInstallation) -> UpgradeError {
+        install_replacement(
+            installation,
+            b"not an executable",
+            &unused_receipt(installation),
+        )
+        .unwrap_err()
+    }
+
+    fn assert_installation_unchanged(installation: &ManagedInstallation) {
+        assert_eq!(
+            fs::read(&installation.executable).unwrap(),
+            executable_script(VERSION)
+        );
+        assert_eq!(
+            fs::read(&installation.receipt_path).unwrap(),
+            b"old receipt\n"
+        );
+    }
+
+    #[test]
+    fn held_installation_lock_blocks_a_second_upgrade_before_any_file_change() {
+        let directory = tempfile::tempdir().unwrap();
+        let installation = test_installation(&directory);
+        let live_stage = directory.path().join(format!(
+            ".kasb.receipt.new.{}",
+            std::process::id().wrapping_add(1)
+        ));
+        fs::write(&live_stage, b"stage of the upgrade holding the lock").unwrap();
+        let held = lock_installation(directory.path()).unwrap();
+
+        let error = stage_invalid_replacement(&installation);
+
+        assert_eq!(error.code, "upgrade_in_progress");
+        assert!(live_stage.exists());
+        assert_installation_unchanged(&installation);
+
+        // Once the other upgrade releases the lock, its leftovers are reclaimed.
+        drop(held);
+        let error = stage_invalid_replacement(&installation);
+        assert_eq!(error.code, "upgrade_executable_invalid");
+        assert!(!live_stage.exists());
+        assert!(directory.path().join(UPGRADE_LOCK).is_file());
+        assert_installation_unchanged(&installation);
+    }
+
+    #[test]
+    fn concurrently_scheduled_windows_replacement_blocks_staging() {
+        // A concurrent upgrade scheduled its helper after this process
+        // reconciled; that helper may still need its stages.
+        let directory = tempfile::tempdir().unwrap();
+        let installation = test_installation(&directory);
+        let pending_stage = directory.path().join(".kasb.new.7");
+        fs::write(&pending_stage, b"stage awaiting its helper").unwrap();
+        fs::write(
+            directory.path().join(".kasb-upgrade-7.status.json"),
+            b"{\"status\":\"pending\",\"phase\":\"staged\"}\n",
+        )
+        .unwrap();
+
+        let error = stage_invalid_replacement(&installation);
+
+        assert_eq!(error.code, "upgrade_in_progress");
+        assert!(pending_stage.exists());
+        assert_installation_unchanged(&installation);
     }
 
     #[test]
@@ -2829,30 +2978,11 @@ mod tests {
             )
             .unwrap();
         }
-        let receipt = Receipt {
-            schema_version: 1,
-            manager: "standalone".to_owned(),
-            version: "0.1.1".to_owned(),
-            target: "linux-x64-gnu".to_owned(),
-            executable: installation.executable.clone(),
-            release_repository: "cpaikr/kasb".to_owned(),
-            release_tag: "v0.1.1".to_owned(),
-            asset_name: "unused".to_owned(),
-            sha256: hex_digest(b"not an executable"),
-        };
-
-        let error = install_replacement(&installation, b"not an executable", &receipt).unwrap_err();
+        let error = stage_invalid_replacement(&installation);
 
         assert_eq!(error.code, "upgrade_executable_invalid");
         assert_eq!(staging_names(directory.path()), Vec::<String>::new());
-        assert_eq!(
-            fs::read(&installation.executable).unwrap(),
-            executable_script(VERSION)
-        );
-        assert_eq!(
-            fs::read(&installation.receipt_path).unwrap(),
-            b"old receipt\n"
-        );
+        assert_installation_unchanged(&installation);
     }
 
     #[cfg(unix)]

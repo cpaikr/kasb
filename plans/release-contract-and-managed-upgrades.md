@@ -67,7 +67,10 @@ binary without runtime addon downloads.
 - `upgrade --check` is side-effect-free apart from bounded network access and
   local cache/receipt reads. `upgrade` verifies release metadata, checksum, and
   executable identity; stages on the destination filesystem; and replaces the
-  executable and receipt recoverably.
+  executable and receipt recoverably. Upgrades of one installation are
+  serialized by a crash-released lock beside the executable. Reclaiming
+  abandoned stages happens only while that lock is held, so it never reaches a
+  live upgrade's files.
 - npm, source-built, and otherwise externally managed executables are not
   self-replaced. They return actionable guidance to their owning installation
   method.
