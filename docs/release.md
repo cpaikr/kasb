@@ -9,7 +9,7 @@ records its publication and validation evidence. The current release is
 `get-paragraph-range` operation, accepts suffixed paragraph `uniqueKey` values,
 and serializes standalone upgrades per installation while reclaiming abandoned
 staged files. It was prepared through a pull request, tagged at the reviewed
-commit with `bun run release:tag`, and published as an immutable release after
+commit with `bun run release:tag -- <sha>`, and published as an immutable release after
 all four targets, clean consumers, and sealed installer/upgrade candidates
 passed. [v0.5.0](https://github.com/cpaikr/kasb/releases/tag/v0.5.0) delivered
 cross-process [request pacing](../plans/request-pacing.md) and the
