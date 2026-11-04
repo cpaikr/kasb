@@ -119,6 +119,26 @@
       "expected": "conformance/v1/expected/get-paragraph-multiple-rows.json"
     },
     {
+      "id": "get-paragraph-range-success",
+      "operation": "get-paragraph-range",
+      "input": { "stdNum": "1116", "from": "1", "to": "한2.1" },
+      "routes": [
+        { "requestUrl": "https://db.kasb.or.kr/api/paragraphs/content/1116/1", "fixture": "conformance/v1/source-controls/paragraph-1116-1.json", "responseSchemaValidity": "valid" },
+        { "requestUrl": "https://db.kasb.or.kr/api/paragraphs/content/1116/%ED%95%9C2.1", "fixture": "fixtures/kasb/paragraph-1116-han2.1.json" },
+        { "requestUrl": "https://db.kasb.or.kr/api/standard-indexes/1116", "fixture": "fixtures/kasb/standard-indexes-1116.json" },
+        { "requestUrl": "https://db.kasb.or.kr/api/paragraphs/1116/ZB2hJW", "fixture": "fixtures/kasb/section-1116-ZB2hJW.json" },
+        { "requestUrl": "https://db.kasb.or.kr/api/paragraphs/1116/fgc8eT", "fixture": "conformance/v1/source-controls/section-1116-fgc8eT.json", "responseSchemaValidity": "valid" }
+      ],
+      "expected": "conformance/v1/expected/get-paragraph-range-success.json"
+    },
+    {
+      "id": "get-paragraph-range-invalid-input",
+      "operation": "get-paragraph-range",
+      "input": { "stdNum": "1116", "from": "23", "to": "B3" },
+      "routes": [],
+      "expected": "conformance/v1/expected/get-paragraph-range-invalid-input.json"
+    },
+    {
       "id": "search-qna-success",
       "operation": "search-qna",
       "input": { "keyword": "리스", "page": 1, "rows": 5 },

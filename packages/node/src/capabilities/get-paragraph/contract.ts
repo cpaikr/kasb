@@ -22,7 +22,7 @@ const ExactStdNumSchema = StdNumSchema.pipe(Schema.pattern(
 const ExactParaNumSchema = ParaNumSchema.pipe(Schema.pattern(
   new RegExp(`^(?![${ecmascriptWhitespaceClass}]*\\.{1,2}[${ecmascriptWhitespaceClass}]*$)[^~]+$`, "u"),
 )).annotations({
-  description: "Exact paragraph reference within one standard; ranges belong to get-section ref.",
+  description: "Exact paragraph reference within one standard; ranges belong to get-section ref or get-paragraph-range.",
   examples: ["23", "한2.1", "B3", "BC240A"],
 });
 

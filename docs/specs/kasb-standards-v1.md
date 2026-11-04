@@ -21,7 +21,7 @@ Generic browsing is insufficient because:
 
 ## 3. Capability Boundary
 
-This product provides the six v1 operations through a public Rust SDK, a Rust
+This product provides the seven v1 operations through a public Rust SDK, a Rust
 `clap` CLI over that SDK, and a Rust-backed Node SDK/toolset. Rust owns the KASB
 transport and capability implementation; Node projects the same semantic
 results through an asynchronous Node-API boundary. The npm executable only
@@ -38,6 +38,7 @@ In scope:
 - standard structure lookup
 - section retrieval
 - exact paragraph retrieval
+- inclusive paragraph-range retrieval across indexed sections
 - Q&A search
 - Q&A document retrieval
 - stable references and source metadata
@@ -131,6 +132,7 @@ Examples:
 | `get-section` | `indexDocumentId` | `--index-document-id` |
 | `get-section` | `ref` | `--ref` |
 | `get-paragraph` | `paraNum` | `--para-num` |
+| `get-paragraph-range` | `from`, `to` | `--from`, `--to` |
 | `search-qna` | `keyword` | `--keyword` |
 | `search-qna` | `rows` | `--rows`, `--limit` alias |
 | `search-qna` | `sortDate` | `--sort-date` |
@@ -301,8 +303,33 @@ Implementation notes:
 - Treat more than one returned paragraph row as `source_changed`; an exact lookup must not silently choose one row.
 - Treat missing `documentId`, `fullContent`, or other required paragraph fields as `source_changed`; do not synthesize them from optional fields.
 - Direct paragraph lookup should not require the caller to know the section id.
-- Reject paragraph ranges such as `22~30` as `invalid_input` and direct callers to `get-section --ref`.
+- Reject paragraph ranges such as `22~30` as `invalid_input` and direct callers to `get-section --ref`; `get-paragraph-range` covers ranges that span indexed sections.
 - Record routine `paraContent` HTML preservation in `metadata.content`, not as a warning.
+
+### `get-paragraph-range`
+
+- `purpose`
+  Fetch an inclusive paragraph range that may span several indexed sections, without the caller resolving section boundaries.
+- `inputs`
+  `stdNum`, `from`, `to`, each boundary an exact paragraph number
+- `output`
+  `result.sections` lists the fetched sections (`indexDocumentId`, `title`, optional `ref`, `level`, `sectionUrl`) in structure order; fetching stops once the range is complete. `result.clauses` holds the clauses from paragraph `from` through paragraph `to`, inclusive, in source order, using the `get-section` clause shape with each paragraph once. References carry `stdNum`, `from`, `to`, `indexDocumentIds`, `structureUrl`, and best-effort `standardTitle`/`standardKind`. `metadata.source.endpoint` is the structure URL, which defines the range resolution.
+- `warnings`
+  `partial_clause_normalization`, `source_metadata_incomplete`
+- `failure cases`
+  `invalid_input`, `not_found`, `source_unavailable`, `rate_limited`, `source_changed`
+- `safety class`
+  read-only
+
+Implementation notes:
+
+- Order comes from the source, never from parsing paragraph numbers. Each boundary's exact `getParagraphSource` lookup names its parent section; `getStandardIndexesSource` orders the sections from the `from` parent through the `to` parent; each is fetched with `getSectionSource`.
+- Slice the concatenated clauses from the first `from` paragraph through the first following `to` paragraph, and stop fetching once both are present. Ancestor sections repeat their children's paragraphs ([observed](../research/kasb-standard-source-map.md#example-evidence)), so keep each `paraNum` once and each title once per section.
+- When the structure index dropped rows it could not normalize, a section inside the range may be missing: return `source_metadata_incomplete` and `partial` completeness.
+- Both boundaries must share a paragraph namespace: the non-digit prefix before the first digit (body, `B`, `BC`, `IE`, ...). A leading `한` marks a Korean-added body paragraph and does not start a namespace. A mismatch is `invalid_input` on `to` before any request.
+- When `to` comes before `from` in source order, fail with `invalid_input` on `to`.
+- Combine at most 20 sections, counted from the `from` parent through the `to` parent in the structure, since each is a separate paced request; a wider range is `invalid_input` on `to` before any section is fetched.
+- A missing boundary paragraph is `not_found`. A boundary section absent from the structure, or section content that lacks a boundary its exact lookup placed there, is `source_changed`.
 
 ### `search-qna`
 
@@ -377,7 +404,7 @@ CLI-local version-evidence extension does not change SDK envelopes or provider
 warnings. An explicit `version-check` command reports the same object at
 `result.versionCheck` with CLI-local metadata. The
 [CLI contract](../../crates/kasb-cli/README.md) owns its schema and runtime
-policy. The six-operation semantic judge opts out explicitly and remains exact;
+policy. The seven-operation semantic judge opts out explicitly and remains exact;
 a separate advisory judge validates the extension.
 
 Success envelope shape without an advisory:

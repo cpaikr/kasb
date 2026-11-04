@@ -50,6 +50,12 @@ export const cliSuccessCases: readonly CliSuccessCase[] = [
     output: "structured",
   },
   {
+    id: "get-paragraph-range-summary",
+    semanticCase: "get-paragraph-range-success",
+    argv: ["get-paragraph-range", "--std-num", "1116", "--from", "1", "--to", "한2.1", "--output", "summary"],
+    output: "summary",
+  },
+  {
     id: "search-qna-summary-with-alias-precedence",
     semanticCase: "search-qna-success",
     argv: ["search-qna", "--keyword", "리스", "--rows", "40", "--limit", "5", "--output", "summary"],
@@ -226,6 +232,14 @@ const projectSummary = (envelope: Record<string, unknown>, operation: string): v
     envelope.result = {
       request: result.request,
       section: result.section,
+      clauses: (result.clauses as Array<Record<string, unknown>>).map((clause) =>
+        select(clause, ["kind", "title", "paraNum", "uniqueKey", "fullContent"])),
+    };
+  } else if (operation === "get-paragraph-range") {
+    envelope.result = {
+      request: result.request,
+      sections: (result.sections as Array<Record<string, unknown>>).map((section) =>
+        select(section, ["indexDocumentId", "title", "ref"])),
       clauses: (result.clauses as Array<Record<string, unknown>>).map((clause) =>
         select(clause, ["kind", "title", "paraNum", "uniqueKey", "fullContent"])),
     };

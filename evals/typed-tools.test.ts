@@ -43,6 +43,7 @@ describe("internal Rust-backed Node eval tools", () => {
       "kasb_get_standard_structure",
       "kasb_get_section",
       "kasb_get_paragraph",
+      "kasb_get_paragraph_range",
       "kasb_search_qna",
       "kasb_get_qna",
     ]);

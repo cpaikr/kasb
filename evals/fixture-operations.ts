@@ -1,5 +1,6 @@
 import {
   defaultGetParagraphOperation,
+  defaultGetParagraphRangeOperation,
   defaultGetQnaOperation,
   defaultGetSectionOperation,
   defaultGetStandardStructureOperation,
@@ -110,6 +111,31 @@ export const fixtureKasbAppOperations: KasbAppOperations = {
       warnings: [],
     };
   }),
+  getParagraphRange: withFixtureExecution(defaultGetParagraphRangeOperation, async (input) => ({
+    result: {
+      request: input,
+      sections: [{
+        indexDocumentId: "ZB2hJW",
+        title: "목적",
+        ref: "1~2",
+        level: 2,
+        sectionUrl: "https://example.test/section",
+      }],
+      clauses: [
+        { kind: "paragraph", stdNum: "1116", indexDocumentId: "ZB2hJW", paraNum: String(input.from) },
+        { kind: "paragraph", stdNum: "1116", indexDocumentId: "ZB2hJW", paraNum: String(input.to) },
+      ],
+    },
+    metadata,
+    references: {
+      stdNum: "1116",
+      from: input.from,
+      to: input.to,
+      indexDocumentIds: ["ZB2hJW"],
+      structureUrl: "https://example.test/structure",
+    },
+    warnings: [],
+  })),
   searchQna: withFixtureExecution(defaultSearchQnaOperation, async (input) => ({
     result: {
       request: input,

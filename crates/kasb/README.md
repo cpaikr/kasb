@@ -1,8 +1,8 @@
 # kasb Rust SDK
 
-The native `kasb` crate implements all six read-only KASB v1 operations:
+The native `kasb` crate implements all seven read-only KASB v1 operations:
 `search-standards`, `get-standard-structure`, `get-section`, `get-paragraph`,
-`search-qna`, and `get-qna`. It has no dependency on the TypeScript package or
+`get-paragraph-range`, `search-qna`, and `get-qna`. It has no dependency on the TypeScript package or
 Node.js runtime. KASB transport, source decoding, normalization, domain policy,
 and typed capability failures live in this crate.
 

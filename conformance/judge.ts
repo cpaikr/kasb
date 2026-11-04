@@ -6,6 +6,7 @@ export type ConformanceOperationName =
   | "get-standard-structure"
   | "get-section"
   | "get-paragraph"
+  | "get-paragraph-range"
   | "search-qna"
   | "get-qna";
 

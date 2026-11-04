@@ -36,6 +36,7 @@ The approved v1 operations remain:
 - retrieve the structural index for a standard;
 - fetch one section by KASB's retrieval-facing section id;
 - fetch one exact paragraph by standard and paragraph number;
+- fetch an inclusive paragraph range across indexed sections;
 - search KASB Q&A material by keyword; and
 - fetch one Q&A document by document number.
 
@@ -88,7 +89,7 @@ The Pi export and extension are absent and receive no replacement host adapter.
 
 ### In scope
 
-- the six approved read-only KASB operations;
+- the seven approved read-only KASB operations;
 - stable standard, section, paragraph, and Q&A references;
 - source metadata, warnings, and typed failures;
 - a public native Rust SDK;

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   defaultGetParagraphOperation,
+  defaultGetParagraphRangeOperation,
   defaultGetQnaOperation,
   defaultGetSectionOperation,
   defaultGetStandardStructureOperation,
@@ -32,6 +33,12 @@ const operations = [
     operation: defaultGetParagraphOperation,
     requiredInput: ["stdNum", "paraNum"],
     inputProperties: ["stdNum", "paraNum"],
+    resultProperties: ["result", "metadata", "references", "warnings"],
+  },
+  {
+    operation: defaultGetParagraphRangeOperation,
+    requiredInput: ["stdNum", "from", "to"],
+    inputProperties: ["stdNum", "from", "to"],
     resultProperties: ["result", "metadata", "references", "warnings"],
   },
   {

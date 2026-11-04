@@ -1,0 +1,96 @@
+{
+  "ok": true,
+  "value": {
+    "result": {
+      "request": {
+        "stdNum": "1116",
+        "from": "1",
+        "to": "한2.1"
+      },
+      "sections": [
+        {
+          "indexDocumentId": "ZB2hJW",
+          "title": "목적",
+          "level": 2,
+          "sectionUrl": "https://db.kasb.or.kr/api/paragraphs/1116/ZB2hJW",
+          "ref": "1~2"
+        },
+        {
+          "indexDocumentId": "fgc8eT",
+          "title": "적용",
+          "level": 2,
+          "sectionUrl": "https://db.kasb.or.kr/api/paragraphs/1116/fgc8eT",
+          "ref": "한2.1"
+        }
+      ],
+      "clauses": [
+        {
+          "fullContent": "이 기준서에서는 리스의 인식, 측정, 표시, 공시 원칙을 제시한다. 이 기준서의 목적은 리스이용자와 리스제공자가 리스 거래를 충실하게 표현하여 목적 적합한 정보를 제공하게 하는 것이다. 이 정보는 재무제표이용자들이 기업의 재무상태, 재무성과, 현금흐름에 리스가 미치는 영향을 평가할 수 있게 하는 기초가 된다.",
+          "indexDocumentId": "ZB2hJW",
+          "kind": "paragraph",
+          "paraContent": "<div class=\"para-inner-para\"><b>이 기준서에서는 리스의 인식, 측정, 표시, 공시 원칙을 제시한다. 이 기준서의 목적은 리스이용자와 리스제공자가 리스 거래를 충실하게 표현하여 목적 적합한 정보를 제공하게 하는 것이다. 이 정보는 재무제표이용자들이 기업의 재무상태, 재무성과, 현금흐름에 리스가 미치는 영향을 평가할 수 있게 하는 기초가 된다.</b></div>",
+          "paraNum": "1",
+          "sort": 1,
+          "stdNum": "1116",
+          "uniqueKey": "1116-1"
+        },
+        {
+          "fullContent": "이 기준서를 적용할 때에는 계약 조건과 관련되는 사실 및 상황을 모두 고려해야 한다. 비슷한 상황에서 특성이 비슷한 계약에 이 기준서를 일관되게 적용한다.",
+          "indexDocumentId": "ZB2hJW",
+          "kind": "paragraph",
+          "paraContent": "<div class=\"para-inner-para\">이 기준서를 적용할 때에는 계약 조건과 관련되는 사실 및 상황을 모두 고려해야 한다. 비슷한 상황에서 특성이 비슷한 계약에 이 기준서를 일관되게 적용한다.</div>",
+          "paraNum": "2",
+          "sort": 2,
+          "stdNum": "1116",
+          "uniqueKey": "1116-2"
+        },
+        {
+          "kind": "paragraph",
+          "uniqueKey": "1116-한2.1",
+          "stdNum": "1116",
+          "paraNum": "한2.1",
+          "indexDocumentId": "fgc8eT",
+          "paraContent": "<div class=\"para-inner-para\"><b>이 기준서는 「주식회사 등의 외부감사에 관한 법률」에서 정하는 한국채택국제회계기준 의무적용대상 주식회사의 회계처리에 적용한다. 그리고 이 기준서는 같은 법률에 따라 재무제표를 작성하고 표시하기 위해 한국채택국제회계기준을 적용하기로 선택하거나 다른 법률 등에서 적용을 요구하는 기업의 회계처리에도 적용한다.</b></div>",
+          "fullContent": "이 기준서는 「주식회사 등의 외부감사에 관한 법률」에서 정하는 한국채택국제회계기준 의무적용대상 주식회사의 회계처리에 적용한다. 그리고 이 기준서는 같은 법률에 따라 재무제표를 작성하고 표시하기 위해 한국채택국제회계기준을 적용하기로 선택하거나 다른 법률 등에서 적용을 요구하는 기업의 회계처리에도 적용한다.",
+          "sort": 3
+        }
+      ]
+    },
+    "metadata": {
+      "fetchedAt": "<normalized-fetched-at>",
+      "source": {
+        "system": "kasb",
+        "endpoint": "https://db.kasb.or.kr/api/standard-indexes/1116"
+      },
+      "sourceBehavior": {
+        "observationStatus": "observed",
+        "apiBase": "https://db.kasb.or.kr/api"
+      },
+      "completeness": "complete",
+      "content": {
+        "htmlFields": [
+          "result.clauses[].paraContent"
+        ],
+        "textFields": [
+          "result.clauses[].fullContent"
+        ],
+        "notes": [
+          "paraContent is a source HTML fragment; fullContent is the normalized plain-text result."
+        ]
+      }
+    },
+    "references": {
+      "stdNum": "1116",
+      "from": "1",
+      "to": "한2.1",
+      "standardTitle": "기업회계기준서 제1116호 리스",
+      "standardKind": "k-ifrs-standard",
+      "indexDocumentIds": [
+        "ZB2hJW",
+        "fgc8eT"
+      ],
+      "structureUrl": "https://db.kasb.or.kr/api/standard-indexes/1116"
+    },
+    "warnings": []
+  }
+}

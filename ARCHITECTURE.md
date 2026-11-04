@@ -54,7 +54,7 @@ behavior.
   `src/lib.rs`, then follow the capability, source, and HTTP modules.
 - `crates/kasb-cli` owns command parsing, help, presentation, stdout/stderr,
   cancellation, and exit behavior over the public SDK.
-- `crates/kasb-node` projects all six SDK operations asynchronously. It owns
+- `crates/kasb-node` projects all seven SDK operations asynchronously. It owns
   cancellation, stable failure serialization, reusable client lifetime, and
   panic containment, but no source rules.
 - `packages/node` is the canonical Node SDK, network-free toolset, native

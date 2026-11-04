@@ -1,5 +1,6 @@
 import {
   defaultGetParagraphOperation,
+  defaultGetParagraphRangeOperation,
   defaultGetQnaOperation,
   defaultGetSectionOperation,
   defaultGetStandardStructureOperation,
@@ -7,6 +8,7 @@ import {
   defaultSearchStandardsOperation,
 } from "./default-operations.ts";
 import { resolveGetParagraphRequest } from "./capabilities/get-paragraph/contract.ts";
+import { resolveGetParagraphRangeRequest } from "./capabilities/get-paragraph-range/contract.ts";
 import { resolveGetQnaRequest } from "./capabilities/get-qna/contract.ts";
 import { resolveGetSectionRequest } from "./capabilities/get-section/contract.ts";
 import { resolveGetStandardStructureRequest } from "./capabilities/get-standard-structure/contract.ts";
@@ -18,6 +20,7 @@ export const kasbOperationNames = [
   "get-standard-structure",
   "get-section",
   "get-paragraph",
+  "get-paragraph-range",
   "search-qna",
   "get-qna",
 ] as const;
@@ -286,10 +289,24 @@ const defaultOperationDefinitions = [
     prepareInput: (input) => resolveGetParagraphRequest(input as Record<string, unknown>),
     examples: [{ stdNum: "1116", paraNum: "23" }, { stdNum: "1116", paraNum: "B3" }],
     limitations: [
-      "paraNum must identify one exact paragraph, not a paragraph range. Use get-section with ref for ranges.",
+      "paraNum must identify one exact paragraph, not a paragraph range. Use get-section with ref for one indexed section, or get-paragraph-range for a range across indexed sections.",
       "Parent-section metadata is best-effort when the structure index can be checked.",
     ],
     resultSummary: "Returns one paragraph with uniqueKey, source HTML/plain text, parent indexDocumentId, references, metadata, and warnings.",
+  },
+  {
+    name: "get-paragraph-range",
+    label: "Get paragraph range",
+    description: "Retrieve an inclusive paragraph range by stdNum + from + to, combining the indexed sections it spans in KASB source order.",
+    operation: defaultGetParagraphRangeOperation,
+    prepareInput: (input) => resolveGetParagraphRangeRequest(input as Record<string, unknown>),
+    examples: [{ stdNum: "1102", from: "BC339", to: "BC346" }, { stdNum: "1118", from: "130", to: "한132.5" }],
+    limitations: [
+      "from and to must be exact paragraph numbers in one namespace (body, B, BC, IE, ...); Korean-added 한 paragraphs belong to the body.",
+      "Order comes from the source structure, not from parsing paragraph numbers; to must not precede from.",
+      "At most 20 indexed sections can be combined, and each is a separate paced request. Use get-section for one indexed section.",
+    ],
+    resultSummary: "Returns the fetched sections and the ordered clauses from from through to, each paragraph once, with references, metadata, and warnings.",
   },
   {
     name: "search-qna",

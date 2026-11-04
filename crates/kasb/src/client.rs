@@ -3,6 +3,7 @@ use serde_json::Value;
 
 use crate::KasbError;
 use crate::capabilities::get_paragraph::{GetParagraphRequest, GetParagraphResult};
+use crate::capabilities::get_paragraph_range::{GetParagraphRangeRequest, GetParagraphRangeResult};
 use crate::capabilities::get_qna::{GetQnaRequest, GetQnaResult};
 use crate::capabilities::get_section::{GetSectionRequest, GetSectionResult};
 use crate::capabilities::get_standard_structure::{
@@ -17,6 +18,7 @@ use crate::sources::kasb::operations::{
     get_qna, get_section, get_standard_structure, search_qna, search_standards,
 };
 use crate::sources::kasb::paragraph::get_paragraph;
+use crate::sources::kasb::paragraph_range::get_paragraph_range;
 
 pub trait Clock: Send + Sync {
     fn now_iso8601(&self) -> String;
@@ -195,6 +197,29 @@ where
         cancellation: &CancellationToken,
     ) -> Result<GetParagraphResult, KasbError> {
         get_paragraph(&self.transport, &request, cancellation, || {
+            self.clock.now_iso8601()
+        })
+        .await
+    }
+
+    pub async fn execute_get_paragraph_range(
+        &self,
+        input: Value,
+        cancellation: &CancellationToken,
+    ) -> Result<GetParagraphRangeResult, KasbError> {
+        self.get_paragraph_range(
+            GetParagraphRangeRequest::from_json(input).map_err(KasbError::from)?,
+            cancellation,
+        )
+        .await
+    }
+
+    pub async fn get_paragraph_range(
+        &self,
+        request: GetParagraphRangeRequest,
+        cancellation: &CancellationToken,
+    ) -> Result<GetParagraphRangeResult, KasbError> {
+        get_paragraph_range(&self.transport, &request, cancellation, || {
             self.clock.now_iso8601()
         })
         .await
